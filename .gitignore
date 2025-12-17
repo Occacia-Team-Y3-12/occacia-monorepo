@@ -1,0 +1,24 @@
+# --- OS JUNK ---
+.DS_Store
+Thumbs.db
+
+# --- SECURITY (NEVER UPLOAD THESE) ---
+.env
+.env.local
+.env.*
+
+# --- FRONTEND (NODE) ---
+node_modules/
+npm-debug.log
+yarn-error.log
+.next/
+build/
+dist/
+
+# --- BACKEND (PYTHON) ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.pytest_cache/
