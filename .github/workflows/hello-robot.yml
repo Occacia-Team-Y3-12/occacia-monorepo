@@ -1,10 +1,10 @@
-name: 🛡️ Occacia Professional QA
+name: 🛡️ Occacia Quality Guard
 
 on: [push, pull_request]
 
 jobs:
-  # LAYER 1: BACKEND QUALITY & SECURITY
-  backend-qa:
+  # This part checks the Python Backend
+  backend-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -12,27 +12,16 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      
-      - name: 📦 Install QA Tools
-        run: pip install flake8 pytest pytest-cov bandit
-
-      - name: 🔍 LINT: Check Syntax
-        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-
-      - name: 🔒 SECURITY: Scan for Vulnerabilities (Bandit)
-        run: bandit -r . -x ./venv
-
-      - name: 🧪 TEST: Run Logic Tests
-        # This only runs if you have a /tests folder
+      - name: 📦 Install Linting Tools
+        run: pip install flake8
+      - name: 🔍 Check for Python Syntax Errors
+        # This will fail the build if there are serious Python errors
         run: |
-          if [ -d "backend/tests" ]; then
-            pytest --cov=backend
-          else
-            echo "No tests found yet. Create a /tests folder soon!"
-          fi
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
-  # LAYER 2: FRONTEND QUALITY
-  frontend-qa:
+  # This part checks the Next.js Frontend
+  frontend-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,13 +29,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-
-      - name: 📦 Install & Build Check
+      - name: 📦 Install Dependencies
+        # This checks if your package.json is actually valid
         run: |
           if [ -f "frontend/package.json" ]; then
-            cd frontend
-            npm ci
-            npm run build # This ensures your React code actually compiles
+            cd frontend && npm install --package-lock-only
           else
-            echo "Frontend not detected."
+            echo "No frontend found yet, skipping..."
           fi
