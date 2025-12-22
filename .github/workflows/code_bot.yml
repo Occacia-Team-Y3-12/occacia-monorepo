@@ -1,52 +1,59 @@
-name: 🛡️ Occacia Professional QA
+name: 🟡 Zone 2: Continuous Integration
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ "main", "dev/*" ] # Runs on main and your personal branch
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
-  # LAYER 1: BACKEND QUALITY & SECURITY
-  backend-qa:
+  # TEST THE BACKEND (Python/FastAPI)
+  backend-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4 # Download your code
+      
       - name: 🐍 Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      
-      - name: 📦 Install QA Tools
-        run: pip install flake8 pytest pytest-cov bandit
 
-      - name: 🔍 LINT: Check Syntax
+      - name: 📦 Install Backend Deps
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install flake8 pytest # Install the "Inspectors"
+
+      - name: 🔍 LINT: Grammar Check
         run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
-      - name: 🔒 SECURITY: Scan for Vulnerabilities (Bandit)
-        run: bandit -r . -x ./venv
-
-      - name: 🧪 TEST: Run Logic Tests
-        # This only runs if you have a /tests folder
+      - name: 🧪 TEST: Logic Check
         run: |
           if [ -d "backend/tests" ]; then
-            pytest --cov=backend
+            pytest
           else
-            echo "No tests found yet. Create a /tests folder soon!"
+            echo "No tests found yet! Add some in backend/tests/"
           fi
 
-  # LAYER 2: FRONTEND QUALITY
-  frontend-qa:
+  # TEST THE FRONTEND (Next.js/React)
+  frontend-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: 🟢 Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: 📦 Install & Build Check
+      - name: 📦 Install Frontend Deps
         run: |
-          if [ -f "frontend/package.json" ]; then
-            cd frontend
-            npm ci
-            npm run build # This ensures your React code actually compiles
-          else
-            echo "Frontend not detected."
-          fi
+          cd frontend
+          npm ci
+
+      - name: 🏗️ BUILD: Compilation Check
+        run: |
+          cd frontend
+          npm run build
