@@ -1,0 +1,10 @@
+name: Baby Robot
+
+on: [push]  # Trigger: When I push code
+
+jobs:
+  say-hello:
+    runs-on: ubuntu-latest  # The computer to use
+    steps:
+      - name: The Greeting
+        run: echo " beep boop... I am alive! I am your new CI/CD pipeline. 🤖"
