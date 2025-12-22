@@ -6,36 +6,41 @@ on:
   pull_request:
     branches: [ "main" ]
 
-jobs: # <--- This was the missing drawer!
-
-  # ZONE 2: QUALITY LAB
+jobs:
+  # ZONE 2: QUALITY LAB (Logic and Syntax Verification)
   quality-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
+      - name: Load Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python Environment
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      - name: Backend Check
+
+      - name: Backend Quality Check
         run: |
           cd backend
           pip install -r requirements.txt
+          pip install flake8
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
-  # ZONE 3: SECURITY LAB
+  # ZONE 3: SECURITY LAB (Vulnerability and Secret Scanning)
   security-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Load Source Code
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Secret Scan
+
+      - name: Run Secret Scan
         uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --only-verified
 
-  # ZONE 4: DEPLOYMENT SIMULATION
+  # ZONE 4: DEPLOYMENT SIMULATION (Environment-Based Release)
   deploy-production:
     name: Zone 4 - Production Deployment Simulation
     needs: [quality-check, security-audit] 
@@ -45,10 +50,10 @@ jobs: # <--- This was the missing drawer!
       url: https://occacia-demo.github.io
 
     steps:
-      - name: 📥 Download Artifacts
+      - name: Download Verified Artifacts
         uses: actions/checkout@v4
 
-      - name: 🚀 Simulate Production Sync
+      - name: Simulate Production Sync
         run: |
           echo "Bypassing physical SSH... Server not detected."
           echo "Logic Check: PASSED"
