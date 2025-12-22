@@ -1,14 +1,48 @@
-# ZONE 4: CONTINUOUS DEPLOYMENT (SIMULATED)
+name: Occacia Industrial Pipeline
+
+on:
+  push:
+    branches: [ "main", "dev/*" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs: # <--- This was the missing drawer!
+
+  # ZONE 2: QUALITY LAB
+  quality-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Backend Check
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+  # ZONE 3: SECURITY LAB
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+
+  # ZONE 4: DEPLOYMENT SIMULATION
   deploy-production:
     name: Zone 4 - Production Deployment Simulation
-    # THIS IS THE SECRET SAUCE: It only runs if Zone 2 & 3 pass!
     needs: [quality-check, security-audit] 
     runs-on: ubuntu-latest
-    
-    # Links this job to the GitHub Environment we created in Step 1
     environment: 
       name: production
-      url: https://occacia.example.com # A placeholder URL for your report
+      url: https://occacia-demo.github.io
 
     steps:
       - name: 📥 Download Artifacts
@@ -19,5 +53,4 @@
           echo "Bypassing physical SSH... Server not detected."
           echo "Logic Check: PASSED"
           echo "Security Scan: PASSED"
-          echo "Action: Packaging Occacia Backend and Frontend for Production."
           echo "Status: Code successfully 'Deployed' to GitHub Production Environment."
