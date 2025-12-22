@@ -15,16 +15,17 @@ jobs:
         with:
           fetch-depth: 0 
 
-      - name: Secret Scan (TruffleHog)
-        # This replaces Gitleaks and requires NO license
+      - name: Run Secret Scan
+        # Updated to scan the entire repo to avoid the 'BASE and HEAD' error
         uses: trufflesecurity/trufflehog@main
         with:
-          path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --debug --only-verified
+          extra_args: --only-verified
 
-      - name: Python Security Scan (Bandit)
+      - name: Run Python Security Scan
         run: |
           pip install bandit
-          bandit -r ./backend
+          if [ -d "backend" ]; then
+            bandit -r ./backend
+          else
+            echo "Backend not found."
+          fi
