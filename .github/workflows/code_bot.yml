@@ -1,0 +1,52 @@
+name: 🛡️ Occacia Professional QA
+
+on: [push, pull_request]
+
+jobs:
+  # LAYER 1: BACKEND QUALITY & SECURITY
+  backend-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: 📦 Install QA Tools
+        run: pip install flake8 pytest pytest-cov bandit
+
+      - name: 🔍 LINT: Check Syntax
+        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: 🔒 SECURITY: Scan for Vulnerabilities (Bandit)
+        run: bandit -r . -x ./venv
+
+      - name: 🧪 TEST: Run Logic Tests
+        # This only runs if you have a /tests folder
+        run: |
+          if [ -d "backend/tests" ]; then
+            pytest --cov=backend
+          else
+            echo "No tests found yet. Create a /tests folder soon!"
+          fi
+
+  # LAYER 2: FRONTEND QUALITY
+  frontend-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 🟢 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: 📦 Install & Build Check
+        run: |
+          if [ -f "frontend/package.json" ]; then
+            cd frontend
+            npm ci
+            npm run build # This ensures your React code actually compiles
+          else
+            echo "Frontend not detected."
+          fi
