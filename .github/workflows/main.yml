@@ -1,0 +1,23 @@
+# ZONE 4: CONTINUOUS DEPLOYMENT (SIMULATED)
+  deploy-production:
+    name: Zone 4 - Production Deployment Simulation
+    # THIS IS THE SECRET SAUCE: It only runs if Zone 2 & 3 pass!
+    needs: [quality-check, security-audit] 
+    runs-on: ubuntu-latest
+    
+    # Links this job to the GitHub Environment we created in Step 1
+    environment: 
+      name: production
+      url: https://occacia.example.com # A placeholder URL for your report
+
+    steps:
+      - name: 📥 Download Artifacts
+        uses: actions/checkout@v4
+
+      - name: 🚀 Simulate Production Sync
+        run: |
+          echo "Bypassing physical SSH... Server not detected."
+          echo "Logic Check: PASSED"
+          echo "Security Scan: PASSED"
+          echo "Action: Packaging Occacia Backend and Frontend for Production."
+          echo "Status: Code successfully 'Deployed' to GitHub Production Environment."
