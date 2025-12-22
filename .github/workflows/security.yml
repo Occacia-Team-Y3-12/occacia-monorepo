@@ -7,26 +7,24 @@ on:
     branches: [ "main" ]
 
 jobs:
-  security-scan:
+  security-audit:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 
 
-      - name: Run Secret Scan
-        # This scans for leaked API keys and passwords
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Secret Scan (TruffleHog)
+        # This replaces Gitleaks and requires NO license
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
 
-      - name: Run Python Security Scan
-        # This looks for hackable patterns in your Python code
+      - name: Python Security Scan (Bandit)
         run: |
           pip install bandit
-          if [ -d "backend" ]; then
-            bandit -r ./backend -x ./backend/tests
-          else
-            echo "No backend directory found."
-          fi
+          bandit -r ./backend
