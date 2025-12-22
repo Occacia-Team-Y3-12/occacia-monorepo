@@ -1,0 +1,32 @@
+name: Zone 3 - Continuous Security
+
+on:
+  push:
+    branches: [ "main", "dev/*" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Secret Scan
+        # This scans for leaked API keys and passwords
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Python Security Scan
+        # This looks for hackable patterns in your Python code
+        run: |
+          pip install bandit
+          if [ -d "backend" ]; then
+            bandit -r ./backend -x ./backend/tests
+          else
+            echo "No backend directory found."
+          fi
