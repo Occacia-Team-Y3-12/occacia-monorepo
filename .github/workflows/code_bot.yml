@@ -1,59 +1,63 @@
-name: 🟡 Zone 2: Continuous Integration
+name: Zone 2 - Continuous Integration
 
 on:
   push:
-    branches: [ "main", "dev/*" ] # Runs on main and your personal branch
+    branches: [ "main", "dev/*" ]
   pull_request:
     branches: [ "main" ]
 
 jobs:
-  # TEST THE BACKEND (Python/FastAPI)
+  # Job for testing the Python FastAPI Backend
   backend-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # Download your code
-      
-      - name: 🐍 Set up Python
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: 📦 Install Backend Deps
+      - name: Install Backend Dependencies
         run: |
           cd backend
           pip install -r requirements.txt
-          pip install flake8 pytest # Install the "Inspectors"
+          pip install flake8 pytest
 
-      - name: 🔍 LINT: Grammar Check
-        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+      - name: Run Linter
+        run: |
+          cd backend
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
-      - name: 🧪 TEST: Logic Check
+      - name: Run Backend Tests
         run: |
           if [ -d "backend/tests" ]; then
-            pytest
+            cd backend && pytest
           else
-            echo "No tests found yet! Add some in backend/tests/"
+            echo "No tests directory found in backend/"
           fi
 
-  # TEST THE FRONTEND (Next.js/React)
+  # Job for testing the Next.js/React Frontend
   frontend-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: 🟢 Set up Node.js
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: 📦 Install Frontend Deps
+      - name: Install Frontend Dependencies
         run: |
           cd frontend
           npm ci
 
-      - name: 🏗️ BUILD: Compilation Check
+      - name: Run Build Check
         run: |
           cd frontend
           npm run build
