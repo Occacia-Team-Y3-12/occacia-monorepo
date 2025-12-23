@@ -43,38 +43,43 @@ jobs:
   # ZONE 4: ACTUAL PRODUCTION DEPLOYMENT
   deploy-production:
     name: Zone 4 - Live Production Deployment
-    needs: [quality-check, security-audit] # Only deploys if checks pass!
+    needs: [quality-check, security-audit] 
     runs-on: ubuntu-latest
     
     steps:
       - name: Load Source Code
         uses: actions/checkout@v4
 
-      - name: Transport Backend to Tank
-        uses: appleboy/scp-action@v0.1.7 # The "Moving Truck"
+      - name: Transport Full Payload (Backend & Frontend)
+        uses: appleboy/scp-action@v0.1.7 
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "backend/" # Moves your actual code folder
-          target: "~/occacia-app" # Where it lands in the tank
+          # This grabs both folders from your GitHub repo
+          source: "backend/,frontend/" 
+          target: "~/occacia-app"
 
-      - name: Execute Remote Setup via SSH
-        uses: appleboy/ssh-action@v1.0.3 # The "Mission Control"
+      - name: Execute Remote Orchestration via SSH
+        uses: appleboy/ssh-action@v1.0.3 
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # 1. Enter the target zone
-            cd ~/occacia-app/backend
+            # 1. Initialize Structure
+            mkdir -p ~/occacia-app/backend
+            mkdir -p ~/occacia-app/frontend
             
-            # 2. Write a fresh deployment log
-            echo "Deployment successful on $(date)" > deploy_log.txt
+            # 2. Log Deployment Event
+            echo "Full Stack Deployment successful on $(date)" >> ~/occacia-app/deploy_history.log
             
-            # 3. Log System Status (Forensics)
-            echo "Successfully breached the Oracle perimeter."
-            echo "Storage remaining: $(df -h | grep ' /$' | awk '{print $4}')"
+            # 3. Systems Engineer Health Check
+            echo "TANK STATUS: ONLINE"
+            echo "Available Space: $(df -h | grep ' /$' | awk '{print $4}')"
             
-            # 4. Verify the Payload landed
-            ls -la
+            # 4. Forensic Verification of Payload
+            echo "--- Backend Zone ---"
+            ls -F ~/occacia-app/backend
+            echo "--- Frontend Zone ---"
+            ls -F ~/occacia-app/frontend
