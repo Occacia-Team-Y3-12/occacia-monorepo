@@ -40,7 +40,7 @@ jobs:
         with:
           extra_args: --only-verified
 
-# ZONE 4: ACTUAL PRODUCTION DEPLOYMENT
+  # ZONE 4: ACTUAL PRODUCTION DEPLOYMENT
   deploy-production:
     name: Zone 4 - Live Production Deployment
     needs: [quality-check, security-audit] # Only deploys if checks pass!
@@ -50,20 +50,31 @@ jobs:
       - name: Load Source Code
         uses: actions/checkout@v4
 
-      - name: Deploy to Oracle Tank via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Transport Backend to Tank
+        uses: appleboy/scp-action@v0.1.7 # The "Moving Truck"
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "backend/" # Moves your actual code folder
+          target: "~/occacia-app" # Where it lands in the tank
+
+      - name: Execute Remote Setup via SSH
+        uses: appleboy/ssh-action@v1.0.3 # The "Mission Control"
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # 1. Create project home
-            mkdir -p ~/occacia-app && cd ~/occacia-app
+            # 1. Enter the target zone
+            cd ~/occacia-app/backend
             
-            # 2. Log status
+            # 2. Write a fresh deployment log
+            echo "Deployment successful on $(date)" > deploy_log.txt
+            
+            # 3. Log System Status (Forensics)
             echo "Successfully breached the Oracle perimeter."
-            echo "Deploying Occacia Industrial Pipeline to: $(hostname)"
+            echo "Storage remaining: $(df -h | grep ' /$' | awk '{print $4}')"
             
-            # 3. Systems Engineer health check
-            docker --version
-            df -h | grep '/' # Shows your 200GB storage status
+            # 4. Verify the Payload landed
+            ls -la
