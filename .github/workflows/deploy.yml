@@ -7,18 +7,16 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # ZONE 2: QUALITY LAB (Logic and Syntax Verification)
+  # ZONES 2 & 3 (Quality & Security) remain unchanged as they are working
   quality-check:
     runs-on: ubuntu-latest
     steps:
       - name: Load Source Code
         uses: actions/checkout@v4
-
       - name: Setup Python Environment
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-
       - name: Backend Quality Check
         run: |
           cd backend
@@ -26,7 +24,6 @@ jobs:
           pip install flake8
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
-  # ZONE 3: SECURITY LAB (Vulnerability and Secret Scanning)
   security-audit:
     runs-on: ubuntu-latest
     steps:
@@ -34,13 +31,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Run Secret Scan
         uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --only-verified
 
-  # ZONE 4: ACTUAL PRODUCTION DEPLOYMENT
+  # ZONE 4: THE ACTUAL ENGINE IGNITION
   deploy-production:
     name: Zone 4 - Live Production Deployment
     needs: [quality-check, security-audit] 
@@ -50,14 +46,14 @@ jobs:
       - name: Load Source Code
         uses: actions/checkout@v4
 
-      - name: Transport Full Payload (Backend & Frontend)
+      - name: Transport Full Payload (Backend, Frontend, & Blueprint)
         uses: appleboy/scp-action@v0.1.7 
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # This grabs both folders from your GitHub repo
-          source: "backend/,frontend/" 
+          # THE FIX: Added docker-compose.yml to the source list
+          source: "backend/,frontend/,docker-compose.yml" 
           target: "~/occacia-app"
 
       - name: Execute Remote Orchestration via SSH
@@ -67,19 +63,17 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # 1. Initialize Structure
-            mkdir -p ~/occacia-app/backend
-            mkdir -p ~/occacia-app/frontend
+            # 1. Enter the Deployment Zone
+            cd ~/occacia-app
             
-            # 2. Log Deployment Event
-            echo "Full Stack Deployment successful on $(date)" >> ~/occacia-app/deploy_history.log
+            # 2. Kill old engines to prevent Port conflicts
+            sudo docker compose down || true 
             
-            # 3. Systems Engineer Health Check
-            echo "TANK STATUS: ONLINE"
-            echo "Available Space: $(df -h | grep ' /$' | awk '{print $4}')"
+            # 3. Build and Fire the Tank in background mode
+            # This uses the docker-compose.yml that we just transported
+            sudo docker compose up --build -d
             
-            # 4. Forensic Verification of Payload
-            echo "--- Backend Zone ---"
-            ls -F ~/occacia-app/backend
-            echo "--- Frontend Zone ---"
-            ls -F ~/occacia-app/frontend
+            # 4. Forensic Status Report
+            echo "--- ENGINE STATUS ---"
+            sudo docker ps
+            echo "Deployment finished at $(date)" >> ~/occacia-app/deploy_history.log

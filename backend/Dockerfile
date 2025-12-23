@@ -3,5 +3,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-# Use 'python' for a script or 'uvicorn' for FastAPI/Flask
+# SKEPTICAL FIX: If you use FastAPI/Flask, you MUST bind to 0.0.0.0
+# Otherwise, it stays "inside" the container and you can't reach it from the IP.
 CMD ["python", "main.py"]
