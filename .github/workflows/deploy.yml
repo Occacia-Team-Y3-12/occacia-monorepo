@@ -1,34 +1,69 @@
-name: Occacia CD Pipeline
+name: Occacia Industrial Pipeline
 
 on:
   push:
-    branches: [ main ]  # This fires every time you push to the 'main' branch
+    branches: [ "main", "dev/*" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
-  deploy:
+  # ZONE 2: QUALITY LAB (Logic and Syntax Verification)
+  quality-check:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4  # Grabs your code from GitHub
+      - name: Load Source Code
+        uses: actions/checkout@v4
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3  # The "Teleportation" tool
+      - name: Setup Python Environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Backend Quality Check
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install flake8
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+  # ZONE 3: SECURITY LAB (Vulnerability and Secret Scanning)
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Load Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+
+# ZONE 4: ACTUAL PRODUCTION DEPLOYMENT
+  deploy-production:
+    name: Zone 4 - Live Production Deployment
+    needs: [quality-check, security-audit] # Only deploys if checks pass!
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Load Source Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Oracle Tank via SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # 1. Go to the home directory
-            cd ~
+            # 1. Create project home
+            mkdir -p ~/occacia-app && cd ~/occacia-app
             
-            # 2. Check if the project folder exists, if not, create it
-            mkdir -p occacia-project && cd occacia-project
+            # 2. Log status
+            echo "Successfully breached the Oracle perimeter."
+            echo "Deploying Occacia Industrial Pipeline to: $(hostname)"
             
-            # 3. Pull latest changes or clone if empty (Simplified for first run)
-            echo "Successfully connected to the Occacia Tank!"
-            echo "Current Directory: $(pwd)"
-            
-            # 4. Systems Engineer Check
+            # 3. Systems Engineer health check
             docker --version
-            
-            # 5. Future: This is where we run 'docker-compose up'
+            df -h | grep '/' # Shows your 200GB storage status
