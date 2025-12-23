@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # ZONES 2 & 3 (Quality & Security) remain unchanged as they are working
+  # ZONES 2 & 3 remain the same
   quality-check:
     runs-on: ubuntu-latest
     steps:
@@ -46,14 +46,14 @@ jobs:
       - name: Load Source Code
         uses: actions/checkout@v4
 
-      - name: Transport Full Payload (Backend, Frontend, & Blueprint)
+      - name: Transport Full Payload (Logic, Face, Blueprint & Config)
         uses: appleboy/scp-action@v0.1.7 
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # THE FIX: Added docker-compose.yml to the source list
-          source: "backend/,frontend/,docker-compose.yml" 
+          # THE FIX: Added nginx.conf to the source list
+          source: "backend/,frontend/,docker-compose.yml,nginx.conf" 
           target: "~/occacia-app"
 
       - name: Execute Remote Orchestration via SSH
@@ -66,11 +66,12 @@ jobs:
             # 1. Enter the Deployment Zone
             cd ~/occacia-app
             
-            # 2. Kill old engines to prevent Port conflicts
+            # 2. THE SKEPTICAL CLEANUP: Nuke broken containers and the fake nginx.conf folder
             sudo docker compose down || true 
+            sudo rm -rf nginx.conf  # Deletes the accidental directory so the real file can land
             
-            # 3. Build and Fire the Tank in background mode
-            # This uses the docker-compose.yml that we just transported
+            # 3. Fire the Tank in background mode
+            # --build ensures the new main.py and nginx.conf are applied
             sudo docker compose up --build -d
             
             # 4. Forensic Status Report
