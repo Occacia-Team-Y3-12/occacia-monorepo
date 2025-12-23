@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # ZONES 2 & 3 remain the same
+  # ZONE 2: QUALITY LAB (Logic and Syntax Verification)
   quality-check:
     runs-on: ubuntu-latest
     steps:
@@ -24,6 +24,7 @@ jobs:
           pip install flake8
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
+  # ZONE 3: SECURITY LAB (Vulnerability and Secret Scanning)
   security-audit:
     runs-on: ubuntu-latest
     steps:
@@ -36,7 +37,7 @@ jobs:
         with:
           extra_args: --only-verified
 
-  # ZONE 4: THE ACTUAL ENGINE IGNITION
+  # ZONE 4: THE ACTUAL ENGINE IGNITION (Now with Self-Healing)
   deploy-production:
     name: Zone 4 - Live Production Deployment
     needs: [quality-check, security-audit] 
@@ -52,7 +53,7 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # THE FIX: Added nginx.conf to the source list
+          # THE FIX: Ensuring the actual config file is included in the shipment
           source: "backend/,frontend/,docker-compose.yml,nginx.conf" 
           target: "~/occacia-app"
 
@@ -66,12 +67,13 @@ jobs:
             # 1. Enter the Deployment Zone
             cd ~/occacia-app
             
-            # 2. THE SKEPTICAL CLEANUP: Nuke broken containers and the fake nginx.conf folder
+            # 2. THE SKEPTICAL CLEANUP: Nuke old engines and any "Ghost Folders"
+            # This ensures that if nginx.conf was a folder, it is deleted before Docker tries to use it.
             sudo docker compose down || true 
-            sudo rm -rf nginx.conf  # Deletes the accidental directory so the real file can land
+            [ -d "nginx.conf" ] && sudo rm -rf nginx.conf || true
             
             # 3. Fire the Tank in background mode
-            # --build ensures the new main.py and nginx.conf are applied
+            # --build forces Docker to look at the new main.py and the real nginx.conf file
             sudo docker compose up --build -d
             
             # 4. Forensic Status Report
