@@ -1,4 +1,12 @@
 services:
+
+Check failure on line 1 in .github/workflows/docker-compose.yml
+GitHub Actions / .github/workflows/docker-compose.yml
+
+Invalid workflow file
+
+(Line: 1, Col: 1): Unexpected value 'services', (Line: 1, Col: 1): Required property is missing: jobs
+
   backend:
     build: ./backend
     ports: ["8000:8000"]
