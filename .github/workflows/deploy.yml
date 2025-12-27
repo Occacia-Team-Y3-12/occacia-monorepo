@@ -62,7 +62,7 @@ jobs:
           cd backend
           pip install bandit
           # Scan for real vulnerabilities but skip B104 (Docker 0.0.0.0 binding)
-          bandit -r . -ll --skip B104 
+          bandit -r . -ll --skip B104 --exclude ./tests
 
       - name: Build Local Image for Scan
         run: docker build -t occacia-backend:scan ./backend
