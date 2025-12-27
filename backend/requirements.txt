@@ -4,3 +4,7 @@ psycopg2-binary
 alembic
 sqlalchemy
 psycopg2-binary
+bandit
+flake8
+httpx
+pytest
