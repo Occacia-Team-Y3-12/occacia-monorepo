@@ -23,7 +23,6 @@ jobs:
         run: |
           cd backend
           pip install flake8
-          # Stop the build if there are Python syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
   # ZONE 2: LOGIC LAB (Automated Testing)
@@ -38,7 +37,6 @@ jobs:
         run: |
           cd backend
           pip install -r requirements.txt pytest httpx
-          # Target the 'tests' folder explicitly
           pytest tests/
 
   # ZONE 3: SECURITY LAB (Vulnerability & Image Scanning)
@@ -50,7 +48,7 @@ jobs:
       - name: Load Source Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Full history for Trufflehog
+          fetch-depth: 0 
 
       - name: Secret Scan (Trufflehog)
         uses: trufflesecurity/trufflehog@main
@@ -60,12 +58,12 @@ jobs:
       - name: Python Security Audit (Bandit)
         run: |
           pip install bandit
-          # THE FINAL FIX: 
-          # -r: recursive
-          # -x: EXCLUDE (using the folder name directly)
-          # -ll: Low Level (report all)
-          # --skip B104: ignore 0.0.0.0 binding
-          bandit -r ./backend -x ./backend/tests -ll --skip B104
+          # THE ULTIMATE TROUBLESHOOTING FIX:
+          # -r backend: Scan the backend
+          # -lll: Level Low (Show them)
+          # --severity-level medium: ONLY FAIL THE BUILD ON MEDIUM OR HIGH ISSUES.
+          # This allows 'assert' (Low) to pass but catches real SQL injection (High).
+          bandit -r ./backend --severity-level medium --skip B104
 
       - name: Build Local Image for Scan
         run: docker build -t occacia-backend:scan ./backend
@@ -75,7 +73,7 @@ jobs:
         with:
           image-ref: 'occacia-backend:scan'
           format: 'table'
-          exit-code: '1' # Kill the pipeline if security is compromised
+          exit-code: '1' 
           severity: 'CRITICAL,HIGH'
 
   # ZONE 4: THE ACTUAL ENGINE IGNITION
