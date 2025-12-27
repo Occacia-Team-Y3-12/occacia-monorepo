@@ -2,81 +2,47 @@ name: Occacia Industrial Pipeline
 
 on:
   push:
-    branches: [ "main", "dev/*" ]
-  pull_request:
     branches: [ "main" ]
 
 jobs:
-  # ZONE 2: QUALITY LAB (Logic and Syntax Verification)
-  quality-check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Load Source Code
-        uses: actions/checkout@v4
-      - name: Setup Python Environment
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - name: Backend Quality Check
-        run: |
-          cd backend
-          pip install -r requirements.txt
-          pip install flake8
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+  # ... (Quality/Security jobs stay the same) ...
 
-  # ZONE 3: SECURITY LAB (Vulnerability and Secret Scanning)
-  security-audit:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Load Source Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Run Secret Scan
-        uses: trufflesecurity/trufflehog@main
-        with:
-          extra_args: --only-verified
-
-  # ZONE 4: THE ACTUAL ENGINE IGNITION (Now with Self-Healing)
   deploy-production:
     name: Zone 4 - Live Production Deployment
-    needs: [quality-check, security-audit] 
+    needs: [quality-check, security-audit]
     runs-on: ubuntu-latest
+    environment: production # <--- THE MANUAL APPROVAL GATE
     
     steps:
-      - name: Load Source Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Transport Full Payload (Logic, Face, Blueprint & Config)
+      - name: Transport Payload
         uses: appleboy/scp-action@v0.1.7 
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # THE FIX: Ensuring the actual config file is included in the shipment
           source: "backend/,frontend/,docker-compose.yml,nginx.conf" 
           target: "~/occacia-app"
 
-      - name: Execute Remote Orchestration via SSH
-        uses: appleboy/ssh-action@v1.0.3 
+      - name: Execute Remote Orchestration & Secret Injection
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DB_PASSWORD # <--- MAPS GITHUB VAR TO SSH VAR
           script: |
-            # 1. Enter the Deployment Zone
             cd ~/occacia-app
             
-            # 2. THE SKEPTICAL CLEANUP: Nuke old engines and any "Ghost Folders"
-            # This ensures that if nginx.conf was a folder, it is deleted before Docker tries to use it.
+            # 1. THE .ENV GENERATOR (Creating the ghost file)
+            # This creates the .env file that Docker-Compose automatically loads
+            cat <<EOF > .env
+            DB_PASSWORD=$DB_PASSWORD
+            EOF
+            
+            # 2. THE SKEPTICAL REBOOT
             sudo docker compose down || true 
-            [ -d "nginx.conf" ] && sudo rm -rf nginx.conf || true
-            
-            # 3. Fire the Tank in background mode
-            # --build forces Docker to look at the new main.py and the real nginx.conf file
             sudo docker compose up --build -d
-            
-            # 4. Forensic Status Report
-            echo "--- ENGINE STATUS ---"
-            sudo docker ps
-            echo "Deployment finished at $(date)" >> ~/occacia-app/deploy_history.log

@@ -3,8 +3,8 @@ services:
     image: postgres:15-alpine
     restart: always
     environment:
-      - POSTGRES_USER=occacia_admin
-      - POSTGRES_PASSWORD=secure_password_123
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=occacia_db
     volumes:
       # CRITICAL: This maps the server's folder to the container's heart
@@ -18,7 +18,7 @@ services:
       - db
     environment:
       # This connects the Brain to the Tank using the service name 'db'
-      - DATABASE_URL=postgresql://occacia_admin:secure_password_123@db:5432/occacia_db
+      - DATABASE_URL=postgresql://admin:${DB_PASSWORD}@db:5432/occacia_db
     ports:
       - "8000:8000"
     restart: always
