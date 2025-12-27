@@ -23,6 +23,7 @@ jobs:
         run: |
           cd backend
           pip install flake8
+          # Stop the build if there are Python syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
   # ZONE 2: LOGIC LAB (Automated Testing)
@@ -37,7 +38,7 @@ jobs:
         run: |
           cd backend
           pip install -r requirements.txt pytest httpx
-          # INDUSTRIAL FIX: Looking specifically inside the tests/ directory
+          # Target the 'tests' folder explicitly
           pytest tests/
 
   # ZONE 3: SECURITY LAB (Vulnerability & Image Scanning)
@@ -50,7 +51,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Full history for Trufflehog
-      
+
       - name: Secret Scan (Trufflehog)
         uses: trufflesecurity/trufflehog@main
         with:
@@ -59,9 +60,12 @@ jobs:
       - name: Python Security Audit (Bandit)
         run: |
           pip install bandit
-          # THE FIX: Entering the directory first makes 'tests' a simple subfolder to exclude
-          cd backend
-          bandit -r . -ll --skip B104 --exclude tests
+          # THE FINAL FIX: 
+          # -r: recursive
+          # -x: EXCLUDE (using the folder name directly)
+          # -ll: Low Level (report all)
+          # --skip B104: ignore 0.0.0.0 binding
+          bandit -r ./backend -x ./backend/tests -ll --skip B104
 
       - name: Build Local Image for Scan
         run: docker build -t occacia-backend:scan ./backend
@@ -71,7 +75,7 @@ jobs:
         with:
           image-ref: 'occacia-backend:scan'
           format: 'table'
-          exit-code: '1' # Stop the line if critical security holes are found
+          exit-code: '1' # Kill the pipeline if security is compromised
           severity: 'CRITICAL,HIGH'
 
   # ZONE 4: THE ACTUAL ENGINE IGNITION
@@ -105,16 +109,10 @@ jobs:
           envs: DB_PASSWORD
           script: |
             cd ~/occacia-app
-            
-            # Injecting the Secret via Environment Variable passed from GitHub
             cat <<EOF > .env
             DB_PASSWORD=$DB_PASSWORD
             EOF
-            
-            # Skeptical cleanup and forced rebuild
             sudo docker compose down --remove-orphans || true 
             sudo docker compose up --build -d
-            
-            # Resource Management
             sudo docker image prune -f
             echo "Industrial Deployment finished at $(date)" >> ~/occacia-app/deploy_history.log
