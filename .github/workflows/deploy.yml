@@ -23,6 +23,7 @@ jobs:
         run: |
           cd backend
           pip install flake8
+          # Stop the build if there are Python syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
   # ZONE 2: LOGIC LAB (Automated Testing)
@@ -37,6 +38,7 @@ jobs:
         run: |
           cd backend
           pip install -r requirements.txt pytest httpx
+          # INDUSTRIAL FIX: Ensure logic works before we even think about deployment
           pytest tests/
 
   # ZONE 3: SECURITY LAB (Vulnerability & Image Scanning)
@@ -48,8 +50,8 @@ jobs:
       - name: Load Source Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
-
+          fetch-depth: 0 # Needed for Trufflehog to scan history
+      
       - name: Secret Scan (Trufflehog)
         uses: trufflesecurity/trufflehog@main
         with:
@@ -57,13 +59,10 @@ jobs:
 
       - name: Python Security Audit (Bandit)
         run: |
+          cd backend
           pip install bandit
-          # THE ULTIMATE TROUBLESHOOTING FIX:
-          # -r backend: Scan the backend
-          # -lll: Level Low (Show them)
-          # --severity-level medium: ONLY FAIL THE BUILD ON MEDIUM OR HIGH ISSUES.
-          # This allows 'assert' (Low) to pass but catches real SQL injection (High).
-          bandit -r ./backend --severity-level medium --skip B104
+          # Scan for real vulnerabilities but skip B104 (Docker 0.0.0.0 binding)
+          bandit -r . -ll --skip B104 --exclude ./tests
 
       - name: Build Local Image for Scan
         run: docker build -t occacia-backend:scan ./backend
@@ -73,13 +72,13 @@ jobs:
         with:
           image-ref: 'occacia-backend:scan'
           format: 'table'
-          exit-code: '1' 
+          exit-code: '1' # Fails the pipeline if HIGH/CRITICAL vulnerabilities are found
           severity: 'CRITICAL,HIGH'
 
   # ZONE 4: THE ACTUAL ENGINE IGNITION
   deploy-production:
     name: Zone 4 - Live Production Deployment
-    needs: security-audit
+    needs: security-audit # The deployment is now locked behind 3 security layers
     runs-on: ubuntu-latest
     environment: production 
     
