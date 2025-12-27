@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # ZONE 2: QUALITY LAB (Unchanged Structure, Better Efficiency)
+  # ZONE 2: QUALITY LAB (Logic and Syntax Verification)
   quality-check:
     runs-on: ubuntu-latest
     steps:
@@ -17,15 +17,14 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-          cache: 'pip' # Improvement: Caches dependencies to speed up runs
+          cache: 'pip'
       - name: Backend Quality Check
         run: |
           cd backend
           pip install flake8
-          # We check the code without installing every single requirement to save time
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
-  # ZONE 3: SECURITY LAB (Unchanged Structure)
+  # ZONE 3: SECURITY LAB (Vulnerability and Secret Scanning)
   security-audit:
     runs-on: ubuntu-latest
     steps:
@@ -33,17 +32,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Run Secret Scan
+      
+      - name: Run Secret Scan (Trufflehog)
         uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --only-verified
 
-  # ZONE 4: THE ACTUAL ENGINE IGNITION (The "Iron Fortress" Refactor)
+      - name: Python Security Audit (Bandit)
+        run: |
+          cd backend
+          pip install bandit
+          # Improvement: Scan for real vulnerabilities but skip B104 (Docker 0.0.0.0 binding)
+          # -r: recursive, -ll: level low (find all), --skip: ignore specific rules
+          bandit -r . -ll --skip B104 
+
+  # ZONE 4: THE ACTUAL ENGINE IGNITION
   deploy-production:
     name: Zone 4 - Live Production Deployment
     needs: [quality-check, security-audit] 
     runs-on: ubuntu-latest
-    # THE GATEKEEPER: Requires you to manually click "Approve" in GitHub
     environment: production 
     
     steps:
@@ -61,7 +68,6 @@ jobs:
 
       - name: Execute Remote Orchestration & Secret Injection
         uses: appleboy/ssh-action@v1.0.3 
-        # IMPROVEMENT: Passing variables directly into the SSH session
         env:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         with:
@@ -72,20 +78,19 @@ jobs:
           script: |
             cd ~/occacia-app
             
-            # 1. THE .ENV GENERATOR: Injects the secret ghost into the server
+            # 1. THE .ENV GENERATOR (Ghost Secret Injection)
             cat <<EOF > .env
             DB_PASSWORD=$DB_PASSWORD
             EOF
             
-            # 2. THE SKEPTICAL CLEANUP: Nuke old logic and ghost folders
+            # 2. THE SKEPTICAL CLEANUP
             sudo docker compose down --remove-orphans || true 
             [ -d "nginx.conf" ] && sudo rm -rf nginx.conf || true
             
-            # 3. FIRE THE TANK: Rebuild and start
+            # 3. FIRE THE TANK
             sudo docker compose up --build -d
             
-            # 4. INDUSTRIAL MAINTENANCE: Clear old Docker junk to save OCI disk space
-            # This stops your server from crashing when the disk hits 100%
+            # 4. INDUSTRIAL MAINTENANCE (OCI Disk Space Saver)
             sudo docker image prune -f
             
             # 5. FORENSIC STATUS REPORT
