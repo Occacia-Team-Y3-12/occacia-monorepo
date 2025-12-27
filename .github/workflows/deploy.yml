@@ -23,7 +23,6 @@ jobs:
         run: |
           cd backend
           pip install flake8
-          # Stop the build if there are Python syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
   # ZONE 2: LOGIC LAB (Automated Testing)
@@ -38,7 +37,7 @@ jobs:
         run: |
           cd backend
           pip install -r requirements.txt pytest httpx
-          # INDUSTRIAL FIX: Ensure logic works before we even think about deployment
+          # INDUSTRIAL FIX: Looking specifically inside the tests/ directory
           pytest tests/
 
   # ZONE 3: SECURITY LAB (Vulnerability & Image Scanning)
@@ -50,7 +49,7 @@ jobs:
       - name: Load Source Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Needed for Trufflehog to scan history
+          fetch-depth: 0 # Full history for Trufflehog
       
       - name: Secret Scan (Trufflehog)
         uses: trufflesecurity/trufflehog@main
@@ -59,10 +58,10 @@ jobs:
 
       - name: Python Security Audit (Bandit)
         run: |
-          cd backend
           pip install bandit
-          # Scan for real vulnerabilities but skip B104 (Docker 0.0.0.0 binding)
-          bandit -r . -ll --skip B104 --exclude ./tests
+          # THE FIX: Entering the directory first makes 'tests' a simple subfolder to exclude
+          cd backend
+          bandit -r . -ll --skip B104 --exclude tests
 
       - name: Build Local Image for Scan
         run: docker build -t occacia-backend:scan ./backend
@@ -72,13 +71,13 @@ jobs:
         with:
           image-ref: 'occacia-backend:scan'
           format: 'table'
-          exit-code: '1' # Fails the pipeline if HIGH/CRITICAL vulnerabilities are found
+          exit-code: '1' # Stop the line if critical security holes are found
           severity: 'CRITICAL,HIGH'
 
   # ZONE 4: THE ACTUAL ENGINE IGNITION
   deploy-production:
     name: Zone 4 - Live Production Deployment
-    needs: security-audit # The deployment is now locked behind 3 security layers
+    needs: security-audit
     runs-on: ubuntu-latest
     environment: production 
     
@@ -106,10 +105,16 @@ jobs:
           envs: DB_PASSWORD
           script: |
             cd ~/occacia-app
+            
+            # Injecting the Secret via Environment Variable passed from GitHub
             cat <<EOF > .env
             DB_PASSWORD=$DB_PASSWORD
             EOF
+            
+            # Skeptical cleanup and forced rebuild
             sudo docker compose down --remove-orphans || true 
             sudo docker compose up --build -d
+            
+            # Resource Management
             sudo docker image prune -f
             echo "Industrial Deployment finished at $(date)" >> ~/occacia-app/deploy_history.log
