@@ -2,21 +2,55 @@ name: Occacia Industrial Pipeline
 
 on:
   push:
+    branches: [ "main", "dev/*" ]
+  pull_request:
     branches: [ "main" ]
 
 jobs:
-  # ... (Quality/Security jobs stay the same) ...
+  # ZONE 2: QUALITY LAB (Unchanged Structure, Better Efficiency)
+  quality-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Load Source Code
+        uses: actions/checkout@v4
+      - name: Setup Python Environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip' # Improvement: Caches dependencies to speed up runs
+      - name: Backend Quality Check
+        run: |
+          cd backend
+          pip install flake8
+          # We check the code without installing every single requirement to save time
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
+  # ZONE 3: SECURITY LAB (Unchanged Structure)
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Load Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+
+  # ZONE 4: THE ACTUAL ENGINE IGNITION (The "Iron Fortress" Refactor)
   deploy-production:
     name: Zone 4 - Live Production Deployment
-    needs: [quality-check, security-audit]
+    needs: [quality-check, security-audit] 
     runs-on: ubuntu-latest
-    environment: production # <--- THE MANUAL APPROVAL GATE
+    # THE GATEKEEPER: Requires you to manually click "Approve" in GitHub
+    environment: production 
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Load Source Code
+        uses: actions/checkout@v4
 
-      - name: Transport Payload
+      - name: Transport Full Payload
         uses: appleboy/scp-action@v0.1.7 
         with:
           host: ${{ secrets.REMOTE_HOST }}
@@ -26,23 +60,35 @@ jobs:
           target: "~/occacia-app"
 
       - name: Execute Remote Orchestration & Secret Injection
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.0.3 
+        # IMPROVEMENT: Passing variables directly into the SSH session
         env:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DB_PASSWORD # <--- MAPS GITHUB VAR TO SSH VAR
+          envs: DB_PASSWORD
           script: |
             cd ~/occacia-app
             
-            # 1. THE .ENV GENERATOR (Creating the ghost file)
-            # This creates the .env file that Docker-Compose automatically loads
+            # 1. THE .ENV GENERATOR: Injects the secret ghost into the server
             cat <<EOF > .env
             DB_PASSWORD=$DB_PASSWORD
             EOF
             
-            # 2. THE SKEPTICAL REBOOT
-            sudo docker compose down || true 
+            # 2. THE SKEPTICAL CLEANUP: Nuke old logic and ghost folders
+            sudo docker compose down --remove-orphans || true 
+            [ -d "nginx.conf" ] && sudo rm -rf nginx.conf || true
+            
+            # 3. FIRE THE TANK: Rebuild and start
             sudo docker compose up --build -d
+            
+            # 4. INDUSTRIAL MAINTENANCE: Clear old Docker junk to save OCI disk space
+            # This stops your server from crashing when the disk hits 100%
+            sudo docker image prune -f
+            
+            # 5. FORENSIC STATUS REPORT
+            echo "--- ENGINE STATUS ---"
+            sudo docker ps
+            echo "Industrial Deployment finished at $(date)" >> ~/occacia-app/deploy_history.log
