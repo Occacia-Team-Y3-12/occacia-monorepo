@@ -1,0 +1,41 @@
+name: 03 - Production Deployment
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    name: Zone 4 - OCI Orchestration
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Transport Payload (SCP)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "backend/,frontend/,docker-compose.yml,nginx.conf"
+          target: "~/occacia-app"
+
+      - name: Execute Orchestration (SSH)
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DB_PASSWORD
+          script: |
+            cd ~/occacia-app
+            cat <<EOF > .env
+            DB_PASSWORD=$DB_PASSWORD
+            EOF
+            sudo docker compose down --remove-orphans || true
+            sudo docker compose up --build -d
+            sudo docker image prune -f
+            echo "✅ Deployment finished at $(date)" >> ~/occacia-app/deploy_history.log

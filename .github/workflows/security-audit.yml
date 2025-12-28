@@ -1,0 +1,38 @@
+name: 02 - Security Audit
+
+on:
+  push:
+    branches: [ "main", "dev/*" ]
+
+jobs:
+  security-audit:
+    name: Zone 3 - Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for Trufflehog secret scanning
+
+      - name: Trufflehog (Secret Scan)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+
+      - name: Bandit (Python Security)
+        run: |
+          pip install bandit
+          # THE FIX: Exclude tests folder and ignore Low severity (asserts)
+          cd backend
+          bandit -r . -ll --skip B104 --exclude tests --severity-level medium
+
+      - name: Build for Scan
+        run: docker build -t occacia-scan ./backend
+
+      - name: Trivy (Container Scan)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'occacia-scan'
+          format: 'table'
+          exit-code: '1' # Fail the build on CRITICAL vulnerabilities
+          ignore-unfixed: true # Ignore bugs Debian hasn't patched yet
+          severity: 'CRITICAL'
