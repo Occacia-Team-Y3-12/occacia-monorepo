@@ -1,8 +1,9 @@
-name: 01 - Quality Test
+name: 01 - Quality Gate
 
 on:
   push:
-    branches: [ "dev/*" ]
+    # THE FIX: Add "main" here so the workflow triggers when you push your refactor
+    branches: [ "main", "dev/*" ]
   pull_request:
     branches: [ "main" ]
 
@@ -17,7 +18,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-
+      
       - name: Install Dependencies
         run: |
           cd backend
