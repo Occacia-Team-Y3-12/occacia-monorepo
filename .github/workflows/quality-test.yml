@@ -1,4 +1,4 @@
-name: 01 - Quality Gate
+name: 01 - Quality Test
 
 on:
   push:

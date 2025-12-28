@@ -6,7 +6,7 @@ on:
 
 jobs:
   security-audit:
-    name: Zone 3 - Security Scan
+    name: Zone 3 - Security Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

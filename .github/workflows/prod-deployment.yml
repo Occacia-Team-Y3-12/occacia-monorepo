@@ -1,12 +1,17 @@
 name: 03 - Production Deployment
 
 on:
-  push:
+  workflow_run:
+    workflows: ["02 - Security Audit"]
+    types:
+      - completed
     branches: [ "main" ]
 
 jobs:
   deploy:
     name: Zone 4 - OCI Orchestration
+    # THE SKEPTICAL GUARD: Only ignite the engines if the Security Audit PASSED.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -21,7 +26,7 @@ jobs:
           source: "backend/,frontend/,docker-compose.yml,nginx.conf"
           target: "~/occacia-app"
 
-      - name: Execute Orchestration (SSH)
+      - name: Execute Orchestration & DB Migration (SSH)
         uses: appleboy/ssh-action@v1.0.3
         env:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
@@ -35,7 +40,17 @@ jobs:
             cat <<EOF > .env
             DB_PASSWORD=$DB_PASSWORD
             EOF
+            
+            # SKEPTICAL CLEANUP
             sudo docker compose down --remove-orphans || true
+            
+            # IGNITION
             sudo docker compose up --build -d
+            
+            # THE NERVOUS SYSTEM: Triggering Alembic Auto-Migrations
+            # This ensures your Postgres tables match your current models.py
+            sudo docker compose exec -T backend alembic upgrade head
+            
+            # MAINTENANCE
             sudo docker image prune -f
-            echo "✅ Deployment finished at $(date)" >> ~/occacia-app/deploy_history.log
+            echo "✅ Industrial Deployment finished at $(date)" >> ~/occacia-app/deploy_history.log
