@@ -1,0 +1,46 @@
+[33maf6ea3e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m qa final?>?>?
+[33m6a3753f[m qa final????
+[33m1d82863[m qa final????
+[33m2f8d88d[m qa final?>?
+[33m9c9fa24[m qa final??
+[33m3c3acc7[m qa final?
+[33m2b720dc[m Database migration test 4
+[33m654f24e[m Database migration test 2
+[33mf05ee61[m Database migration test
+[33m9b6f7af[m feat: implement iron fortress secrets management and .env injection 2
+[33m635273c[m fix: restore pipeline roots and dependencies
+[33m8e3d3f5[m feat: implement iron fortress secrets management and .env injection
+[33m5c1c23c[m feat: complete Phase 2 persistence with postgres volumes
+[33m13c9df0[m feat: add postgres persistence and volume mapping
+[33m1b4eee6[m chore: add deployment pipeline final :(<
+[33m002abfc[m chore: add deployment pipeline final :(
+[33m031d3a7[m chore: add deployment pipeline ????
+[33mb35f356[m chore: add deployment pipeline final??
+[33m3b5e2db[m chore: add deployment pipeline final?
+[33m0982e7a[m chore: add deployment pipeline ii
+[33med1a51a[m chore: add deployment pipeline iv
+[33m19dbf5b[m chore: add deployment pipeline iii
+[33m4f6ea95[m chore: add deployment pipeline ii
+[33m6e43b35[m chore: add deployment pipeline
+[33m6e0bd28[m cd test3
+[33m253fe54[m cd test2
+[33m219df49[m cd test1
+[33m8a6981a[m sec: added zone 3 security scanners try3
+[33m08f40ec[m sec: added zone 3 security scanners try2
+[33m75169a4[m sec: added zone 3 security scanners
+[33m6e9e370[m fix: added root layout and corrected backend encoding
+[33m4094ea6[m CI TEST 3
+[33m1de8062[m generated frontend lockfile and fixed package.json
+[33me444599[m CI Test 2
+[33m028dcd4[m CI TEST 1
+[33m7d85d26[m Wake up robot
+[33m0993852[m Wake up robot
+[33mfc9bb8e[m Wake up robot
+[33m6cd7fbd[m Wake up robot
+[33m3d967df[m[33m ([m[1;31morigin/dev/kashmika[m[33m, [m[1;32mdev/kashmika[m[33m)[m Wake up robot
+[33mffe3ba4[m Wake up robot
+[33mc226989[m Wake up robot
+[33m756bcf1[m Wake up robot
+[33m8a25934[m Initial project structure setup
+[33m324a779[m Add .gitignore file with common exclusions
+[33m4a6d44a[m Initial commit

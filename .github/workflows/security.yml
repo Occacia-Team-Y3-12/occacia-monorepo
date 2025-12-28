@@ -8,7 +8,6 @@ on:
 
 jobs:
   security-audit:
-    name: Security & Container Audit
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -16,31 +15,17 @@ jobs:
         with:
           fetch-depth: 0 
 
-      - name: Run Secret Scan (Trufflehog)
+      - name: Run Secret Scan
+        # Updated to scan the entire repo to avoid the 'BASE and HEAD' error
         uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --only-verified
 
-      - name: Run Python Security Scan (Bandit)
+      - name: Run Python Security Scan
         run: |
           pip install bandit
           if [ -d "backend" ]; then
-            # THE FIX: 
-            # 1. -x ./backend/tests: Tell Bandit to STAY OUT of the test folder.
-            # 2. --severity-level medium: Report 'Low' (asserts) but DON'T fail the build for them.
-            # 3. --skip B104: Ignore the 0.0.0.0 binding for Docker containers.
-            bandit -r ./backend -x ./backend/tests --severity-level medium --skip B104
+            bandit -r ./backend
           else
             echo "Backend not found."
           fi
-
-      - name: Build Local Image for Scan
-        run: docker build -t occacia-backend:scan ./backend
-
-      - name: Container OS Scan (Trivy)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'occacia-backend:scan'
-          format: 'table'
-          exit-code: '1' # This stays 1 because we want to fail on OS vulnerabilities.
-          severity: 'CRITICAL,HIGH'

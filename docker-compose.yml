@@ -7,25 +7,18 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=occacia_db
     volumes:
+      # CRITICAL: This maps the server's folder to the container's heart
       - ./postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    # THE HEARTBEAT: Checks every 5s if Postgres is actually ready to talk
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d occacia_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
 
   backend:
     build: ./backend
-    # THE GATEKEEPER: Don't just depend on 'db', wait for it to be HEALTHY
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     environment:
+      # This connects the Brain to the Tank using the service name 'db'
       - DATABASE_URL=postgresql://admin:${DB_PASSWORD}@db:5432/occacia_db
-      - DB_PASSWORD=${DB_PASSWORD}
     ports:
       - "8000:8000"
     restart: always
@@ -35,9 +28,6 @@ services:
     ports:
       - "3000:3000"
     restart: always
-    # Best practice: Frontend should wait for the API to be up
-    depends_on:
-      - backend
 
   nginx:
     image: nginx:latest
