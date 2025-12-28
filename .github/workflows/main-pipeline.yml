@@ -1,4 +1,4 @@
-name: Occacia Industrial Monolith
+name: Occacia pipeline - Main
 
 on:
   push:
