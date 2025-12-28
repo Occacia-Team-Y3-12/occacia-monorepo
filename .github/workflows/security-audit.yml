@@ -21,9 +21,12 @@ jobs:
       - name: Bandit (Python Security)
         run: |
           pip install bandit
-          # THE FIX: Exclude tests folder and ignore Low severity (asserts)
+          # THE FIX: Removed -ll to resolve the argument conflict
+          # -r .: Recursive scan starting from backend directory
+          # -x tests: HARD EXCLUSION of the test folder
+          # --severity-level medium: Report 'Low' (asserts) but DON'T fail the build
           cd backend
-          bandit -r . -ll --skip B104 --exclude tests --severity-level medium
+          bandit -r . -x tests --severity-level medium --skip B104
 
       - name: Build for Scan
         run: docker build -t occacia-scan ./backend
@@ -33,6 +36,6 @@ jobs:
         with:
           image-ref: 'occacia-scan'
           format: 'table'
-          exit-code: '1' # Fail the build on CRITICAL vulnerabilities
-          ignore-unfixed: true # Ignore bugs Debian hasn't patched yet
+          exit-code: '1' # Stop the line if critical security holes exist
+          ignore-unfixed: true # Don't bark at bugs with no known fix
           severity: 'CRITICAL'
