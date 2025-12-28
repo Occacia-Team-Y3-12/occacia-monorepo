@@ -10,6 +10,7 @@ x-logging: &default-logging
     max-file: "3"
 
 services:
+
   # ===========================
   # 🧠 DATABASE CORE
   # ===========================
@@ -64,7 +65,7 @@ services:
 
 
   # ===========================
-  # 🧠 TRAFFIC CONTROLLER
+  # 🧠 TRAFFIC CONTROLLER (NGINX)
   # ===========================
   nginx:
     image: nginx:latest
@@ -73,13 +74,19 @@ services:
     ports:
       - "80:80"
       - "443:443"
+
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./certbot/www:/var/www/certbot
+      # Master nginx config (has events{}, http{}, servers)
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+
+      # Certbot TLS + challenge files
       - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot:ro
+
     depends_on:
       - frontend
       - backend
+
     logging: *default-logging
 
 
@@ -94,10 +101,10 @@ services:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
     entrypoint: >
-      /bin/sh -c "trap exit TERM; 
-      while :; do 
-        certbot renew; 
-        sleep 12h & wait $${!}; 
+      /bin/sh -c "trap exit TERM;
+      while :; do
+        certbot renew;
+        sleep 12h & wait $${!};
       done"
 
 
