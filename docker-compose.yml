@@ -75,11 +75,9 @@ services:
       - "80:80"
       - "443:443"
 
+    network_mode: "host"
     volumes:
-      # Master nginx config (has events{}, http{}, servers)
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-
-      # Certbot TLS + challenge files
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot:ro
 
