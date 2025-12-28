@@ -1,5 +1,15 @@
 version: "3.9"
 
+# ===========================
+# 🧾 LOGGING BLACKBOX
+# ===========================
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+
 services:
   # ===========================
   # 🧠 DATABASE CORE
@@ -16,8 +26,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    logging: *default-logging
 
-    # 🚦 HEALTH SENSOR — prevents backend from booting too early
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d occacia_db"]
       interval: 5s
@@ -33,16 +43,14 @@ services:
     build: ./backend
     container_name: occacia-backend
     restart: always
-
     depends_on:
       db:
         condition: service_healthy
-
     environment:
       DATABASE_URL: postgresql://admin:${DB_PASSWORD}@db:5432/occacia_db
-
     ports:
       - "8000:8000"
+    logging: *default-logging
 
 
   # ===========================
@@ -54,10 +62,11 @@ services:
     restart: always
     ports:
       - "3000:3000"
+    logging: *default-logging
 
 
   # ===========================
-  # 🧠 TRAFFIC CONTROLLER (NGINX)
+  # 🧠 TRAFFIC CONTROLLER
   # ===========================
   nginx:
     image: nginx:latest
@@ -70,10 +79,30 @@ services:
     depends_on:
       - frontend
       - backend
+    logging: *default-logging
+
+
+  # ===========================
+  # 📡 RADAR – PORTAINER
+  # ===========================
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: occacia-radar
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer_data:/data
+    ports:
+      - "9443:9443"
+    logging: *default-logging
 
 
 # ===========================
-# 💾 PERSISTENT STORAGE
+# 💾 PERSISTENCE LAYER
 # ===========================
 volumes:
   postgres_data:
+  portainer_data:
