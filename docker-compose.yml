@@ -77,9 +77,10 @@ services:
 
     network_mode: "host"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot:ro
+          - ./nginx.conf:/etc/nginx/nginx.conf:ro
+          # CRITICAL: This maps the real certs you just got into the container
+          - /etc/letsencrypt:/etc/letsencrypt:ro 
+          - ./certbot/www:/var/www/certbot:ro
 
     depends_on:
       - frontend
