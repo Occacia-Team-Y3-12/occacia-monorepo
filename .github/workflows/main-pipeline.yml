@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # ZONE 1 & 2: THE QUALITY GATE (Syntax & Logic)
+  # ZONE 1 & 2: THE QUALITY GATE (Syntax & Logic) - tt
   quality-gate:
     name: Zone 1 & 2 - Quality & Logic
     runs-on: ubuntu-latest
