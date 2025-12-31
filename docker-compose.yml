@@ -108,7 +108,7 @@ services:
 
 
   # ===========================
-  # 📡 RADAR – PORTAINER
+  # 📡 RADAR – PORTAINER  
   # ===========================
   portainer:
     image: portainer/portainer-ce:latest
