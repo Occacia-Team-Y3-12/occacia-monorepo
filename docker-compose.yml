@@ -1,8 +1,5 @@
-version: "3.9"
+# Note: 'version' is removed as it's obsolete in modern Compose.
 
-# ===========================
-# 🧾 LOGGING BLACKBOX
-# ===========================
 x-logging: &default-logging
   driver: "json-file"
   options:
@@ -12,7 +9,7 @@ x-logging: &default-logging
 services:
 
   # ===========================
-  # 🧠 DATABASE CORE
+  # 🧠 DATABASE CORE (Optimized for 1GB RAM)
   # ===========================
   db:
     image: postgres:15-alpine
@@ -22,6 +19,16 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: occacia_db
+    # SKEPTICAL TUNING: Force Postgres to think small
+    command: >
+      postgres 
+      -c shared_buffers=64MB 
+      -c max_connections=20 
+      -c work_mem=4MB
+    deploy:
+      resources:
+        limits:
+          memory: 256M # Hard cap to prevent system crash
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -29,11 +36,9 @@ services:
     logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d occacia_db"]
-      interval: 5s
+      interval: 10s # Increased for low-CPU environment
       timeout: 5s
       retries: 5
-      start_period: 10s
-
 
   # ===========================
   # 🧠 BACKEND API
@@ -42,6 +47,10 @@ services:
     build: ./backend
     container_name: occacia-backend
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     depends_on:
       db:
         condition: service_healthy
@@ -51,7 +60,6 @@ services:
       - "8000:8000"
     logging: *default-logging
 
-
   # ===========================
   # 🌐 FRONTEND
   # ===========================
@@ -59,43 +67,46 @@ services:
     build: ./frontend
     container_name: occacia-frontend
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 128M # Static apps need very little RAM
     ports:
       - "3000:3000"
     logging: *default-logging
-
 
   # ===========================
   # 🧠 TRAFFIC CONTROLLER (NGINX)
   # ===========================
   nginx:
-    image: nginx:latest
+    image: nginx:alpine # Switched to Alpine to save 100MB
     container_name: occacia-nginx
     restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-
     network_mode: "host"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
     volumes:
-          - ./nginx.conf:/etc/nginx/nginx.conf:ro
-          # CRITICAL: This maps the real certs you just got into the container
-          - /etc/letsencrypt:/etc/letsencrypt:ro 
-          - ./certbot/www:/var/www/certbot:ro
-
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro 
+      - ./certbot/www:/var/www/certbot:ro
     depends_on:
       - frontend
       - backend
-
     logging: *default-logging
 
-
   # ===========================
-  # 🔐 CERTBOT – AUTO HTTPS
+  # 🔐 CERTBOT
   # ===========================
   certbot:
     image: certbot/certbot:latest
     container_name: occacia-certbot
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
@@ -106,14 +117,17 @@ services:
         sleep 12h & wait $${!};
       done"
 
-
   # ===========================
-  # 📡 RADAR – PORTAINER  
+  # 📡 RADAR (PORTAINER) - High RAM Risk!
   # ===========================
   portainer:
     image: portainer/portainer-ce:latest
     container_name: occacia-radar
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     security_opt:
       - no-new-privileges:true
     volumes:
@@ -124,10 +138,6 @@ services:
       - "9443:9443"
     logging: *default-logging
 
-
-# ===========================
-# 💾 PERSISTENCE LAYER
-# ===========================
 volumes:
   postgres_data:
   portainer_data:
