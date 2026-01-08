@@ -1,4 +1,4 @@
-name: Occacia pipeline - Main
+name: CI/CD Pipeline - OCCACIA - FINAL
 
 on:
   push:
@@ -7,12 +7,16 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # ZONE 1 & 2: THE QUALITY GATE (Syntax & Logic)
+  # =======================================================
+  # ZONE 1 & 2: THE QUALITY GATE (Runs on EVERY PUSH)
+  # Purpose: Syntax, Logic, and Unit Tests
+  # =======================================================
   quality-gate:
     name: Zone 1 & 2 - Quality & Logic
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -23,10 +27,10 @@ jobs:
         run: |
           cd backend
           pip install -r requirements.txt pytest flake8 httpx
-          # Stop the build if there are Python syntax errors
+          # 1. Syntax Check (Stop build on errors)
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # Verify the business logic
-          if [ -d "tests" ]; then pytest tests/; fi
+          # 2. Run Tests (if they exist)
+          if [ -d "app/tests" ]; then pytest app/tests/; fi
 
       - name: Frontend Build Check
         run: |
@@ -34,11 +38,16 @@ jobs:
           npm ci
           npm run build
 
-  # ZONE 3: THE SECURITY AUDIT (Vulnerability & Secret Scanning)
+  # =======================================================
+  # ZONE 3: THE SECURITY AUDIT (Runs on EVERY PUSH)
+  # Purpose: Vulnerability Scanning (Now active on Dev too!)
+  # =======================================================
   security-audit:
     name: Zone 3 - Security Scan
-    needs: quality-gate # THE CHAIN: Won't run if Quality fails
+    needs: quality-gate
     runs-on: ubuntu-latest
+    # REMOVED the 'if' condition. This now runs on dev/kashmika too.
+    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,7 +62,7 @@ jobs:
         run: |
           pip install bandit
           cd backend
-          # THE FIX: Removed -ll conflict and excluded tests
+          # Scan strictly, skip test folder, ignore B104 (binding to all interfaces in Docker is normal)
           bandit -r . -x tests --severity-level medium --skip B104
 
       - name: Build Local Image for Scan
@@ -64,16 +73,21 @@ jobs:
         with:
           image-ref: 'occacia-scan'
           format: 'table'
-          exit-code: '1' # Fails build on critical OS vulnerabilities
-          ignore-unfixed: true # Ignore bugs with no patch
+          exit-code: '1' # Fail the build if CRITICAL bugs are found
+          ignore-unfixed: true
           severity: 'CRITICAL'
 
-  # ZONE 4: THE ENGINE IGNITION (OCI Deployment)
+  # =======================================================
+  # ZONE 4: THE DEPLOYMENT (Runs ONLY on MAIN)
+  # Purpose: Ship to Production. Dev branches STOP before this.
+  # =======================================================
   deploy:
     name: Zone 4 - OCI Orchestration
-    needs: security-audit # THE CHAIN: Won't run if Security fails
+    needs: security-audit
     runs-on: ubuntu-latest
-    environment: production # Triggers your "Manual Approval" shield
+    environment: production
+    # THE GATEKEEPER: This prevents 'dev' code from hitting your live server
+    if: github.ref == 'refs/heads/main'
     
     steps:
       - uses: actions/checkout@v4
@@ -91,19 +105,29 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3 
         env:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DB_PASSWORD
+          envs: DB_PASSWORD,DATABASE_URL
           script: |
             cd ~/occacia-app
-            cat <<EOF > .env
-            DB_PASSWORD=$DB_PASSWORD
+            
+            # 1. Build Production .env
+            cat <<EOF > backend/.env
+            DATABASE_URL=$DATABASE_URL
             EOF
+
+            # 2. Restart Containers
             sudo docker compose down --remove-orphans || true 
             sudo docker compose up --build -d
-            # THE NERVOUS SYSTEM: Triggering Alembic Auto-Migrations
+            
+            # 3. Apply Migrations
+            echo "🧠 Running Database Migrations..."
             sudo docker compose exec -T backend alembic upgrade head
+            
+            # 4. Cleanup
             sudo docker image prune -f
-            echo "✅ Deployment finished at $(date)" >> ~/occacia-app/deploy_history.log
+            
+            echo "✅ Deployment finished successfully at $(date)" >> ~/occacia-app/deploy_history.log
