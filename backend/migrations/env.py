@@ -6,7 +6,7 @@ from alembic import context
 
 # 1. MOVEMENT: Ensure Python can find models.py in the backend root
 sys.path.append(os.path.join(os.getcwd()))
-from models import Base
+from app.models import Base
 
 # 2. CONFIG: This is the Alembic Config object.
 config = context.config
