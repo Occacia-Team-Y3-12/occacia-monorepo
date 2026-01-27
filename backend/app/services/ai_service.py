@@ -5,15 +5,16 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 class AIService:
     def __init__(self):
-        # ✅ SECURE: Read credentials from the .env file
-        # This prevents GitHub from blocking your push
+        # ✅ Reading from injected environment variables
         self.base_url = os.getenv("LANGFLOW_URL")
         self.token = os.getenv("LANGFLOW_TOKEN")
         self.org_id = os.getenv("LANGFLOW_ORG_ID")
 
-        # Safety check to warn you if .env is missing
+        # Initialization check for logs
         if not self.token:
-            print("⚠️ WARNING: LANGFLOW_TOKEN is missing from environment variables!")
+            print("🚨 CRITICAL: LANGFLOW_TOKEN not found in environment!")
+        else:
+            print("🔧 AI Service initialized with secure credentials.")
 
     @retry(
         stop=stop_after_attempt(3),
@@ -21,8 +22,6 @@ class AIService:
         retry=retry_if_exception_type(httpx.HTTPStatusError)
     )
     async def generate_date_plan(self, raw_query: str):
-        # 🚀 SIMPLIFIED: We send ONLY what the user typed.
-        
         headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
@@ -43,10 +42,10 @@ class AIService:
             
             data = response.json()
             try:
-                # We expect JSON because your System Prompt enforces it
+                # Extracting text from Langflow nested structure
                 outputs = data["outputs"][0]["outputs"][0]["results"]["message"]["text"]
                 
-                # Clean up markdown if AI adds it
+                # Remove markdown code blocks if present
                 clean_json = outputs.replace("```json", "").replace("```", "").strip()
                 parsed_data = json.loads(clean_json)
                 
@@ -54,12 +53,11 @@ class AIService:
                 return parsed_data
                 
             except Exception as e:
-                print(f"⚠️ JSON Parse Error: {e}")
-                # Fallback structure
+                print(f"⚠️ JSON Parse Error: {e}. Raw Output: {outputs[:100]}...")
                 return {
                     "intent": "chat",
-                    "reasoning": "I couldn't process the response structure.",
-                    "chat_response": "I'm having trouble connecting to my brain right now. Please try again."
+                    "reasoning": "AI returned unstructured data.",
+                    "chat_response": "I'm having trouble formatting my thoughts. Can you try again?"
                 }
 
 ai_service = AIService()
