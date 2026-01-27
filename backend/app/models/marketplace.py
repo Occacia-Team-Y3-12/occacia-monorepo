@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, ARRAY, Text
 from sqlalchemy.orm import relationship
-from app.database import Base
+from app.core.database import Base
 
 class Vendor(Base):
     __tablename__ = "vendors"

@@ -5,7 +5,7 @@ from jose import JWTError, jwt
 from datetime import timedelta
 
 # Internal Imports
-from app.database import get_db
+from app.core.database import get_db
 from app.schemas.vendor_schema import VendorRegisterRequest, VendorResponse
 from app.services import vendor_service
 from app.common.security import verify_password, create_access_token, SECRET_KEY, ALGORITHM
