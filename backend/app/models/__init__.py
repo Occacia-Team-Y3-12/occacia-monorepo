@@ -1,2 +1,2 @@
-from .vendor_model import Vendor
+from .marketplace import Vendor, Package
 # This lets you do: from app.models import Vendor
