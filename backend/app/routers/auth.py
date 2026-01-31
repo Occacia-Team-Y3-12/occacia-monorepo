@@ -8,7 +8,7 @@ from datetime import timedelta
 from app.core.database import get_db
 from app.schemas.vendor_schema import VendorRegisterRequest, VendorResponse
 from app.services import vendor_service
-from app.common.security import verify_password, create_access_token, SECRET_KEY, ALGORITHM
+from app.core.security import verify_password, create_access_token, SECRET_KEY, ALGORITHM
 
 # 1. SETUP ROUTER & AUTH SCHEME
 router = APIRouter(prefix="/auth", tags=["Authentication"])
