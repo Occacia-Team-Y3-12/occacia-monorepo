@@ -6,9 +6,11 @@ from datetime import timedelta
 
 # Internal Imports
 from app.core.database import get_db
+from app.schemas.auth import RegisterRequest
 from app.schemas.vendor_schema import VendorRegisterRequest, VendorResponse
 from app.services import vendor_service
 from app.core.security import verify_password, create_access_token, SECRET_KEY, ALGORITHM
+from app.services.auth_service import auth_service
 
 # 1. SETUP ROUTER & AUTH SCHEME
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -61,6 +63,13 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
         raise HTTPException(status_code=400, detail="Business name already in use!")
 
     return vendor_service.create_vendor(db, vendor_data)
+
+
+@router.post("/customers/register", status_code=201)
+def register(payload: RegisterRequest):
+    # payload will be CustomerRegister OR VendorRegister automatically
+    return auth_service.register(payload)
+
 
 # 2. LOGIN (Public)
 @router.post("/vendors/login")
