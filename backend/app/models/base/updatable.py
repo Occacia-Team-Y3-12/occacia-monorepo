@@ -1,10 +1,8 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from app.common.utils.time_utils import now_utc
 from app.models.base.base import BaseEntity
-
-def now_utc() -> datetime:
-    return datetime.now(timezone.utc)
 
 # Use this class if you need updated_at along with the base entity
 @dataclass
