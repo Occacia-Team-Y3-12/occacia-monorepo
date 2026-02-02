@@ -5,19 +5,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import OperationalError
 from app.core.database import engine, Base
 
+# --- IMPORT MODELS ---
+# ✅ CRITICAL: You must import your models here so Base knows they exist 
+# before calling create_all()
+from app.models import chat_model 
+
 # --- IMPORT ROUTERS ---
 from app.routers import auth
 from app.routers import planning
 
 # --- IMPORT EXCEPTION HANDLERS ---
-# ✅ The Safety Net: Catches crashes and returns clean JSON
 from app.core.exceptions import add_exception_handlers
 
 # --- IMPORT SEEDER ---
-# Ensure this file exists at app/core/seed.py
 from app.scripts.seed import seed_data 
+
 # =========================================================
-# 📝 LOGGING CONFIGURATION (The "Eyes" of the App)
+# 📝 LOGGING CONFIGURATION
 # =========================================================
 logging.basicConfig(
     level=logging.INFO,
@@ -30,10 +34,10 @@ logger = logging.getLogger(__name__)
 # =========================================================
 app = FastAPI(
     title="Occacia Event Backend",
-    root_path="/api"  # Fixes Swagger UI behind Nginx
+    root_path="/api"  # Essential for Nginx Reverse Proxy
 )
 
-# CORS (Allow Frontend to talk to Backend)
+# CORS: Allows your Frontend (React/Next.js) to communicate with this API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -46,7 +50,7 @@ app.add_middleware(
 # 🔗 REGISTER COMPONENTS
 # =========================================================
 
-# 1. Apply Global Exception Handlers (The "Safety Net")
+# 1. Apply Global Exception Handlers
 add_exception_handlers(app)
 
 # 2. Register Routers
@@ -60,21 +64,21 @@ app.include_router(planning.router)
 def startup_event():
     logger.info("⏳ Starting up... Waiting for Database to wake up...")
     
-    # 1. RETRY LOOP: Wait for Postgres (Fixes "Race Condition")
+    # 1. RETRY LOOP: Wait for Postgres (Fixes Docker "Race Condition")
     db_connected = False
-    for i in range(15): # Try 15 times (30 seconds total)
+    for i in range(15): 
         try:
-            # Try to create tables. If DB is locked/starting, this will fail safely.
+            # ✅ create_all now sees 'chat_history' because we imported chat_model
             Base.metadata.create_all(bind=engine)
             db_connected = True
-            logger.info("✅ Database connection successful!")
+            logger.info("✅ Database connection successful and Tables synchronized!")
             break
         except OperationalError:
             logger.warning(f"⚠️ Database unavailable, retrying in 2s... ({i+1}/15)")
             time.sleep(2)
             
     if not db_connected:
-        logger.critical("❌ CRITICAL: Database failed to start after 30s. Exiting.")
+        logger.critical("❌ CRITICAL: Database failed to start. System halting.")
         return
 
     # 2. RUN SEEDER
@@ -87,5 +91,4 @@ def startup_event():
 
 @app.get("/health")
 def health_check():
-    logger.info("Health check endpoint hit.")
     return {"status": "active", "system": "Occacia Core"}
