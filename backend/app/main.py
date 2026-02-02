@@ -1,31 +1,91 @@
-import os
-import psycopg2
+import time
+import logging
 from fastapi import FastAPI
-import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import OperationalError
+from app.core.database import engine, Base
 
-app = FastAPI()
+# --- IMPORT ROUTERS ---
+from app.routers import auth
+from app.routers import planning
 
-# Pulls the DATABASE_URL from the docker-compose environment
-DATABASE_URL = os.getenv("DATABASE_URL")
+# --- IMPORT EXCEPTION HANDLERS ---
+# ✅ The Safety Net: Catches crashes and returns clean JSON
+from app.core.exceptions import add_exception_handlers
 
-@app.get("/")
-def read_root():
-    return {"message": "Occacia API is Online"}
+# --- IMPORT SEEDER ---
+# Ensure this file exists at app/core/seed.py
+from app.scripts.seed import seed_data 
+# =========================================================
+# 📝 LOGGING CONFIGURATION (The "Eyes" of the App)
+# =========================================================
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-@app.get("/api/db-test")
-def test_db():
+# =========================================================
+# 🛠️ APP INITIALIZATION
+# =========================================================
+app = FastAPI(
+    title="Occacia Event Backend",
+    root_path="/api"  # Fixes Swagger UI behind Nginx
+)
+
+# CORS (Allow Frontend to talk to Backend)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# =========================================================
+# 🔗 REGISTER COMPONENTS
+# =========================================================
+
+# 1. Apply Global Exception Handlers (The "Safety Net")
+add_exception_handlers(app)
+
+# 2. Register Routers
+app.include_router(auth.router)
+app.include_router(planning.router)
+
+# =========================================================
+# 🛡️ STARTUP LOGIC
+# =========================================================
+@app.on_event("startup")
+def startup_event():
+    logger.info("⏳ Starting up... Waiting for Database to wake up...")
+    
+    # 1. RETRY LOOP: Wait for Postgres (Fixes "Race Condition")
+    db_connected = False
+    for i in range(15): # Try 15 times (30 seconds total)
+        try:
+            # Try to create tables. If DB is locked/starting, this will fail safely.
+            Base.metadata.create_all(bind=engine)
+            db_connected = True
+            logger.info("✅ Database connection successful!")
+            break
+        except OperationalError:
+            logger.warning(f"⚠️ Database unavailable, retrying in 2s... ({i+1}/15)")
+            time.sleep(2)
+            
+    if not db_connected:
+        logger.critical("❌ CRITICAL: Database failed to start after 30s. Exiting.")
+        return
+
+    # 2. RUN SEEDER
+    logger.info("🌱 Checking Seed Data...")
     try:
-        # Skeptical Check: Can we actually talk to the database?
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
-        cur.execute('SELECT version();')
-        db_version = cur.fetchone()
-        cur.close()
-        conn.close()
-        return {"status": "Success", "db_version": db_version[0]}
+        seed_data()
+        logger.info("✅ Seeding check complete.")
     except Exception as e:
-        return {"status": "Database Failed", "error": str(e)}
+        logger.error(f"⚠️ Seeding warning: {e}")
 
-if __name__ == "__main__":
-    # We use 0.0.0.0 so Nginx can route traffic to this Docker container
-    uvicorn.run(app, host="0.0.0.0", port=8000)  # nosec B104
+@app.get("/health")
+def health_check():
+    logger.info("Health check endpoint hit.")
+    return {"status": "active", "system": "Occacia Core"}
