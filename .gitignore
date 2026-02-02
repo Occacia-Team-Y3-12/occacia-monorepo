@@ -1,24 +1,85 @@
-# --- OS JUNK ---
+########################################
+# OS / Editor junk
+########################################
 .DS_Store
 Thumbs.db
 
-# --- SECURITY (NEVER UPLOAD THESE) ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+########################################
+# Secrets / Environment files
+########################################
 .env
-.env.local
 .env.*
+.env.local
+!.env.example
 
-# --- FRONTEND (NODE) ---
+########################################
+# Logs
+########################################
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+########################################
+# Frontend (Node / JS)
+########################################
 node_modules/
-npm-debug.log
-yarn-error.log
 .next/
-build/
+out/
 dist/
+build/
+coverage/
+.turbo/
+.cache/
+.parcel-cache/
 
-# --- BACKEND (PYTHON) ---
+########################################
+# Backend (Python)
+########################################
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Virtual environments
+.venv/
 venv/
 env/
+ENV/
+.ENV/
+
+# Test / type / lint caches
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.tox/
+.nox/
+
+# Coverage / reports
+.coverage
+coverage.xml
+htmlcov/
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+########################################
+# Database / local dev artifacts
+########################################
+*.sqlite3
+*.db
+
+########################################
+# Docker / misc
+########################################
+**/.dockerignore
