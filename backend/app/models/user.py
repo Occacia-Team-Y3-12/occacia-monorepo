@@ -4,11 +4,8 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.common.enums import UserRole, UserStatus
+from app.common.utils.time_utils import now_utc
 from app.models.base.updatable import UpdatableEntity
-
-
-def now_utc() -> datetime:
-    return datetime.now(timezone.utc)
 
 @dataclass
 class User(UpdatableEntity, ABC):

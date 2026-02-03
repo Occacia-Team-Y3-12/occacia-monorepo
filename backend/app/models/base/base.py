@@ -2,8 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
-def now_utc() -> datetime:
-    return datetime.now(timezone.utc)
+from app.common.utils.time_utils import now_utc
 
 # Use this base entity for every other entity
 @dataclass
