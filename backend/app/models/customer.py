@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.common.enums.enums import UserRole
+from app.common.enums import UserRole
 from app.models.user import User
 
 @dataclass

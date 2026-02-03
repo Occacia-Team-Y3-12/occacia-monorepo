@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
-from app.common.enums.enums import UserRole, UserStatus
+from app.common.enums import UserRole, UserStatus
 
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
