@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from datetime import datetime, timezone # <--- IMPORT timezone
-from app.database import Base
+from app.core.database import Base
 
 class Vendor(Base):  # <--- THIS is what Python is looking for
     __tablename__ = "vendors"

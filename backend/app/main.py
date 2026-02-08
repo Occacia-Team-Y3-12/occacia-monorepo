@@ -7,8 +7,8 @@ from sqlalchemy.exc import OperationalError
 from app.core.database import engine, Base
 
 # --- IMPORT ROUTERS ---
-from app.routers import auth
-from app.routers import planning
+from app.routers import auth_router
+from app.routers import planning_router
 
 # --- IMPORT EXCEPTION HANDLERS ---
 # ✅ The Safety Net: Catches crashes and returns clean JSON
@@ -16,7 +16,7 @@ from app.core.exceptions import add_exception_handlers
 
 # --- IMPORT SEEDER ---
 # Ensure this file exists at app/core/seed.py
-from app.scripts.seed import seed_data 
+from app.scripts.seed import seed_data
 # =========================================================
 # 📝 LOGGING CONFIGURATION (The "Eyes" of the App)
 # =========================================================
@@ -51,8 +51,8 @@ app.add_middleware(
 add_exception_handlers(app)
 
 # 2. Register Routers
-app.include_router(auth.router)
-app.include_router(planning.router)
+app.include_router(auth_router.router)
+app.include_router(planning_router.router)
 
 # =========================================================
 # 🛡️ STARTUP LOGIC

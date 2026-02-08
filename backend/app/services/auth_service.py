@@ -1,4 +1,4 @@
-from app.schemas.auth import CustomerRegister, VendorRegister
+from app.schemas.auth_schema import CustomerRegister, VendorRegister
 
 class AuthService:
     def register(self, payload):
