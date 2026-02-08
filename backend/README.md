@@ -9,7 +9,7 @@ It provides REST APIs for authentication, customers, vendors, and other MVP feat
 
 ## Tech Stack
 
-- **Python**: 3.11+
+- **Python**: 3.14+
 - **Framework**: FastAPI
 - **Server**: Uvicorn
 - **Database**: PostgreSQL
@@ -48,7 +48,52 @@ backend/
   migrations/
   tests/
   alembic.ini
-  requirements.txt
+  pyproject.toml
+  poetry.lock  # generated after `poetry lock`
   Dockerfile
   start.sh
   README.md
+```
+
+---
+
+## Setup
+
+### Linux/macOS
+
+```bash
+poetry install
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Windows (PowerShell)
+
+```powershell
+poetry install
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## Dependency Updates
+
+```bash
+poetry update
+poetry lock
+```
+
+## Tests
+
+```bash
+poetry run pytest
+```
+
+## Dependency Security Checks
+
+Linux/macOS:
+```bash
+make audit
+```
+
+Windows:
+```powershell
+poetry run pip-audit -l
+```
