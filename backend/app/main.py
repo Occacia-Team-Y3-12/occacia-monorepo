@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 from fastapi import FastAPI
@@ -58,6 +59,10 @@ app.include_router(planning.router)
 # =========================================================
 @app.on_event("startup")
 def startup_event():
+    if os.getenv("SKIP_DB_STARTUP") == "1":
+        logger.info("⏭️ SKIP_DB_STARTUP=1 set. Skipping DB startup checks and seeding.")
+        return
+
     logger.info("⏳ Starting up... Waiting for Database to wake up...")
     
     # 1. RETRY LOOP: Wait for Postgres (Fixes "Race Condition")
