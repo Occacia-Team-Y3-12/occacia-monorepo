@@ -1,14 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import InvalidTokenError
 from datetime import timedelta
 
 # Internal Imports
 from app.core.database import get_db
+from app.schemas.auth_schema import RegisterRequest
 from app.schemas.vendor_schema import VendorRegisterRequest, VendorResponse
 from app.services import vendor_service
-from app.common.security import verify_password, create_access_token, SECRET_KEY, ALGORITHM
+from app.core.security import verify_password, create_access_token, SECRET_KEY, ALGORITHM
+from app.services.auth_service import auth_service
 
 # 1. SETUP ROUTER & AUTH SCHEME
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -35,7 +38,7 @@ def get_current_vendor(token: str = Depends(oauth2_scheme), db: Session = Depend
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
-    except JWTError:
+    except InvalidTokenError:
         raise credentials_exception
     
     # Check if the user still exists in the database
@@ -61,6 +64,13 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
         raise HTTPException(status_code=400, detail="Business name already in use!")
 
     return vendor_service.create_vendor(db, vendor_data)
+
+
+@router.post("/customers/register", status_code=201)
+def register(payload: RegisterRequest):
+    # payload will be CustomerRegister OR VendorRegister automatically
+    return auth_service.register(payload)
+
 
 # 2. LOGIN (Public)
 @router.post("/vendors/login")
