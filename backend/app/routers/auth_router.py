@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-import jwt
+from jose import JWTError, jwt
 from jwt.exceptions import InvalidTokenError
 from datetime import timedelta
 
@@ -22,6 +22,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/vendors/login")
 # ==========================================
 # 👮‍♂️ THE SECURITY GUARD (Dependency)
 # ==========================================
+
 def get_current_vendor(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     """
     Decodes the JWT token and retrieves the logged-in vendor.
