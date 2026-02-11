@@ -1,42 +1,38 @@
-import jwt  # This is the PyJWT library
+import jwt  # Modern PyJWT
 from datetime import datetime, timedelta, timezone
-from jwt.exceptions import PyJWTError as JWTError  # Alias for backward compatibility
+from jwt.exceptions import PyJWTError as JWTError
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 import os
 
-# 1. Initialize the Argon2 Hasher. 
-# This is the industry gold standard for DevSecOps. 
-# It's memory-hard, making it a nightmare for GPU cracking.
+# Initialize the bouncer
+# Argon2 is memory-hard; it's the gold standard for resisting GPU cracking.
 ph = PasswordHasher()
 
+# Grab secrets from environment - fail fast if missing
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+
+if not SECRET_KEY:
+    # A Systems Engineer never lets an app start without its brain.
+    raise RuntimeError("❌ CRITICAL: SECRET_KEY is missing from environment variables!")
+
 def get_password_hash(password: str) -> str:
-    """Hashes a password using Argon2."""
+    """Uses Argon2 to hash the password with an automatic salt."""
     return ph.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifies a password; returns False if there's any mismatch or error."""
+    """Returns True if valid, False if wrong or tampered with."""
     try:
         return ph.verify(hashed_password, plain_password)
     except (VerifyMismatchError, Exception):
         return False
 
-# 2. Config Loading (ensure these are in your .env!)
-SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-emergency-fallback")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
-    """Generates a secure JWT access token."""
+    """Generates a secure JWT for the user."""
     to_encode = data.copy()
-    
-    # Calculate expiration
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-        
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
     to_encode.update({"exp": expire})
     
-    # PyJWT.encode returns a 'str', no more manual decoding needed
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    # PyJWT returns a string directly
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
