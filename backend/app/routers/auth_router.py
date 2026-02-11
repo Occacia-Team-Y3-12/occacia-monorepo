@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from jose import JWTError, jwt
+#from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError as JWTError
 from jwt.exceptions import InvalidTokenError
 from datetime import timedelta
 
