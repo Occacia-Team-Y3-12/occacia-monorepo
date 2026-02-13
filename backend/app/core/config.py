@@ -1,7 +1,17 @@
+import os
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# 🛠️ DYNAMIC PATH CALCULATION
+# This finds the directory where config.py lives, then goes up to the project root.
+# Structure: /app/app/core/config.py -> /app/ (the project root)
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+ENV_FILE_PATH = BASE_DIR / ".env"
+
 class Settings(BaseSettings):
-    # App Config
+    # ==========================================
+    # 📝 APP CONFIGURATION
+    # ==========================================
     PROJECT_NAME: str = "Occacia"
     
     # ✅ AI (Langflow)
@@ -9,22 +19,41 @@ class Settings(BaseSettings):
     LANGFLOW_ORG_ID: str
     LANGFLOW_TOKEN: str
 
-    # ✅ Database (The URL used by SQLAlchemy)
+    # ✅ Database
     DATABASE_URL: str
 
-    # 🛠️ ADDED: Infrastructure Variables (Fixes the validation error)
-    # These match the variables inside your .env file
+    # 🛡️ Infrastructure (Synced with .env / Docker Compose)
     DB_USER: str = "admin"
     DB_PASSWORD: str
     DB_NAME: str = "occacia_db"
-    DOCKER_SOCKET: str
+    DOCKER_SOCKET: str = "N/A"
 
-    # ⚙️ CONFIGURATION
+    # 🛡️ SECURITY SEEDS
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+
+    # ==========================================
+    # ⚙️ CONFIGURATION & THE SILENCER
+    # ==========================================
     model_config = SettingsConfigDict(
-        env_file=".env",
-        # 🛡️ SAFETY NET: This prevents the crash! 
-        # It tells Pydantic to ignore any other random variables in your .env
+        # 🛠️ THE REAL FIX: Check the ABSOLUTE path.
+        # If it doesn't exist, we pass None so Pydantic remains silent.
+        env_file=str(ENV_FILE_PATH) if ENV_FILE_PATH.exists() else None,
+        env_file_encoding='utf-8',
         extra="ignore" 
     )
 
+    # 🛠️ LOGIC: Priority of Truth
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        return init_settings, env_settings, dotenv_settings
+
+# Initialize settings
 settings = Settings()

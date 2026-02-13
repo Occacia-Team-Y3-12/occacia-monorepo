@@ -1,6 +1,7 @@
 import httpx
 import json
 import logging
+from typing import List, Optional
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from app.core.config import settings
 
@@ -13,58 +14,91 @@ class AIService:
         self.token = settings.LANGFLOW_TOKEN
         self.org_id = settings.LANGFLOW_ORG_ID
 
-        # Initialization check
-        if not self.token:
-            logger.critical("🚨 CRITICAL: LANGFLOW_TOKEN is missing from Settings!")
-        else:
-            logger.info("🔧 AI Service initialized with secure credentials.")
+        if not self.token or not self.base_url:
+            logger.critical("🚨 CRITICAL: Missing LANGFLOW_TOKEN or URL in .env!")
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(2),
+        wait=wait_exponential(multiplier=1, min=2, max=5),
         retry=retry_if_exception_type(httpx.HTTPStatusError)
     )
-    async def generate_date_plan(self, raw_query: str):
+    async def generate_date_plan(self, raw_query: str, history: List = None):
+        """
+        Stateful AI Service with Dynamic Field Discovery and Detailed Error Reporting.
+        """
         headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
             "X-DataStax-Current-Org": self.org_id
         }
         
+        # --- 🧠 DYNAMIC CONTEXT INJECTION ---
+        context_string = ""
+        if history:
+            formatted_turns = []
+            for m in history:
+                # 🔍 DYNAMIC DISCOVERY: We look for the correct DB field name
+                # This prevents the 'AttributeError' that crashed your last run.
+                u_msg = getattr(m, 'user_query', getattr(m, 'user_msg', getattr(m, 'user_message', None)))
+                a_msg = getattr(m, 'chat_response', getattr(m, 'ai_msg', getattr(m, 'ai_message', None)))
+
+                if u_msg is None or a_msg is None:
+                    # 🔥 CRITICAL LOG: This tells you exactly what the DB object actually contains
+                    logger.error(f"❌ FIELD MISMATCH: DB object has no recognized message fields. Keys available: {m.__dict__.keys()}")
+                    continue
+                
+                formatted_turns.append(f"PREVIOUS_USER: {u_msg}\nPREVIOUS_AI: {a_msg}")
+
+            context_string = "\n".join(formatted_turns)
+            logger.info(f"🧠 MEMORY LOADED: Injecting {len(formatted_turns)} turns into prompt.")
+
+        # --- 📝 PROMPT CONSTRUCTION ---
+        if context_string:
+            full_input = (
+                "SYSTEM: You are a stateful assistant. Use the following conversation history as context.\n"
+                f"{context_string}\n"
+                f"CURRENT_USER_INPUT: {raw_query}"
+            )
+        else:
+            full_input = raw_query
+        
         payload = {
-            "input_value": raw_query,
+            "input_value": full_input,
             "inputType": "chat",
             "outputType": "chat",
             "tweaks": {}
         }
 
+        # Debug: Total payload length (If this is only the length of your query, history failed)
+        logger.info(f"📡 OUTGOING TO LANGFLOW | Total Payload Length: {len(full_input)}")
+        
         async with httpx.AsyncClient() as client:
-            logger.info(f"🧠 Sending to Langflow: {raw_query}")
-            
-            response = await client.post(self.base_url, json=payload, headers=headers, timeout=45.0)
-            response.raise_for_status()
-            
+            try:
+                response = await client.post(self.base_url, json=payload, headers=headers, timeout=40.0)
+                response.raise_for_status()
+            except Exception as e:
+                logger.error(f"🔥 LANGFLOW CONNECTION ERROR: {str(e)}")
+                raise
+
             data = response.json()
             try:
-                # Extracting text from Langflow nested structure
+                # Extracting raw text from Langflow's nested structure
                 outputs = data["outputs"][0]["outputs"][0]["results"]["message"]["text"]
                 
-                # Clean up markdown
+                # Handling AI Markdown (```json ... ```)
                 clean_json = outputs.replace("```json", "").replace("```", "").strip()
                 parsed_data = json.loads(clean_json)
                 
-                logger.info("✅ Received Valid JSON from Langflow")
+                logger.info("✅ SUCCESS: AI response parsed correctly.")
                 return parsed_data
                 
             except Exception as e:
-                # Safe failure mode
-                error_snippet = str(outputs)[:100] if 'outputs' in locals() else "No output"
-                logger.error(f"⚠️ JSON Parse Error: {e}. Raw Output Start: {error_snippet}...")
-                
+                logger.warning(f"⚠️ PARSE FAILED: AI returned plain text. Raw: {outputs[:100]}...")
                 return {
                     "intent": "chat",
-                    "reasoning": "AI returned unstructured data.",
-                    "chat_response": "I'm having trouble formatting my thoughts. Can you try again?"
+                    "chat_response": outputs,
+                    "reasoning": "AI did not return structured JSON context.",
+                    "missing_info": ["history_context_sync"]
                 }
 
 ai_service = AIService()
