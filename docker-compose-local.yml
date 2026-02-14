@@ -1,0 +1,31 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ===========================
+  # 🧠 DATABASE (Local-only)
+  # ===========================
+  db:
+    image: postgres:15-alpine
+    container_name: occacia-db
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: occacia_db
+    ports:
+      - 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "PostGres is ready -U ${DB_USER:-root} -d ${DB_NAME:-occacia_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+
+volumes:
+  postgres_data:
