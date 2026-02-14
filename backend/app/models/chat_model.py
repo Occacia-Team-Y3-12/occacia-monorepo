@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.database import Base  # Inherit from your existing Base
 
 class ChatMessage(Base):
@@ -16,4 +16,4 @@ class ChatMessage(Base):
     ai_message = Column(Text, nullable=True)
     
     # Timestamp for sorting history chronologically
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))

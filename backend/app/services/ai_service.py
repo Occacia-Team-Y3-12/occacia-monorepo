@@ -1,7 +1,7 @@
 import httpx
 import json
 import logging
-from typing import List, Optional
+from typing import List
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from app.core.config import settings
 
@@ -82,7 +82,7 @@ class AIService:
 
             data = response.json()
             try:
-                # Extracting raw text from Langflow's nested structure
+                # Extracting raw text from LangFlow's nested structure
                 outputs = data["outputs"][0]["outputs"][0]["results"]["message"]["text"]
                 
                 # Handling AI Markdown (```json ... ```)
@@ -93,7 +93,7 @@ class AIService:
                 return parsed_data
                 
             except Exception as e:
-                logger.warning(f"⚠️ PARSE FAILED: AI returned plain text. Raw: {outputs[:100]}...")
+                logger.warning(f"⚠️ PARSE FAILED: AI returned plain text. Raw: {outputs[:100]}...", e)
                 return {
                     "intent": "chat",
                     "chat_response": outputs,

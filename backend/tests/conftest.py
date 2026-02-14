@@ -6,24 +6,24 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-def _set_test_env() -> None:
-    # Ensure imports don't require live infrastructure.
-    os.environ["SKIP_DB_STARTUP"] = "1"
-
-    # Pydantic Settings (app/core/config.py) requires these at import time.
-    os.environ["LANGFLOW_URL"] = "http://localhost:7860/api/v1/run"
-    os.environ["LANGFLOW_ORG_ID"] = "test-org"
-    os.environ["LANGFLOW_TOKEN"] = "test-token"
-    os.environ["DB_PASSWORD"] = "password"
-    os.environ["DOCKER_SOCKET"] = "/var/run/docker.sock"
-    os.environ["SECRET_KEY"] = "test-secret-key"
-    os.environ["ALGORITHM"] = "HS256"
-
+# IMPORTANT:
+# `app/core/config.py` instantiates `Settings()` at import time, so we must
+# populate *all* required environment variables before importing `app.main`.
+_REQUIRED_TEST_ENV: dict[str, str] = {
+    "SKIP_DB_STARTUP": "1",
+    "LANGFLOW_URL": "http://localhost:7860/api/v1/run",
+    "LANGFLOW_ORG_ID": "test-org",
+    "LANGFLOW_TOKEN": "test-token",
+    "DB_PASSWORD": "password",
+    "DOCKER_SOCKET": "/var/run/docker.sock",
+    "SECRET_KEY": "test-secret-key",
+    "ALGORITHM": "HS256",
     # Use SQLite for tests to avoid needing a running Postgres.
-    os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+    "DATABASE_URL": "sqlite:///./test.db",
+}
 
-
-_set_test_env()
+for key, value in _REQUIRED_TEST_ENV.items():
+    os.environ[key] = value
 
 # Ensure repo root is importable when running pytest from other directories.
 repo_root = Path(__file__).resolve().parent.parent

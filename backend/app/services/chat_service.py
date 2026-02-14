@@ -1,6 +1,8 @@
 import logging
-from sqlalchemy.orm import Session
+
 from sqlalchemy import desc
+from sqlalchemy.orm import Session
+
 from app.models.chat_model import ChatMessage
 
 logger = logging.getLogger(__name__)
@@ -25,14 +27,13 @@ class ChatService:
 
     def get_session_history(self, db: Session, session_id: str, limit: int = 5):
         """Retrieves the last X messages for a specific session to provide context."""
-        messages = db.query(ChatMessage)\
-            .filter(ChatMessage.session_id == session_id)\
-            .order_by(desc(ChatMessage.created_at))\
-            .limit(limit)\
+        messages = (
+            db.query(ChatMessage)
+            .filter(ChatMessage.session_id == session_id)
+            .order_by(desc(ChatMessage.created_at))
+            .limit(limit)
             .all()
-        
-        # We reverse them so they are in chronological order (Oldest -> Newest)
+        )
         return messages[::-1]
 
-# Global instance for easy import
 chat_service = ChatService()

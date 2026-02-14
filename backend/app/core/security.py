@@ -1,24 +1,51 @@
-from passlib.context import CryptContext
-from datetime import datetime, timedelta, timezone
-import jwt
 import os
+from datetime import datetime, timedelta, timezone
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import jwt  # PyJWT
 
-def get_password_hash(password):
-    return pwd_context.hash(password)
+try:
+    from argon2 import PasswordHasher
+    from argon2.exceptions import VerifyMismatchError
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    _hasher = PasswordHasher()
+    _hasher_kind = "argon2"
+except ModuleNotFoundError:
+    try:
+        from passlib.context import CryptContext
 
-# Grab these from your .env
+        _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        _hasher_kind = "bcrypt"
+    except ModuleNotFoundError as e:  # pragma: no cover
+        raise ModuleNotFoundError(
+            "Missing password hashing dependency. Install 'argon2-cffi' (preferred) "
+            "or 'passlib[bcrypt]'."
+        ) from e
+
+
+def get_password_hash(password: str) -> str:
+    if _hasher_kind == "argon2":
+        return _hasher.hash(password)
+    return _pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    if _hasher_kind == "argon2":
+        try:
+            return _hasher.verify(hashed_password, plain_password)
+        except (VerifyMismatchError, Exception):
+            return False
+    return _pwd_context.verify(plain_password, hashed_password)
+
+
 SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
-def create_access_token(data: dict):
+if not SECRET_KEY:
+    raise RuntimeError("CRITICAL: SECRET_KEY is missing from environment")
+
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
     to_encode.update({"exp": expire})
-    # This creates the encrypted token string
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)

@@ -2,8 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 import jwt
-from jwt.exceptions import InvalidTokenError
-import jwt
 from jwt.exceptions import PyJWTError as JWTError # The Alias for clean catch-alls
 from datetime import timedelta
 
@@ -71,7 +69,7 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
 @router.post("/customers/register", status_code=201)
 def register(payload: RegisterRequest):
     # payload will be CustomerRegister OR VendorRegister automatically
-    return auth_service.register(payload)
+    return register(payload)
 
 # 2. LOGIN (Public)
 @router.post("/vendors/login")
