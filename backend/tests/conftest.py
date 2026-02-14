@@ -2,31 +2,38 @@ import os
 import sys
 from pathlib import Path
 
-# --------------------------------------------------------------------------
-# CRITICAL: SET ENV VARS BEFORE IMPORTING APP
-# --------------------------------------------------------------------------
-# This code runs immediately when pytest starts, BEFORE it imports your app.
-os.environ["DATABASE_URL"] = "postgresql://admin:password@localhost:5432/occacia_db"
-os.environ["SKIP_DB_STARTUP"] = "1"
-os.environ.setdefault("LANGFLOW_URL", "http://localhost:7860/api/v1/run")
-os.environ.setdefault("LANGFLOW_ORG_ID", "test-org")
-os.environ.setdefault("LANGFLOW_TOKEN", "test-token")
-os.environ.setdefault("DB_PASSWORD", "password")
-os.environ.setdefault("DOCKER_SOCKET", "/var/run/docker.sock")
-
-# Also add the backend folder to Python path just in case
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-# Now we can import pytest
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app
 
-# --------------------------------------------------------------------------
-# THE TEST CLIENT FIXTURE
-# --------------------------------------------------------------------------
-@pytest.fixture(scope="module")
+
+def _set_test_env() -> None:
+    # Ensure imports don't require live infrastructure.
+    os.environ["SKIP_DB_STARTUP"] = "1"
+
+    # Pydantic Settings (app/core/config.py) requires these at import time.
+    os.environ["LANGFLOW_URL"] = "http://localhost:7860/api/v1/run"
+    os.environ["LANGFLOW_ORG_ID"] = "test-org"
+    os.environ["LANGFLOW_TOKEN"] = "test-token"
+    os.environ["DB_PASSWORD"] = "password"
+    os.environ["DOCKER_SOCKET"] = "/var/run/docker.sock"
+    os.environ["SECRET_KEY"] = "test-secret-key"
+    os.environ["ALGORITHM"] = "HS256"
+
+    # Use SQLite for tests to avoid needing a running Postgres.
+    os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+
+
+_set_test_env()
+
+# Ensure repo root is importable when running pytest from other directories.
+repo_root = Path(__file__).resolve().parent.parent
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
+from app.main import app  # noqa: E402 (env must be set before import)
+
+
+@pytest.fixture()
 def client():
-    # This gives every test a fresh robot browser
-    with TestClient(app) as c:
-        yield c
+    with TestClient(app) as test_client:
+        yield test_client
