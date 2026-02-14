@@ -6,7 +6,7 @@ x-logging: &default-logging
 
 services:
   # ===========================
-  # 🧠 DATABASE
+  # 🧠 DATABASE (The Ledger)
   # ===========================
   db:
     image: postgres:15-alpine
@@ -23,12 +23,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *default-logging
 
   # ===========================
-  # 🧠 BACKEND API
+  # ⚙️ BACKEND API (The Engine)
   # ===========================
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: occacia-backend
     restart: always
     depends_on:
@@ -37,25 +40,32 @@ services:
     env_file:
       - .env
     environment:
+      # Use internal service name 'db' for container-to-container networking
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
       LANGFLOW_URL: ${LANGFLOW_URL}
       LANGFLOW_TOKEN: ${LANGFLOW_TOKEN}
       LANGFLOW_ORG_ID: ${LANGFLOW_ORG_ID}
     volumes:
-      - ./.env:/app/.env
+      - ./backend:/app # Hot-reloading for development
+      # Avoid mounting .venv from host to prevent overriding the container's build
+      - /app/.venv
     logging: *default-logging
 
   # ===========================
-  # 🌐 FRONTEND
+  # 🌐 FRONTEND (The Face)
   # ===========================
   frontend:
     build: ./frontend
     container_name: occacia-frontend
     restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost/api
     logging: *default-logging
 
   # ===========================
-  # 🚦 NGINX
+  # 🚦 NGINX (The Traffic Cop)
   # ===========================
   nginx:
     image: nginx:alpine
@@ -71,9 +81,10 @@ services:
     depends_on:
       - frontend
       - backend
+    logging: *default-logging
 
   # ===========================
-  # 📡 PORTAINER
+  # 📡 PORTAINER (The Radar)
   # ===========================
   portainer:
     image: portainer/portainer-ce:latest

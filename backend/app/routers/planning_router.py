@@ -1,43 +1,52 @@
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas.plan_schema import PlanRequest, PlanResponse, VenueDisplay
 from app.services.ai_service import ai_service
 from app.services.vendor_service import vendor_service
+from app.services.chat_service import chat_service
 
-# 1. SETUP LOGGING
 logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/planning", tags=["Planning"])
 
 @router.post("/generate", response_model=PlanResponse)
 async def generate_plan(request: PlanRequest, db: Session = Depends(get_db)):
-    logger.info(f"📥 Processing Query: {request.user_query}")
-
-    # PHASE 1: AI Understanding
-    try:
-        ai_analysis = await ai_service.generate_date_plan(request.user_query)
-        logger.info(f"🧠 AI Analysis complete. Intent: {ai_analysis.get('intent')}")
-    except Exception as e:
-        logger.error(f"⚠️ AI Critical Error: {e}")
-        ai_analysis = {"intent": "chat", "reasoning": "AI error occurred. Using fallback."}
-
-    # PHASE 2: Database Matching (Smart Filter)
-    # Fixed logic: Only define matches ONCE
-    matches = []
+    # 🛡️ Safe Extraction: Fields now exist in PlanRequest
+    session_id = request.session_id
+    user_query = request.user_query
     
-    if ai_analysis.get("intent") == "planning":
-         logger.info("🔎 Planning Intent detected. Searching Database...")
-         matches = vendor_service.find_perfect_matches(db, ai_analysis)
-         logger.info(f"✅ Found {len(matches)} venues.")
-    else:
-         logger.info("💬 Chat Intent detected. Skipping Database search.")
+    logger.info(f"📥 Session {session_id} | New Query: {user_query}")
 
-    # PHASE 3: Response
+    # PHASE 1: Fetch History
+    history = chat_service.get_session_history(db, session_id, limit=5)
+    
+    # PHASE 2: AI Execution
+    try:
+        ai_analysis = await ai_service.generate_date_plan(user_query, history=history)
+        intent = ai_analysis.get("intent", "chat")
+    except Exception as e:
+        logger.error(f"⚠️ AI Critical Error for Session {session_id}: {e}")
+        return PlanResponse(intent="chat", chat_response="My memory is foggy. Try again?")
+
+    # PHASE 3: Database Matching
+    matches = []
+    if intent == "planning":
+        logger.info(f"🔎 Searching Postgres for session {session_id}...")
+        matches = vendor_service.find_perfect_matches(db, ai_analysis)
+
+    # PHASE 4: Memory Persistence
+    chat_service.save_message(
+        db, 
+        session_id=session_id, 
+        user_msg=user_query, 
+        ai_msg=ai_analysis.get("chat_response") or ai_analysis.get("reasoning")
+    )
+
+    # PHASE 5: Standardized Response Construction
     return PlanResponse(
-        intent=ai_analysis.get("intent", "planning"),
-        reasoning=ai_analysis.get("reasoning", ""),
+        intent=intent,
+        reasoning=ai_analysis.get("reasoning"),
         personality_profile=ai_analysis.get("personality_profile"),
         chat_response=ai_analysis.get("chat_response"),
         gift_suggestion=ai_analysis.get("gift_suggestion"),
