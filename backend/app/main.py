@@ -1,96 +1,79 @@
-import os
-import time
+import asyncio
 import logging
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import OperationalError
-from app.core.database import engine, Base
 
-# --- IMPORT ROUTERS ---
-from app.routers import auth_router
-from app.routers import planning_router
-
-# --- IMPORT EXCEPTION HANDLERS ---
-# ✅ The Safety Net: Catches crashes and returns clean JSON
+from app.core.database import Base, engine
 from app.core.exceptions import add_exception_handlers
-
-# --- IMPORT SEEDER ---
-# Ensure this file exists at app/core/seed.py
+from app.routers import auth_router
+from app.routers import health_router
+from app.routers import planning_router
 from app.scripts.seed import seed_data
-# =========================================================
-# 📝 LOGGING CONFIGURATION (The "Eyes" of the App)
-# =========================================================
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# =========================================================
-# 🛠️ APP INITIALIZATION
-# =========================================================
-app = FastAPI(
-    title="Occacia Event Backend",
-    root_path="/api"  # Fixes Swagger UI behind Nginx
-)
 
-# CORS (Allow Frontend to talk to Backend)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# =========================================================
-# 🔗 REGISTER COMPONENTS
-# =========================================================
-
-# 1. Apply Global Exception Handlers (The "Safety Net")
-add_exception_handlers(app)
-
-# 2. Register Routers
-app.include_router(auth_router.router)
-app.include_router(planning_router.router)
-
-# =========================================================
-# 🛡️ STARTUP LOGIC
-# =========================================================
-@app.on_event("startup")
-def startup_event():
+@asynccontextmanager
+async def lifespan(_: FastAPI):
     if os.getenv("SKIP_DB_STARTUP") == "1":
-        logger.info("⏭️ SKIP_DB_STARTUP=1 set. Skipping DB startup checks and seeding.")
+        logger.info("SKIP_DB_STARTUP=1 set. Skipping DB startup checks and seeding.")
+        yield
         return
 
-    logger.info("⏳ Starting up... Waiting for Database to wake up...")
-    
-    # 1. RETRY LOOP: Wait for Postgres (Fixes "Race Condition")
+    logger.info("Starting up... waiting for database...")
+
     db_connected = False
-    for i in range(15): # Try 15 times (30 seconds total)
+    for i in range(15):  # Try 15 times (30 seconds total)
         try:
-            # Try to create tables. If DB is locked/starting, this will fail safely.
             Base.metadata.create_all(bind=engine)
             db_connected = True
-            logger.info("✅ Database connection successful!")
+            logger.info("Database connection successful.")
             break
         except OperationalError:
-            logger.warning(f"⚠️ Database unavailable, retrying in 2s... ({i+1}/15)")
-            time.sleep(2)
-            
+            logger.warning("Database unavailable, retrying in 2s... (%s/15)", i + 1)
+            await asyncio.sleep(2)
+
     if not db_connected:
-        logger.critical("❌ CRITICAL: Database failed to start after 30s. Exiting.")
+        logger.critical("Database failed to start after 30s. Continuing without DB.")
+        yield
         return
 
-    # 2. RUN SEEDER
-    logger.info("🌱 Checking Seed Data...")
     try:
         seed_data()
-        logger.info("✅ Seeding check complete.")
     except Exception as e:
-        logger.error(f"⚠️ Seeding warning: {e}")
+        logger.warning("Seeding warning: %s", e)
 
-@app.get("/health")
-def health_check():
-    logger.info("Health check endpoint hit.")
-    return {"status": "active", "system": "Occacia Core"}
+    yield
+
+
+def create_app() -> FastAPI:
+    application = FastAPI(
+        title="Occacia Event Backend",
+        root_path="/api",
+        lifespan=lifespan,
+    )
+
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    add_exception_handlers(application)
+    application.include_router(auth_router.router)
+    application.include_router(health_router.router)
+    application.include_router(planning_router.router)
+    return application
+
+
+app = create_app()

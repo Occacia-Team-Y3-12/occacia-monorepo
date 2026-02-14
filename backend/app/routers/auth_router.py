@@ -11,7 +11,6 @@ from app.schemas.auth_schema import RegisterRequest
 from app.schemas.vendor_schema import VendorRegisterRequest, VendorResponse
 from app.services import vendor_service
 from app.core.security import verify_password, create_access_token, SECRET_KEY, ALGORITHM
-from app.services.auth_service import auth_service
 
 # 1. SETUP ROUTER & AUTH SCHEME
 router = APIRouter(prefix="/auth", tags=["Authentication"])
