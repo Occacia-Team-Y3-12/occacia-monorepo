@@ -12,16 +12,18 @@ services:
     image: postgres:15-alpine
     container_name: occacia-db
     restart: always
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: root
-      POSTGRES_DB: occacia_db
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-occacia_db}
     ports:
-      - 5432
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "PostGres is ready -U ${DB_USER:-root} -d ${DB_NAME:-occacia_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-admin} -d ${DB_NAME:-occacia_db}"]
       interval: 10s
       timeout: 5s
       retries: 5

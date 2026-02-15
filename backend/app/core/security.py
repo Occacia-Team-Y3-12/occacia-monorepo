@@ -1,7 +1,7 @@
-import os
 from datetime import datetime, timedelta, timezone
 
 import jwt  # PyJWT
+from app.core.config import settings
 
 try:
     from argon2 import PasswordHasher
@@ -37,11 +37,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return _pwd_context.verify(plain_password, hashed_password)
 
 
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-
-if not SECRET_KEY:
-    raise RuntimeError("CRITICAL: SECRET_KEY is missing from environment")
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
