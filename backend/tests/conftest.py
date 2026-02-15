@@ -1,32 +1,39 @@
-# import os
-# import sys
-# from pathlib import Path
+import os
+import sys
+from pathlib import Path
 
-# # --------------------------------------------------------------------------
-# # CRITICAL: SET ENV VARS BEFORE IMPORTING APP
-# # --------------------------------------------------------------------------
-# # This code runs immediately when pytest starts, BEFORE it imports your app.
-# os.environ["DATABASE_URL"] = "postgresql://admin:password@localhost:5432/occacia_db"
-# os.environ["SKIP_DB_STARTUP"] = "1"
-# os.environ.setdefault("LANGFLOW_URL", "http://localhost:7860/api/v1/run")
-# os.environ.setdefault("LANGFLOW_ORG_ID", "test-org")
-# os.environ.setdefault("LANGFLOW_TOKEN", "test-token")
-# os.environ.setdefault("DB_PASSWORD", "password")
-# os.environ.setdefault("DOCKER_SOCKET", "/var/run/docker.sock")
+import pytest
+from fastapi.testclient import TestClient
 
-# # Also add the backend folder to Python path just in case
-# sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# # Now we can import pytest
-# import pytest
-# from fastapi.testclient import TestClient
-# from app.main import app
+# IMPORTANT:
+# `app/core/config.py` instantiates `Settings()` at import time, so we must
+# populate *all* required environment variables before importing `app.main`.
+_REQUIRED_TEST_ENV: dict[str, str] = {
+    "SKIP_DB_STARTUP": "1",
+    "LANGFLOW_URL": "http://localhost:7860/api/v1/run",
+    "LANGFLOW_ORG_ID": "test-org",
+    "LANGFLOW_TOKEN": "test-token",
+    "DB_PASSWORD": "password",
+    "DOCKER_SOCKET": "/var/run/docker.sock",
+    "SECRET_KEY": "test-secret-key",
+    "ALGORITHM": "HS256",
+    # Use SQLite for tests to avoid needing a running Postgres.
+    "DATABASE_URL": "sqlite:///./test.db",
+}
 
-# # --------------------------------------------------------------------------
-# # THE TEST CLIENT FIXTURE
-# # --------------------------------------------------------------------------
-# @pytest.fixture(scope="module")
-# def client():
-#     # This gives every test a fresh robot browser
-#     with TestClient(app) as c:
-#         yield c
+for key, value in _REQUIRED_TEST_ENV.items():
+    os.environ[key] = value
+
+# Ensure repo root is importable when running pytest from other directories.
+repo_root = Path(__file__).resolve().parent.parent
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
+from app.main import app  # noqa: E402 (env must be set before import)
+
+
+@pytest.fixture()
+def client():
+    with TestClient(app) as test_client:
+        yield test_client

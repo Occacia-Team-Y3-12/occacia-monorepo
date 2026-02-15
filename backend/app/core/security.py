@@ -1,39 +1,51 @@
-import jwt  # This is PyJWT, not jose!
-from datetime import datetime, timedelta, timezone
-from jwt.exceptions import PyJWTError as JWTError # Alias so your other files don't break
-from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
 import os
+from datetime import datetime, timedelta, timezone
 
-# 1. THE LOCK: Argon2 is the DevSecOps gold standard.
-# It is memory-hard, making GPU-based brute-force attacks nearly impossible.
-ph = PasswordHasher()
+import jwt  # PyJWT
+
+try:
+    from argon2 import PasswordHasher
+    from argon2.exceptions import VerifyMismatchError
+
+    _hasher = PasswordHasher()
+    _hasher_kind = "argon2"
+except ModuleNotFoundError:
+    try:
+        from passlib.context import CryptContext
+
+        _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        _hasher_kind = "bcrypt"
+    except ModuleNotFoundError as e:  # pragma: no cover
+        raise ModuleNotFoundError(
+            "Missing password hashing dependency. Install 'argon2-cffi' (preferred) "
+            "or 'passlib[bcrypt]'."
+        ) from e
+
 
 def get_password_hash(password: str) -> str:
-    """Hashes a password using Argon2 with automatic salting."""
-    return ph.hash(password)
+    if _hasher_kind == "argon2":
+        return _hasher.hash(password)
+    return _pwd_context.hash(password)
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifies an Argon2 hash. Returns False on mismatch or tampering."""
-    try:
-        return ph.verify(hashed_password, plain_password)
-    except (VerifyMismatchError, Exception):
-        return False
+    if _hasher_kind == "argon2":
+        try:
+            return _hasher.verify(hashed_password, plain_password)
+        except (VerifyMismatchError, Exception):
+            return False
+    return _pwd_context.verify(plain_password, hashed_password)
 
-# 2. THE BRAIN: Loading configuration from the environment.
+
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
-# FAIL-FAST: If the secret key is missing, kill the app. 
-# Don't run a secure app with a 'None' key!
 if not SECRET_KEY:
-    raise RuntimeError("❌ CRITICAL: SECRET_KEY is missing from environment!")
+    raise RuntimeError("CRITICAL: SECRET_KEY is missing from environment")
+
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
-    """Generates a secure, signed JWT access token."""
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
     to_encode.update({"exp": expire})
-    
-    # PyJWT returns a string directly, no more .decode('utf-8') hacks.
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)

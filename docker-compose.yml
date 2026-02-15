@@ -13,13 +13,13 @@ services:
     container_name: occacia-db
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER}
+      POSTGRES_USER: ${DB_USER:-admin}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_DB: ${DB_NAME:-occacia_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-admin} -d ${DB_NAME:-occacia_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -41,27 +41,29 @@ services:
       - .env
     environment:
       # Use internal service name 'db' for container-to-container networking
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
-      SECRET_KEY: ${SECRET_KEY}
-      ALGORITHM: ${ALGORITHM}
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD}@db:5432/${DB_NAME:-occacia_db}
+
+      # Explicitly expose required app settings (in addition to env_file)
+      DB_PASSWORD: ${DB_PASSWORD}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (required)}
+      ALGORITHM: ${ALGORITHM:-HS256}
       LANGFLOW_URL: ${LANGFLOW_URL}
       LANGFLOW_TOKEN: ${LANGFLOW_TOKEN}
       LANGFLOW_ORG_ID: ${LANGFLOW_ORG_ID}
-    volumes:
-      - ./backend:/app # Hot-reloading for development
-      # Avoid mounting .venv from host to prevent overriding the container's build
-      - /app/.venv
+      DOCKER_SOCKET: ${DOCKER_SOCKET:-/var/run/docker.sock}
+    ports:
+      - "8000:8000"
     logging: *default-logging
 
   # ===========================
   # 🌐 FRONTEND (The Face)
   # ===========================
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: occacia-frontend
     restart: always
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost/api
     logging: *default-logging
 
   # ===========================
@@ -89,12 +91,13 @@ services:
   portainer:
     image: portainer/portainer-ce:latest
     container_name: occacia-radar
-    restart: always
+    restart: unless-stopped
     ports:
       - "9443:9443"
     volumes:
-      - ${DOCKER_SOCKET}:/var/run/docker.sock
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
       - portainer_data:/data
+    logging: *default-logging
 
 volumes:
   postgres_data:

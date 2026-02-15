@@ -1,63 +1,86 @@
-from sqlalchemy.orm import Session
+from __future__ import annotations
+
+from typing import Any
+
 from sqlalchemy import or_
-from app.models.marketplace import Vendor, Package
+from sqlalchemy.orm import Session
+
+from app.models.marketplace import Package, Vendor
+
 
 class VendorService:
-    def find_perfect_matches(self, db: Session, analysis: dict):
-        """
-        Takes the AI dictionary and queries the database.
-        ✅ FIXED: Uses .get() to safely handle dictionaries (No more AttributeErrors)
-        """
-        
-        print(f"🕵️ Vendor Service analyzing: {analysis}")
+    def get_vendor_by_email(self, db: Session, email: str) -> Vendor | None:
+        return db.query(Vendor).filter(Vendor.email == email).first()
 
-        # 1. SAFETY CHECK: Ensure analysis is a dictionary
+    def get_vendor_by_display_name(self, db: Session, name: str) -> Vendor | None:
+        return db.query(Vendor).filter(Vendor.business_name == name).first()
+
+    def create_vendor(self, db: Session, vendor_data: Any) -> Vendor:
+        # NOTE: `Vendor` model currently has no `hashed_password` column.
+        # We persist only the mapped fields so the endpoint remains functional.
+        vendor = Vendor(
+            business_name=getattr(vendor_data, "business_name", None)
+            or getattr(vendor_data, "display_name", None),
+            email=vendor_data.email,
+            location_base=getattr(vendor_data, "location_base", None) or "Unknown",
+            phone=getattr(vendor_data, "phone", None),
+            is_verified=False,
+        )
+        db.add(vendor)
+        db.commit()
+        db.refresh(vendor)
+        return vendor
+
+    def find_perfect_matches(self, db: Session, analysis: dict) -> list[Package]:
+        """
+        Takes the AI analysis dictionary and queries the database for matching Packages.
+        """
         if not analysis or not isinstance(analysis, dict):
-            print("⚠️ Analysis is empty or invalid. Returning empty list.")
             return []
 
-        # 2. CHECK FOR FAILURE FLAGS
-        # We use .get("key", default) to prevent crashes if the key is missing
-        missing_info = analysis.get("missing_info", [])
+        missing_info = analysis.get("missing_info", []) or []
         if "SERVICE_UNAVAILABLE" in missing_info:
             return []
 
-        # 3. EXTRACT CRITERIA (Safely)
-        # Handles both "location" (from AI) and "Any" (from fallback)
-        loc = analysis.get("location")
-        if loc == "Any": loc = None
-        
-        budget = analysis.get("budget")
-        if budget == "Any": budget = None
+        location = analysis.get("location")
+        if location == "Any":
+            location = None
 
-        tags = analysis.get("tags", [])
-        if isinstance(tags, str): tags = [tags] # Handle single string case
+        budget_per_head = analysis.get("budget_per_head")
+        try:
+            budget_per_head = float(budget_per_head) if budget_per_head is not None else None
+        except (TypeError, ValueError):
+            budget_per_head = None
 
-        # 4. BUILD QUERY
+        venue_tags = analysis.get("venue_tags") or []
+        if isinstance(venue_tags, str):
+            venue_tags = [venue_tags]
+
         query = db.query(Package).join(Vendor)
 
-        # -- Filter by Location --
-        if loc:
-            query = query.filter(Vendor.location_base.ilike(f"%{loc}%"))
+        if location:
+            query = query.filter(
+                or_(
+                    Vendor.location_base.ilike(f"%{location}%"),
+                    Package.location_coverage.ilike(f"%{location}%"),
+                )
+            )
 
-        # -- Filter by Budget --
-        if budget == "Cheap":
-            query = query.filter(Package.price < 3000)
-        elif budget == "Moderate":
-            query = query.filter(Package.price.between(3000, 10000))
-        elif budget == "Luxury":
-            query = query.filter(Package.price > 10000)
+        if budget_per_head is not None:
+            query = query.filter(
+                or_(
+                    Package.price_per_head.is_(None),
+                    Package.price_per_head <= budget_per_head,
+                )
+            )
 
-        # -- Filter by Vibe/Tags (Simple Keyword Search) --
-        # If we have tags, try to find packages that match at least one
-        if tags:
-            # This creates a dynamic OR filter for tags
-            tag_filters = [Package.tags.contains([t]) for t in tags]
+        if venue_tags:
+            tag_filters = [Package.tags.contains([t]) for t in venue_tags]
             if tag_filters:
                 query = query.filter(or_(*tag_filters))
 
-        results = query.limit(5).all()
-        print(f"✅ Found {len(results)} matches in DB.")
-        return results
+        return query.limit(5).all()
+
 
 vendor_service = VendorService()
+

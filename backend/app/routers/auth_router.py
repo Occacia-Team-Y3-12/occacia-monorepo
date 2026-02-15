@@ -11,7 +11,6 @@ from app.schemas.auth_schema import RegisterRequest
 from app.schemas.vendor_schema import VendorRegisterRequest, VendorResponse
 from app.services import vendor_service
 from app.core.security import verify_password, create_access_token, SECRET_KEY, ALGORITHM
-from app.services.auth_service import auth_service
 
 # 1. SETUP ROUTER & AUTH SCHEME
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -25,7 +24,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/vendors/login")
 
 def get_current_vendor(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     """
-    Validates the Digital ID Card (JWT). 
+    Validates the Digital ID Card (JWT).
     If the signature is wrong or the user is a ghost, throw 401.
     """
     credentials_exception = HTTPException(
@@ -56,9 +55,11 @@ def get_current_vendor(token: str = Depends(oauth2_scheme), db: Session = Depend
 # 1. REGISTER (Public)
 @router.post("/vendors/register", response_model=VendorResponse, status_code=status.HTTP_201_CREATED)
 def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(get_db)):
+    # Check for Duplicate Email
     if vendor_service.get_vendor_by_email(db, email=vendor_data.email):
         raise HTTPException(status_code=400, detail="This email is already taken!")
     
+    # Check for Duplicate Display Name
     if vendor_service.get_vendor_by_display_name(db, name=vendor_data.display_name):
         raise HTTPException(status_code=400, detail="Business name already in use!")
 
@@ -66,7 +67,8 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
 
 @router.post("/customers/register", status_code=201)
 def register(payload: RegisterRequest):
-    return auth_service.register(payload)
+    # payload will be CustomerRegister OR VendorRegister automatically
+    return register(payload)
 
 # 2. LOGIN (Public)
 @router.post("/vendors/login")

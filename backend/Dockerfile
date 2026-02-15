@@ -1,7 +1,7 @@
 # ==========================================
 # STAGE 1: The Builder (The Workshop)
 # ==========================================
-FROM python:3.12-slim AS builder
+FROM python:3.11-slim AS builder
 
 # 1. Install system build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -17,21 +17,19 @@ ENV POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_CREATE=true \
     POETRY_CACHE_DIR='/tmp/poetry_cache'
 
-RUN pip install --no-cache-dir poetry==2.0.1
+RUN pip install --no-cache-dir poetry==2.3.2
 
 # 3. Copy only the blueprint
-COPY pyproject.toml ./
+COPY pyproject.toml poetry.lock ./
 
-# 4. Generate the lock file and install into /app/.venv
-# We run these together to ensure the venv is created in the right spot
-RUN poetry lock && \
-    poetry install --only main --no-root --no-ansi && \
+# 4. Install into /app/.venv (no need to lock during image build)
+RUN poetry install --only main --no-root --no-ansi && \
     rm -rf $POETRY_CACHE_DIR
 
 # ==========================================
 # STAGE 2: The Runtime (The Vault)
 # ==========================================
-FROM python:3.12-slim
+FROM python:3.11-slim
 
 # Systems Optimization
 ENV PYTHONDONTWRITEBYTECODE=1 \
