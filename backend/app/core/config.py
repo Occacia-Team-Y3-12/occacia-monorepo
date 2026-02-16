@@ -1,11 +1,16 @@
 from pathlib import Path
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 🛠️ DYNAMIC PATH CALCULATION
 # This finds the directory where config.py lives, then goes up to the project root.
 # Structure: /app/app/core/config.py -> /app/ (the project root)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-ENV_FILE_PATH = BASE_DIR / ".env"
+ENV_FILE_CANDIDATES = (
+    BASE_DIR / ".env",         # backend/.env (local dev)
+    BASE_DIR.parent / ".env",  # monorepo root .env (common)
+)
+ENV_FILE_PATH = next((p for p in ENV_FILE_CANDIDATES if p.exists()), None)
 
 class Settings(BaseSettings):
     # ==========================================
@@ -14,16 +19,17 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Occacia"
     
     # ✅ AI (Langflow)
-    LANGFLOW_URL: str
-    LANGFLOW_ORG_ID: str
-    LANGFLOW_TOKEN: str
+    # Optional: only required when calling AI endpoints.
+    LANGFLOW_URL: Optional[str] = None
+    LANGFLOW_ORG_ID: Optional[str] = None
+    LANGFLOW_TOKEN: Optional[str] = None
 
     # ✅ Database
     DATABASE_URL: str
 
     # 🛡️ Infrastructure (Synced with .env / Docker Compose)
     DB_USER: str = "admin"
-    DB_PASSWORD: str
+    DB_PASSWORD: Optional[str] = None
     DB_NAME: str = "occacia_db"
     DOCKER_SOCKET: str = "N/A"
 
@@ -37,7 +43,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         # 🛠️ THE REAL FIX: Check the ABSOLUTE path.
         # If it doesn't exist, we pass None so Pydantic remains silent.
-        env_file=str(ENV_FILE_PATH) if ENV_FILE_PATH.exists() else None,
+        env_file=str(ENV_FILE_PATH) if ENV_FILE_PATH else None,
         env_file_encoding='utf-8',
         extra="ignore" 
     )

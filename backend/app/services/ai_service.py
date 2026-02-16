@@ -14,8 +14,11 @@ class AIService:
         self.token = settings.LANGFLOW_TOKEN
         self.org_id = settings.LANGFLOW_ORG_ID
 
-        if not self.token or not self.base_url:
-            logger.critical("🚨 CRITICAL: Missing LANGFLOW_TOKEN or URL in .env!")
+        if not self.token or not self.base_url or not self.org_id:
+            logger.warning(
+                "Langflow is not configured (missing LANGFLOW_URL/LANGFLOW_TOKEN/LANGFLOW_ORG_ID). "
+                "AI endpoints will fail until these are set."
+            )
 
     @retry(
         stop=stop_after_attempt(2),
@@ -26,6 +29,10 @@ class AIService:
         """
         Stateful AI Service with Dynamic Field Discovery and Detailed Error Reporting.
         """
+        if not self.base_url or not self.token or not self.org_id:
+            raise RuntimeError(
+                "Langflow is not configured. Set LANGFLOW_URL, LANGFLOW_TOKEN, and LANGFLOW_ORG_ID."
+            )
         headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",

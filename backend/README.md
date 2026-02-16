@@ -18,15 +18,18 @@ docker compose -f docker-compose-local.yml up -d
 
 2) Set env vars
 
-This repo keeps a single env file at the monorepo root: `../.env`.
-
-- macOS/Linux: `cd backend && ln -s ../.env .env`
-- Windows (PowerShell): `cd backend; Copy-Item ..\.env .\.env`
+Settings load env vars from `backend/.env` if present, otherwise they fall back to the monorepo root `../.env`.
 
 Minimum required:
 
 - `SECRET_KEY`
 - `DATABASE_URL`
+
+Optional (required only for AI planning endpoints):
+
+- `LANGFLOW_URL`
+- `LANGFLOW_TOKEN`
+- `LANGFLOW_ORG_ID`
 
 Generate a dev secret:
 
