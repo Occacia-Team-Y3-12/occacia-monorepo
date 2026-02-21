@@ -9,9 +9,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.core.database import Base, engine
 from app.core.exceptions import add_exception_handlers
-from app.routers import auth_router
-from app.routers import health_router
-from app.routers import planning_router
+from app.routers import api_router
 from app.scripts.seed import seed_data
 
 logging.basicConfig(
@@ -57,7 +55,6 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     application = FastAPI(
         title="Occacia Event Backend",
-        root_path="/api",
         lifespan=lifespan,
     )
 
@@ -70,9 +67,7 @@ def create_app() -> FastAPI:
     )
 
     add_exception_handlers(application)
-    application.include_router(auth_router.router)
-    application.include_router(health_router.router)
-    application.include_router(planning_router.router)
+    application.include_router(api_router)
     return application
 
 

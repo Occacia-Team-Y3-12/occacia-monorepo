@@ -1,4 +1,14 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, ARRAY, Text
+from sqlalchemy import (
+    ARRAY,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -14,6 +24,20 @@ class Vendor(Base):
     
     # Relationships
     packages = relationship("Package", back_populates="vendor")
+
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    phone = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    email_verified = Column(Boolean, default=False, nullable=False)
+    status = Column(String, default="PENDING_VERIFICATION", nullable=False)
+    verification_token = Column(String, nullable=True)
+    verification_token_expires_at = Column(DateTime(timezone=True), nullable=True)
 
 class Package(Base):
     __tablename__ = "packages"
