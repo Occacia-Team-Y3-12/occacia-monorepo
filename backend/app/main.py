@@ -55,6 +55,11 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     application = FastAPI(
         title="Occacia Event Backend",
+        description="Occacia backend APIs",
+        version="1.0.0",
+        docs_url="/api/docs",
+        redoc_url="/api/redoc",
+        openapi_url="/api/openapi.json",
         lifespan=lifespan,
     )
 
