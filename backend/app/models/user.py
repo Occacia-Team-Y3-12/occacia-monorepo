@@ -1,6 +1,6 @@
 from abc import ABC
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 from app.common.enums import UserRole, UserStatus

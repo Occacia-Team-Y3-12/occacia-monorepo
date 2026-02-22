@@ -1,11 +1,11 @@
-from pydantic import BaseModel
-from typing import List, Optional, Any
+from pydantic import BaseModel, Field
+from typing import List, Optional
 
-# 1. The Input Request
+# 🎯 THE FIX: Added session_id so the router can find it.
 class PlanRequest(BaseModel):
-    user_query: str
+    user_query: str = Field(..., description="The user's text input")
+    session_id: str = Field(..., description="Unique ID for chat context")
 
-# 2. The Venue Display (Matches your DB Table fields)
 class VenueDisplay(BaseModel):
     name: str
     description: Optional[str] = None
@@ -13,12 +13,11 @@ class VenueDisplay(BaseModel):
     tags: List[str] = []
 
     class Config:
-        from_attributes = True  # ✅ CRITICAL: Allows conversion from SQLAlchemy Object
+        from_attributes = True  # ✅ Crucial for SQLAlchemy compatibility
 
-# 3. The Final Response Schema (Flattened)
 class PlanResponse(BaseModel):
     intent: str
-    reasoning: str
+    reasoning: Optional[str] = None
     personality_profile: Optional[str] = None
     chat_response: Optional[str] = None
     gift_suggestion: Optional[str] = None
@@ -28,6 +27,4 @@ class PlanResponse(BaseModel):
     guest_count: int = 0
     venue_tags: List[str] = []
     missing_info: List[str] = []
-    
-    # ✅ FIX: Strictly typed list forces the conversion from SQL -> JSON
     matched_venues: List[VenueDisplay] = []

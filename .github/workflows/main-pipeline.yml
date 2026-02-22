@@ -20,17 +20,24 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.14'
           cache: 'pip'
+
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --user "poetry==2.3.2"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          poetry --version
       
       - name: Backend Lint & Logic
         run: |
           cd backend
-          pip install -r requirements.txt pytest flake8 httpx
+          poetry sync --no-root
           # 1. Syntax Check (Stop build on errors)
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          poetry run ruff check . --select E9,F63,F7,F82
           # 2. Run Tests (if they exist)
-          if [ -d "app/tests" ]; then pytest app/tests/; fi
+          if [ -d "tests" ]; then poetry run pytest; fi
 
       - name: Frontend Build Check
         run: |
@@ -52,6 +59,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: 'pip'
 
       - name: Trufflehog (Secret Scan)
         uses: trufflesecurity/trufflehog@main
@@ -60,7 +73,8 @@ jobs:
 
       - name: Bandit (Python Security)
         run: |
-          pip install bandit
+          python -m pip install --upgrade pip
+          python -m pip install bandit
           cd backend
           # Scan strictly, skip test folder, ignore B104 (binding to all interfaces in Docker is normal)
           bandit -r . -x tests --severity-level medium --skip B104

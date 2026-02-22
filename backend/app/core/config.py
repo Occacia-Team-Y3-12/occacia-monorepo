@@ -1,30 +1,64 @@
+from pathlib import Path
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# 🛠️ DYNAMIC PATH CALCULATION
+# This finds the directory where config.py lives, then goes up to the project root.
+# Structure: /app/app/core/config.py -> /app/ (the project root)
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+ENV_FILE_CANDIDATES = (
+    BASE_DIR / ".env",         # backend/.env (local dev)
+    BASE_DIR.parent / ".env",  # monorepo root .env (common)
+)
+ENV_FILE_PATH = next((p for p in ENV_FILE_CANDIDATES if p.exists()), None)
+
 class Settings(BaseSettings):
-    # App Config
+    # ==========================================
+    # 📝 APP CONFIGURATION
+    # ==========================================
     PROJECT_NAME: str = "Occacia"
     
     # ✅ AI (Langflow)
-    LANGFLOW_URL: str
-    LANGFLOW_ORG_ID: str
-    LANGFLOW_TOKEN: str
+    # Optional: only required when calling AI endpoints.
+    LANGFLOW_URL: Optional[str] = None
+    LANGFLOW_ORG_ID: Optional[str] = None
+    LANGFLOW_TOKEN: Optional[str] = None
 
-    # ✅ Database (The URL used by SQLAlchemy)
+    # ✅ Database
     DATABASE_URL: str
 
-    # 🛠️ ADDED: Infrastructure Variables (Fixes the validation error)
-    # These match the variables inside your .env file
+    # 🛡️ Infrastructure (Synced with .env / Docker Compose)
     DB_USER: str = "admin"
-    DB_PASSWORD: str
+    DB_PASSWORD: Optional[str] = None
     DB_NAME: str = "occacia_db"
-    DOCKER_SOCKET: str
+    DOCKER_SOCKET: str = "N/A"
 
-    # ⚙️ CONFIGURATION
+    # 🛡️ SECURITY SEEDS
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+
+    # ==========================================
+    # ⚙️ CONFIGURATION & THE SILENCER
+    # ==========================================
     model_config = SettingsConfigDict(
-        env_file=".env",
-        # 🛡️ SAFETY NET: This prevents the crash! 
-        # It tells Pydantic to ignore any other random variables in your .env
+        # 🛠️ THE REAL FIX: Check the ABSOLUTE path.
+        # If it doesn't exist, we pass None so Pydantic remains silent.
+        env_file=str(ENV_FILE_PATH) if ENV_FILE_PATH else None,
+        env_file_encoding='utf-8',
         extra="ignore" 
     )
 
+    # 🛠️ LOGIC: Priority of Truth
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        return init_settings, env_settings, dotenv_settings
+
+# Initialize settings
 settings = Settings()
