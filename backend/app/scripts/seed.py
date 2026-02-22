@@ -1,5 +1,4 @@
-from sqlalchemy.orm import Session
-from app.core.database import SessionLocal, engine
+from app.core.database import SessionLocal
 from app.models.marketplace import Vendor, Package
 
 def seed_data():

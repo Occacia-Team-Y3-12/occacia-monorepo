@@ -1,4 +1,4 @@
-FROM node:18-slim
+FROM node:22-slim
 WORKDIR /app
 COPY package*.json ./
 # HACK: Use 'npm ci' for faster, more stable builds in a pipeline

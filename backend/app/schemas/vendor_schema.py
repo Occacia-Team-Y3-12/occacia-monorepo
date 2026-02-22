@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional
 
 # 1. Registration Input
 class VendorRegisterRequest(BaseModel):
