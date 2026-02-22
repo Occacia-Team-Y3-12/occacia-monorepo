@@ -71,25 +71,17 @@ def register(payload: RegisterRequest):
     return register(payload)
 
 # 2. LOGIN (Public)
-@router.post("/vendors/login")
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # Find the user
-    vendor = vendor_service.get_vendor_by_email(db, email=form_data.username)
+@router.post("/vendor/login")
+async def vendor_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    vendor = vendor_service.get_vendor_by_email(db, form_data.username)
+    if not vendor:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    # Password Verification (Now using Argon2 under the hood in security.py)
-    if not vendor or not verify_password(form_data.password, vendor.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    # password verification
+    if not verify_password(form_data.password, vendor.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    # Create the Token
-    access_token = create_access_token(
-        data={"sub": vendor.email},
-        expires_delta=timedelta(minutes=60)
-    )
-    
+    access_token = create_access_token(data={"sub": vendor.email, "type": "vendor"})
     return {"access_token": access_token, "token_type": "bearer"}
 
 # 3. GET CURRENT USER (Protected 🔒)

@@ -25,6 +25,7 @@ class VendorService:
             location_base=getattr(vendor_data, "location_base", None) or "Unknown",
             phone=getattr(vendor_data, "phone", None),
             is_verified=False,
+            hashed_password=get_password_hash(vendor_data.password)
         )
         db.add(vendor)
         db.commit()
