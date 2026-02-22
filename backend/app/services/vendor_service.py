@@ -28,6 +28,7 @@ class VendorService:
             phone=getattr(vendor_data, "phone", None),
             contact_phone=getattr(vendor_data, "contact_phone", None),
             is_verified=False,
+            hashed_password=get_password_hash(vendor_data.password)
         )
         db.add(vendor)
         db.commit()
