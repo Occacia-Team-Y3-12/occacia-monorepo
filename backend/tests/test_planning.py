@@ -4,17 +4,17 @@ from unittest.mock import AsyncMock, patch
 def test_generate_plan_success_planning_intent_calls_db(client):
     with (
         patch(
-            "app.routers.planning_router.ai_service.generate_date_plan",
+            "app.routers.v1.planning_router.ai_service.generate_date_plan",
             new_callable=AsyncMock,
         ) as mock_generate_date_plan,
         patch(
-            "app.routers.planning_router.vendor_service.find_perfect_matches",
+            "app.routers.v1.planning_router.vendor_service.find_perfect_matches",
         ) as mock_find_perfect_matches,
         patch(
-            "app.routers.planning_router.chat_service.get_session_history",
+            "app.routers.v1.planning_router.chat_service.get_session_history",
         ) as mock_get_session_history,
         patch(
-            "app.routers.planning_router.chat_service.save_message",
+            "app.routers.v1.planning_router.chat_service.save_message",
         ) as mock_save_message,
     ):
         mock_get_session_history.return_value = []
@@ -45,7 +45,7 @@ def test_generate_plan_success_planning_intent_calls_db(client):
         ]
 
         payload = {"user_query": "I want a romantic dinner in Kandy", "session_id": "s1"}
-        response = client.post("/planning/generate", json=payload)
+        response = client.post("/api/v1/planning/generate", json=payload)
 
         assert response.status_code == 200
         data = response.json()
@@ -59,17 +59,17 @@ def test_generate_plan_success_planning_intent_calls_db(client):
 def test_generate_plan_chat_intent_does_not_call_db(client):
     with (
         patch(
-            "app.routers.planning_router.ai_service.generate_date_plan",
+            "app.routers.v1.planning_router.ai_service.generate_date_plan",
             new_callable=AsyncMock,
         ) as mock_generate_date_plan,
         patch(
-            "app.routers.planning_router.vendor_service.find_perfect_matches",
+            "app.routers.v1.planning_router.vendor_service.find_perfect_matches",
         ) as mock_find_perfect_matches,
         patch(
-            "app.routers.planning_router.chat_service.get_session_history",
+            "app.routers.v1.planning_router.chat_service.get_session_history",
         ) as mock_get_session_history,
         patch(
-            "app.routers.planning_router.chat_service.save_message",
+            "app.routers.v1.planning_router.chat_service.save_message",
         ) as mock_save_message,
     ):
         mock_get_session_history.return_value = []
@@ -82,7 +82,7 @@ def test_generate_plan_chat_intent_does_not_call_db(client):
         }
 
         payload = {"user_query": "Hi", "session_id": "s1"}
-        response = client.post("/planning/generate", json=payload)
+        response = client.post("/api/v1/planning/generate", json=payload)
 
         assert response.status_code == 200
         data = response.json()
@@ -90,4 +90,3 @@ def test_generate_plan_chat_intent_does_not_call_db(client):
         assert data["intent"] == "chat"
         assert data["matched_venues"] == []
         mock_find_perfect_matches.assert_not_called()
-

@@ -1,5 +1,7 @@
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
+
 from pydantic import BaseModel, EmailStr, Field
+
 
 class RegisterBase(BaseModel):
     email: EmailStr
@@ -16,7 +18,17 @@ class VendorRegister(RegisterBase):
     display_name: str = Field(min_length=2)
     contact_phone: str | None = None
 
+
+class RegisterResponse(BaseModel):
+    message: str
+    email: EmailStr
+
+
+class VerifyEmailResponse(BaseModel):
+    message: str
+
+
 RegisterRequest = Annotated[
-    Union[CustomerRegister, VendorRegister],
+    CustomerRegister | VendorRegister,
     Field(discriminator="role")
 ]
