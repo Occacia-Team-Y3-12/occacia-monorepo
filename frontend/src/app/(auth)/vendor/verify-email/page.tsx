@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import Image from 'next/image';
 
-export default function VerifyEmail() {
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'pending' | 'success' | 'error'>('pending');
 
@@ -50,5 +51,19 @@ export default function VerifyEmail() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmail() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md w-full relative z-10 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1e88e5] mx-auto"></div>
+        </div>
+      </div>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

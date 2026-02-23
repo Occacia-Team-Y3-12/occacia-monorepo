@@ -31,7 +31,7 @@ export default function PendingApproval() {
         </div>
 
         <Link
-          href={ROUTES.VENDORS.LOGIN}
+          href={ROUTES.VENDOR.LOGIN}
           className="inline-block bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium px-6 py-3 rounded-lg transition-colors duration-200"
         >
           Back to Login
