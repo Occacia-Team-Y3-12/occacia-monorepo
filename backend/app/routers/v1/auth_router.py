@@ -12,6 +12,9 @@ from app.schemas.auth_schema import (
     CustomerRegister,
     RegisterResponse,
     VerifyEmailResponse,
+    ForgotPasswordRequest,   # New for UC-07
+    ResetPasswordRequest,    # New for UC-07
+    AuthMessageResponse      # New for UC-07
 )
 from app.schemas.vendor_schema import VendorRegisterRequest, VendorResponse
 from app.services.auth_service import auth_service
@@ -44,7 +47,7 @@ def get_current_vendor(
     return vendor
 
 # ==========================================
-# 🚀 ROUTES
+# 🚀 REGISTRATION & VERIFICATION ROUTES
 # ==========================================
 
 @router.post(
@@ -90,6 +93,10 @@ def verify_vendor_email(token: str = Query(...), db: Session = Depends(get_db)):
     return auth_service.verify_vendor_email(db, token)
 
 
+# ==========================================
+# 🔑 LOGIN ROUTES
+# ==========================================
+
 @router.post("/vendors/login")
 def login_vendor(
     form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
@@ -111,3 +118,38 @@ def login_vendor(
 @router.get("/vendors/me", response_model=VendorResponse)
 def read_current_vendor(current_vendor=Depends(get_current_vendor)):
     return current_vendor
+
+
+# ==========================================
+# 🔐 PASSWORD RESET ROUTES (UC-07)
+# ==========================================
+
+@router.post(
+    "/forgot-password", 
+    response_model=AuthMessageResponse, 
+    status_code=status.HTTP_200_OK
+)
+async def forgot_password(
+    request: ForgotPasswordRequest, 
+    db: Session = Depends(get_db)
+):
+    """
+    Triggers the password reset flow. 
+    Generates a secure, time-limited JWT and logs it (mocking email).
+    """
+    return auth_service.request_password_reset(db, request)
+
+
+@router.post(
+    "/reset-password", 
+    response_model=AuthMessageResponse, 
+    status_code=status.HTTP_200_OK
+)
+async def reset_password(
+    request: ResetPasswordRequest, 
+    db: Session = Depends(get_db)
+):
+    """
+    Validates the reset token and updates the customer's password.
+    """
+    return auth_service.confirm_password_reset(db, request)
