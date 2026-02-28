@@ -37,7 +37,7 @@ def test_customer_registration_and_email_verification_success(client):
         "address": "123 Main St",
     }
 
-    register_response = client.post("/api/v1/auth/register", json=payload)
+    register_response = client.post("/api/v1/auth/customers/register", json=payload)
 
     assert register_response.status_code == 201
     assert register_response.json()["message"] == "Verification email sent"
@@ -74,8 +74,8 @@ def test_customer_registration_rejects_duplicate_email(client):
         "password": "StrongPass123!",
     }
 
-    first_response = client.post("/api/v1/auth/register", json=payload)
-    second_response = client.post("/api/v1/auth/register", json=payload)
+    first_response = client.post("/api/v1/auth/customers/register", json=payload)
+    second_response = client.post("/api/v1/auth/customers/register", json=payload)
 
     assert first_response.status_code == 201
     assert second_response.status_code == 400

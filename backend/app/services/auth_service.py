@@ -55,7 +55,6 @@ class AuthService:
 
         return {"message": "Verification email sent", "email": str(payload.email)}
 
-    # 🚨 FIX 1: Restored this method because auth_router.py calls it!
     def register_vendor_verification(self, email: str) -> None:
         """Generates token and logs link for Vendor verification."""
         verification_token, _ = self._create_verification_token_internal(
@@ -70,7 +69,6 @@ class AuthService:
         
         customer = db.query(Customer).filter(Customer.email == email).first()
         
-        # 🚨 FIX 2: Ensure this matches the test expectation exactly
         if not customer or customer.verification_token != token:
             raise HTTPException(status_code=400, detail="Invalid verification token.")
 

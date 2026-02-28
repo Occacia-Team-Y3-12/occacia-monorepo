@@ -65,7 +65,6 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
     return vendor
 
 
-@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 @router.post(
     "/customers/register",
     response_model=RegisterResponse,
@@ -94,6 +93,41 @@ def verify_vendor_email(token: str = Query(...), db: Session = Depends(get_db)):
 
 
 # ==========================================
+# 🔐 PASSWORD RESET ROUTES (UC-07)
+# ==========================================
+
+@router.post(
+    "/customers/forgot-password",
+    response_model=AuthMessageResponse, 
+    status_code=status.HTTP_200_OK
+)
+async def forgot_password(
+    request: ForgotPasswordRequest, 
+    db: Session = Depends(get_db)
+):
+    """
+    Triggers the password reset flow. 
+    Generates a secure, time-limited JWT and logs it (mocking email).
+    """
+    return auth_service.request_password_reset(db, request)
+
+
+@router.post(
+    "/customers/reset-password",
+    response_model=AuthMessageResponse, 
+    status_code=status.HTTP_200_OK
+)
+async def reset_password(
+    request: ResetPasswordRequest, 
+    db: Session = Depends(get_db)
+):
+    """
+    Validates the reset token and updates the customer's password.
+    """
+    return auth_service.confirm_password_reset(db, request)
+
+
+# ==========================================
 # 🔑 LOGIN ROUTES
 # ==========================================
 
@@ -118,38 +152,3 @@ def login_vendor(
 @router.get("/vendors/me", response_model=VendorResponse)
 def read_current_vendor(current_vendor=Depends(get_current_vendor)):
     return current_vendor
-
-
-# ==========================================
-# 🔐 PASSWORD RESET ROUTES (UC-07)
-# ==========================================
-
-@router.post(
-    "/forgot-password", 
-    response_model=AuthMessageResponse, 
-    status_code=status.HTTP_200_OK
-)
-async def forgot_password(
-    request: ForgotPasswordRequest, 
-    db: Session = Depends(get_db)
-):
-    """
-    Triggers the password reset flow. 
-    Generates a secure, time-limited JWT and logs it (mocking email).
-    """
-    return auth_service.request_password_reset(db, request)
-
-
-@router.post(
-    "/reset-password", 
-    response_model=AuthMessageResponse, 
-    status_code=status.HTTP_200_OK
-)
-async def reset_password(
-    request: ResetPasswordRequest, 
-    db: Session = Depends(get_db)
-):
-    """
-    Validates the reset token and updates the customer's password.
-    """
-    return auth_service.confirm_password_reset(db, request)
