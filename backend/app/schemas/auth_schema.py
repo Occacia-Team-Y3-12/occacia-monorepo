@@ -14,6 +14,7 @@ class CustomerRegister(RegisterBase):
     full_name: str = Field(min_length=2)
     phone: str | None = None
     address: str | None = None
+    locale: str | None = None
 
 class VendorRegister(RegisterBase):
     role: Literal["VENDOR"] = "VENDOR"

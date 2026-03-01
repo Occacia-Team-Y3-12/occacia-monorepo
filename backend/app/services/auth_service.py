@@ -9,7 +9,8 @@ from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from sqlalchemy.orm import Session
 
 from app.core.security import ALGORITHM, SECRET_KEY, get_password_hash
-from app.models.marketplace import Customer, Vendor
+from app.models.customer import Customer
+from app.models.vendor import Vendor
 from app.schemas.auth_schema import (
     CustomerRegister, 
     ForgotPasswordRequest, 
@@ -27,6 +28,7 @@ class AuthService:
     # 📝 REGISTRATION & VERIFICATION
     # ==========================================
 
+    # Customer Registration
     def register_customer(self, db: Session, payload: CustomerRegister) -> dict[str, str]:
         existing_customer = db.query(Customer).filter(Customer.email == str(payload.email)).first()
         if existing_customer:
@@ -42,6 +44,7 @@ class AuthService:
             password_hash=get_password_hash(payload.password),
             phone=payload.phone,
             address=payload.address,
+            locale=getattr(payload, "locale", None),
             email_verified=False,
             status="PENDING_VERIFICATION",
             verification_token=verification_token,
@@ -55,7 +58,7 @@ class AuthService:
 
         return {"message": "Verification email sent", "email": str(payload.email)}
 
-    # 🚨 FIX 1: Restored this method because auth_router.py calls it!
+    # Vendor Registration
     def register_vendor_verification(self, email: str) -> None:
         """Generates token and logs link for Vendor verification."""
         verification_token, _ = self._create_verification_token_internal(
@@ -64,13 +67,13 @@ class AuthService:
         link = f"https://app.occacia.com/vendors/register/verify-email?token={verification_token}"
         logger.info("Vendor verification email sent to %s with link: %s", email, link)
 
+    # Verify customer's email
     def verify_customer_email(self, db: Session, token: str) -> dict[str, str]:
         claims = self._decode_verification_token(token, expected_type="verify_customer_email")
         email = claims.get("sub")
         
         customer = db.query(Customer).filter(Customer.email == email).first()
         
-        # 🚨 FIX 2: Ensure this matches the test expectation exactly
         if not customer or customer.verification_token != token:
             raise HTTPException(status_code=400, detail="Invalid verification token.")
 
@@ -86,6 +89,7 @@ class AuthService:
 
         return {"message": "Email verified successfully"}
 
+    # Verify vendor's email
     def verify_vendor_email(self, db: Session, token: str) -> dict[str, str]:
         claims = self._decode_verification_token(token, expected_type="verify_vendor_email")
         email = claims.get("sub")
@@ -102,10 +106,13 @@ class AuthService:
         db.commit()
         return {"message": "Email verified successfully"}
 
+    # ------------------------------------------------------------------------------------------------------------------
+
     # ==========================================
     # 🔐 PASSWORD RESET (UC-07)
     # ==========================================
 
+    # Request customer's email reset
     def request_password_reset(self, db: Session, payload: ForgotPasswordRequest) -> dict[str, str]:
         """Step 4 & 5: Generates a 15-minute token and logs the reset link."""
         customer = db.query(Customer).filter(Customer.email == str(payload.email)).first()
@@ -127,6 +134,7 @@ class AuthService:
 
         return {"message": "If this email is registered, a reset link has been sent."}
 
+    # Confirm customer's email reset
     def confirm_password_reset(self, db: Session, payload: ResetPasswordRequest) -> dict[str, str]:
         """Step 7, 8 & 9: Validates JWT, updates DB, and effectively invalidates token."""
         claims = self._decode_verification_token(payload.token, expected_type="password_reset")
@@ -143,6 +151,8 @@ class AuthService:
 
         logger.info("UC-07: Password successfully reset for: %s", email)
         return {"message": "Password updated successfully"}
+
+    # ------------------------------------------------------------------------------------------------------------------
 
     # ==========================================
     # 🛠️ INTERNAL TOKEN HELPERS
