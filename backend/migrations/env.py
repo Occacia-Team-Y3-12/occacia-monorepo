@@ -55,7 +55,7 @@ def _get_target_metadata():
     _prepare_app_imports()
     from app.core.database import Base  # noqa: E402
     from app.models import chat_model  # noqa: F401,E402
-    from app.models import marketplace  # noqa: F401,E402
+    from app.models import models  # noqa: F401,E402
 
     return Base.metadata
 

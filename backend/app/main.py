@@ -26,6 +26,11 @@ async def lifespan(_: FastAPI):
         yield
         return
 
+    # IMPORTANT: SQLAlchemy only creates tables for ORM models that have been imported.
+    # Importing `app.models.models` ensures every entity class is registered on `Base.metadata`
+    # before `Base.metadata.create_all()` runs.
+    from app.models import models  # noqa: F401
+
     logger.info("Starting up... waiting for database...")
 
     db_connected = False
