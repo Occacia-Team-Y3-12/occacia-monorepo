@@ -9,7 +9,8 @@ from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from sqlalchemy.orm import Session
 
 from app.core.security import ALGORITHM, SECRET_KEY, get_password_hash
-from app.models.marketplace import Customer, Vendor
+from app.models.customer import Customer
+from app.models.vendor import Vendor
 from app.schemas.auth_schema import (
     CustomerRegister, 
     ForgotPasswordRequest, 

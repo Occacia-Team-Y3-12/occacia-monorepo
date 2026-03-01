@@ -5,7 +5,8 @@ from typing import Any
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.models.marketplace import Package, Vendor
+from app.models.package import Package
+from app.models.vendor import Vendor
 
 
 class VendorService:

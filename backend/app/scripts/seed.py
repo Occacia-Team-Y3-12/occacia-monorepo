@@ -1,6 +1,7 @@
 from app.common.utils import now_utc
 from app.core.database import SessionLocal
-from app.models.marketplace import Vendor, Package
+from app.models.package import Package
+from app.models.vendor import Vendor
 
 def seed_data():
     db = SessionLocal()
