@@ -1,38 +1,44 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
-from datetime import datetime, timezone
-from app.core.database import Base
+"""
+Convenience import module.
 
-# --- EXISTING VENDOR MODEL ---
-class Vendor(Base):
-    __tablename__ = "vendors"
+Importing this module registers all ORM models on `Base.metadata`.
+"""
 
-    id = Column(Integer, primary_key=True, index=True)
-    business_name = Column(String, unique=True, index=True) # OCA-85
-    email = Column(String, unique=True, index=True)         # OCA-85
-    business_type = Column(String)
-    contact_number = Column(String)
-    address = Column(String)
-    
-    # OCA-87: Default status
-    status = Column(String, default="Pending Approval") 
-    is_verified = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc)) # OCA-90
+from app.models.admin import Admin
+from app.models.customer import Customer
+from app.models.event import Event
+from app.models.event_chat_message import EventChatMessage
+from app.models.event_persona import EventPersona
+from app.models.offering import Offering
+from app.models.package import Package
+from app.models.package_execution_request import PackageExecutionRequest
+from app.models.package_item import PackageItem
+from app.models.persona import Persona
+from app.models.recommendation_package import RecommendationPackage
+from app.models.support_note import SupportNote
+from app.models.task import Task
+from app.models.task_recommendation import TaskRecommendation
+from app.models.task_request import TaskRequest
+from app.models.user import User
+from app.models.vendor import Vendor
 
-# --- NEW CUSTOMER MODEL (Added for UC-07) ---
-class Customer(Base):
-    __tablename__ = "customers"
+__all__ = [
+    "Admin",
+    "Customer",
+    "Event",
+    "EventChatMessage",
+    "EventPersona",
+    "Offering",
+    "Package",
+    "PackageExecutionRequest",
+    "PackageItem",
+    "Persona",
+    "RecommendationPackage",
+    "SupportNote",
+    "Task",
+    "TaskRecommendation",
+    "TaskRequest",
+    "User",
+    "Vendor",
+]
 
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    
-    # Basic Profile Info
-    first_name = Column(String, nullable=True)
-    last_name = Column(String, nullable=True)
-    is_active = Column(Boolean, default=True)
-    
-    # Reset Password Fields
-    reset_token = Column(String, nullable=True, unique=True)
-    reset_token_expires = Column(DateTime, nullable=True)
-
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

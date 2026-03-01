@@ -1,21 +1,23 @@
-from abc import ABC
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional
+from __future__ import annotations
 
-from app.common.enums import UserRole, UserStatus
-from app.common.utils.time_utils import now_utc
-from app.models.base.updatable import UpdatableEntity
+from sqlalchemy import Column, DateTime, Integer, String
 
-@dataclass
-class User(UpdatableEntity, ABC):
-    user_id: str
-    email: str
-    password_hash: str
-    role: UserRole
-    status: UserStatus
-    last_login_at: Optional[datetime] = None
+from app.common.utils import generate_prefixed_id, now_utc
+from app.core.database import Base
 
-    def mark_login_time(self) -> None:
-        self.last_login_at = now_utc()
-        self.mark_modified_time()
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, unique=True, index=True, default=lambda: generate_prefixed_id("USR"))
+
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+
+    created_at = Column(DateTime(timezone=True), default=now_utc, nullable=False)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False)
+

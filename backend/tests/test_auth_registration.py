@@ -2,6 +2,7 @@ from uuid import uuid4
 
 import jwt
 import pytest
+from sqlalchemy import text
 
 from app.core.database import SessionLocal, engine
 from app.core.security import ALGORITHM, SECRET_KEY
@@ -10,6 +11,11 @@ from app.models.marketplace import Customer, Vendor
 
 @pytest.fixture(autouse=True)
 def prepare_customer_table():
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS packages"))
+        conn.execute(text("DROP TABLE IF EXISTS vendors"))
+        conn.execute(text("DROP TABLE IF EXISTS customers"))
+
     Customer.__table__.create(bind=engine, checkfirst=True)
     Vendor.__table__.create(bind=engine, checkfirst=True)
     db = SessionLocal()
