@@ -1,5 +1,9 @@
 export const ROUTES = {
   HOME: '/',
+  CUSTOMER: {
+    DASHBOARD: '/customer/dashboard',
+    REGISTER: '/customer/register',
+  },
   VENDOR: {
     LOGIN: '/vendor/login',
     REGISTER: '/vendor/register',
