@@ -6,7 +6,8 @@ from sqlalchemy import text
 
 from app.core.database import SessionLocal, engine
 from app.core.security import ALGORITHM, SECRET_KEY
-from app.models.marketplace import Customer, Vendor
+from app.models.customer import Customer
+from app.models.vendor import Vendor
 
 
 @pytest.fixture(autouse=True)

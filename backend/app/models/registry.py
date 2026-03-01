@@ -41,4 +41,3 @@ __all__ = [
     "User",
     "Vendor",
 ]
-

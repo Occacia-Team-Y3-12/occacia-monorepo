@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 # 1. Registration Input
 class VendorRegisterRequest(BaseModel):
@@ -32,8 +32,7 @@ class VendorResponse(BaseModel):
     approval_status: Optional[str] = None
     approved_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True # Allows reading from database models
+    model_config = ConfigDict(from_attributes=True)
 
 # 4. Token Output
 class Token(BaseModel):

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 
 # 🎯 THE FIX: Added session_id so the router can find it.
@@ -12,8 +12,7 @@ class VenueDisplay(BaseModel):
     price_per_head: Optional[float] = 0.0
     tags: List[str] = []
 
-    class Config:
-        from_attributes = True  # ✅ Crucial for SQLAlchemy compatibility
+    model_config = ConfigDict(from_attributes=True)
 
 class PlanResponse(BaseModel):
     intent: str
