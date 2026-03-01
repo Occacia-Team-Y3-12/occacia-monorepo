@@ -1,11 +1,13 @@
 import logging
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+
 from app.core.database import get_db
 from app.schemas.plan_schema import PlanRequest, PlanResponse, VenueDisplay
 from app.services.ai_service import ai_service
-from app.services.vendor_service import vendor_service
 from app.services.chat_service import chat_service
+from app.services.vendor_service import vendor_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/planning", tags=["Planning"])

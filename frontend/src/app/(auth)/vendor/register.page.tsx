@@ -12,13 +12,11 @@ import {
   isVendorFinalValid
 } from '@/lib/validation';
 
-
 export default function VendorRegister() {
   const router = useRouter();
   const [step, setStep] = useState<'account' | 'organization'>('account');
   const [orgChoice, setOrgChoice] = useState<'join' | 'create' | ''>('');
 
-  // --- typed form state -----------------------------------------------------
   const [formData, setFormData] = useState<VendorFormData>({
     username: '',
     fullName: '',
@@ -36,13 +34,11 @@ export default function VendorRegister() {
     businessEmail: ''
   });
 
-  // errors keyed by the same keys as formData
-  const [errors, setErrors] =
-    useState<Partial<Record<keyof VendorFormData, string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<keyof VendorFormData, string>>>({});
   const [isAccountValid, setIsAccountValid] = useState(false);
   const [isFinalValid, setIsFinalValid] = useState(false);
 
-  // validation helpers ------------------------------------------------------
+  // validation helpers
   const validateField = (
     name: keyof VendorFormData,
     value: string,
@@ -53,9 +49,7 @@ export default function VendorRegister() {
     return error;
   };
 
-  const isAccountStepValid = (data: VendorFormData) =>
-    isVendorAccountValid(data);
-
+  const isAccountStepValid = (data: VendorFormData) => isVendorAccountValid(data);
   const isFinalStepValid = (data: VendorFormData, org: typeof orgChoice) =>
     isVendorFinalValid(data, org);
 
@@ -64,13 +58,13 @@ export default function VendorRegister() {
     if (orgChoice === 'join') {
       validateField('organizationCode', formData.organizationCode);
     } else if (orgChoice === 'create') {
-      (['businessName', 'businessRegNumber', 'businessAddress', 'businessPhone', 'businessEmail'] as Array<keyof VendorFormData>).forEach((f) =>
-        validateField(f, formData[f])
+      (['businessName', 'businessRegNumber', 'businessAddress', 'businessPhone', 'businessEmail'] as Array<keyof VendorFormData>).forEach(
+        (f) => validateField(f, formData[f])
       );
     }
   }, [orgChoice]);
 
-  // update validity when relevant bits change
+  // update validity when account step changes
   useEffect(() => {
     setIsAccountValid(isAccountStepValid(formData));
   }, [
@@ -84,6 +78,7 @@ export default function VendorRegister() {
     formData.gender
   ]);
 
+  // update validity when organization step changes
   useEffect(() => {
     setIsFinalValid(isFinalStepValid(formData, orgChoice));
   }, [
@@ -96,24 +91,14 @@ export default function VendorRegister() {
     orgChoice
   ]);
 
-
   const handleAccountSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isAccountStepValid(formData)) {
       setStep('organization');
     } else {
-      // trigger errors for all account fields so user sees messages
-      [
-        'username',
-        'fullName',
-        'email',
-        'password',
-        'confirmPassword',
-        'address',
-        'nicNumber',
-        'gender'
-      ].forEach((field) =>
-        validateField(field as keyof FormData, formData[field as keyof FormData])
+      // trigger errors for all account fields
+      (['username', 'fullName', 'email', 'password', 'confirmPassword', 'address', 'nicNumber', 'gender'] as Array<keyof VendorFormData>).forEach((field) =>
+        validateField(field, formData[field])
       );
     }
   };
@@ -125,19 +110,14 @@ export default function VendorRegister() {
       if (orgChoice === 'join') {
         validateField('organizationCode', formData.organizationCode);
       } else if (orgChoice === 'create') {
-        [
-          'businessName',
-          'businessRegNumber',
-          'businessAddress',
-          'businessPhone',
-          'businessEmail'
-        ].forEach((field) =>
-          validateField(field as keyof FormData, formData[field as keyof FormData])
+        (['businessName', 'businessRegNumber', 'businessAddress', 'businessPhone', 'businessEmail'] as Array<keyof VendorFormData>).forEach((field) =>
+          validateField(field, formData[field])
         );
       }
       return;
     }
 
+    // Call mock API endpoint (ready for production API swap)
     try {
       const response = await fetch('/api/v1/auth/register', {
         method: 'POST',
@@ -147,10 +127,16 @@ export default function VendorRegister() {
           organizationType: orgChoice
         })
       });
-      if (response.ok) {
-        router.push(ROUTES.VENDOR.VERIFY_EMAIL);
-      }
 
+      const data = await response.json();
+
+      if (response.ok && data.status === 'pending_verification') {
+        // Generate mock token based on response
+        const mockToken = data.data?.token || `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        router.push(`${ROUTES.VENDOR.VERIFY_EMAIL}?token=${mockToken}`);
+      } else {
+        console.error('Registration error:', data.message);
+      }
     } catch (error) {
       console.error('Registration failed:', error);
     }
@@ -194,11 +180,7 @@ export default function VendorRegister() {
                     errors.username ? 'border-red-500' : 'border-[#d1dce5]'
                   }`}
                 />
-                {errors.username && (
-                  <p className="text-red-600 text-sm mt-1">
-                    {errors.username}
-                  </p>
-                )}
+                {errors.username && <p className="text-red-600 text-sm mt-1">{errors.username}</p>}
               </div>
 
               <div>
@@ -212,11 +194,7 @@ export default function VendorRegister() {
                     errors.fullName ? 'border-red-500' : 'border-[#d1dce5]'
                   }`}
                 />
-                {errors.fullName && (
-                  <p className="text-red-600 text-sm mt-1">
-                    {errors.fullName}
-                  </p>
-                )}
+                {errors.fullName && <p className="text-red-600 text-sm mt-1">{errors.fullName}</p>}
               </div>
 
               <div>
@@ -230,11 +208,7 @@ export default function VendorRegister() {
                     errors.email ? 'border-red-500' : 'border-[#d1dce5]'
                   }`}
                 />
-                {errors.email && (
-                  <p className="text-red-600 text-sm mt-1">
-                    {errors.email}
-                  </p>
-                )}
+                {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -245,15 +219,11 @@ export default function VendorRegister() {
                     placeholder="Password"
                     value={formData.password}
                     onChange={handleChange}
-                    className={`px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
+                    className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
                       errors.password ? 'border-red-500' : 'border-[#d1dce5]'
                     }`}
                   />
-                  {errors.password && (
-                    <p className="text-red-600 text-sm mt-1">
-                      {errors.password}
-                    </p>
-                  )}
+                  {errors.password && <p className="text-red-600 text-sm mt-1">{errors.password}</p>}
                 </div>
                 <div>
                   <input
@@ -262,15 +232,11 @@ export default function VendorRegister() {
                     placeholder="Confirm password"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={`px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
+                    className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
                       errors.confirmPassword ? 'border-red-500' : 'border-[#d1dce5]'
                     }`}
                   />
-                  {errors.confirmPassword && (
-                    <p className="text-red-600 text-sm mt-1">
-                      {errors.confirmPassword}
-                    </p>
-                  )}
+                  {errors.confirmPassword && <p className="text-red-600 text-sm mt-1">{errors.confirmPassword}</p>}
                 </div>
               </div>
 
@@ -285,11 +251,7 @@ export default function VendorRegister() {
                     errors.address ? 'border-red-500' : 'border-[#d1dce5]'
                   }`}
                 />
-                {errors.address && (
-                  <p className="text-red-600 text-sm mt-1">
-                    {errors.address}
-                  </p>
-                )}
+                {errors.address && <p className="text-red-600 text-sm mt-1">{errors.address}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -300,22 +262,18 @@ export default function VendorRegister() {
                     placeholder="NIC Number"
                     value={formData.nicNumber}
                     onChange={handleChange}
-                    className={`px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
+                    className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
                       errors.nicNumber ? 'border-red-500' : 'border-[#d1dce5]'
                     }`}
                   />
-                  {errors.nicNumber && (
-                    <p className="text-red-600 text-sm mt-1">
-                      {errors.nicNumber}
-                    </p>
-                  )}
+                  {errors.nicNumber && <p className="text-red-600 text-sm mt-1">{errors.nicNumber}</p>}
                 </div>
                 <div>
                   <select
                     name="gender"
                     value={formData.gender}
                     onChange={handleChange}
-                    className={`px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] bg-[#f8fafb] border ${
+                    className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] bg-[#f8fafb] border ${
                       errors.gender ? 'border-red-500' : 'border-[#d1dce5]'
                     }`}
                   >
@@ -324,11 +282,7 @@ export default function VendorRegister() {
                     <option value="female">Female</option>
                     <option value="other">Other</option>
                   </select>
-                  {errors.gender && (
-                    <p className="text-red-600 text-sm mt-1">
-                      {errors.gender}
-                    </p>
-                  )}
+                  {errors.gender && <p className="text-red-600 text-sm mt-1">{errors.gender}</p>}
                 </div>
               </div>
 
@@ -373,7 +327,7 @@ export default function VendorRegister() {
               </div>
 
               {orgChoice === 'join' && (
-                <>
+                <div>
                   <input
                     type="text"
                     name="organizationCode"
@@ -385,89 +339,91 @@ export default function VendorRegister() {
                     }`}
                   />
                   {errors.organizationCode && (
-                    <p className="text-red-600 text-sm mt-1">
-                      {errors.organizationCode}
-                    </p>
+                    <p className="text-red-600 text-sm mt-1">{errors.organizationCode}</p>
                   )}
-                </>
+                </div>
               )}
 
               {orgChoice === 'create' && (
                 <>
-                  <input
-                    type="text"
-                    name="businessName"
-                    placeholder="Business Name"
-                    value={formData.businessName}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
-                      errors.businessName ? 'border-red-500' : 'border-[#d1dce5]'
-                    }`}
-                  />
-                  {errors.businessName && (
-                    <p className="text-red-600 text-sm mt-1">{errors.businessName}</p>
-                  )}
+                  <div>
+                    <input
+                      type="text"
+                      name="businessName"
+                      placeholder="Business Name"
+                      value={formData.businessName}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
+                        errors.businessName ? 'border-red-500' : 'border-[#d1dce5]'
+                      }`}
+                    />
+                    {errors.businessName && <p className="text-red-600 text-sm mt-1">{errors.businessName}</p>}
+                  </div>
 
-                  <input
-                    type="text"
-                    name="businessRegNumber"
-                    placeholder="Business Registration Number"
-                    value={formData.businessRegNumber}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
-                      errors.businessRegNumber ? 'border-red-500' : 'border-[#d1dce5]'
-                    }`}
-                  />
-                  {errors.businessRegNumber && (
-                    <p className="text-red-600 text-sm mt-1">{errors.businessRegNumber}</p>
-                  )}
+                  <div>
+                    <input
+                      type="text"
+                      name="businessRegNumber"
+                      placeholder="Business Registration Number"
+                      value={formData.businessRegNumber}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
+                        errors.businessRegNumber ? 'border-red-500' : 'border-[#d1dce5]'
+                      }`}
+                    />
+                    {errors.businessRegNumber && (
+                      <p className="text-red-600 text-sm mt-1">{errors.businessRegNumber}</p>
+                    )}
+                  </div>
 
-                  <input
-                    type="text"
-                    name="businessAddress"
-                    placeholder="Business Address"
-                    value={formData.businessAddress}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
-                      errors.businessAddress ? 'border-red-500' : 'border-[#d1dce5]'
-                    }`}
-                  />
-                  {errors.businessAddress && (
-                    <p className="text-red-600 text-sm mt-1">{errors.businessAddress}</p>
-                  )}
+                  <div>
+                    <input
+                      type="text"
+                      name="businessAddress"
+                      placeholder="Business Address"
+                      value={formData.businessAddress}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
+                        errors.businessAddress ? 'border-red-500' : 'border-[#d1dce5]'
+                      }`}
+                    />
+                    {errors.businessAddress && (
+                      <p className="text-red-600 text-sm mt-1">{errors.businessAddress}</p>
+                    )}
+                  </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <input
-                      type="tel"
-                      name="businessPhone"
-                      placeholder="Business Phone"
-                      value={formData.businessPhone}
-                      onChange={handleChange}
-                      className={`px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
-                        errors.businessPhone ? 'border-red-500' : 'border-[#d1dce5]'
-                      }`}
-                    />
-                    {errors.businessPhone && (
-                      <p className="text-red-600 text-sm mt-1">
-                        {errors.businessPhone}
-                      </p>
-                    )}
+                    <div>
+                      <input
+                        type="tel"
+                        name="businessPhone"
+                        placeholder="Business Phone"
+                        value={formData.businessPhone}
+                        onChange={handleChange}
+                        className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
+                          errors.businessPhone ? 'border-red-500' : 'border-[#d1dce5]'
+                        }`}
+                      />
+                      {errors.businessPhone && (
+                        <p className="text-red-600 text-sm mt-1">{errors.businessPhone}</p>
+                      )}
+                    </div>
 
-                    <input
-                      type="email"
-                      name="businessEmail"
-                      placeholder="Business Email"
-                      value={formData.businessEmail}
-                      onChange={handleChange}
-                      className={`px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
-                        errors.businessEmail ? 'border-red-500' : 'border-[#d1dce5]'
-                      }`}
-                    />
-                    {errors.businessEmail && (
-                      <p className="text-red-600 text-sm mt-1">
-                        {errors.businessEmail}
-                      </p>
-                    )}
+                    <div>
+                      <input
+                        type="email"
+                        name="businessEmail"
+                        placeholder="Business Email"
+                        value={formData.businessEmail}
+                        onChange={handleChange}
+                        className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb] border ${
+                          errors.businessEmail ? 'border-red-500' : 'border-[#d1dce5]'
+                        }`}
+                      />
+                      {errors.businessEmail && (
+                        <p className="text-red-600 text-sm mt-1">{errors.businessEmail}</p>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
@@ -499,7 +455,6 @@ export default function VendorRegister() {
               </Link>
             </p>
           </div>
-
         </div>
       </div>
     </div>

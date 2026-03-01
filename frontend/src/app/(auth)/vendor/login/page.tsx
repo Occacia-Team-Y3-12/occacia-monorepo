@@ -46,17 +46,17 @@ export default function VendorLogin() {
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
       <Image src="/images/background.png" alt="Background" fill className="object-cover" priority />
 
-      <div className="flex bg-white rounded-3xl shadow-2xl overflow-hidden max-w-4xl w-full relative z-10">
-        <div className="w-2/5 bg-gradient-to-br from-[#f5f7f9] to-white p-12 flex flex-col items-center justify-center">
-          <div className="mb-8">
-            <Image src="/images/logo.png" alt="Occacia Logo" width={180} height={180} priority />
+      <div className="flex flex-col md:flex-row bg-white rounded-3xl shadow-2xl overflow-hidden max-w-4xl w-full relative z-10">
+        <div className="w-full md:w-2/5 bg-gradient-to-br from-[#f5f7f9] to-white p-6 md:p-12 flex flex-col items-center justify-center">
+          <div className="mb-4 md:mb-8">
+            <Image src="/images/logo.png" alt="Occacia Logo" width={120} height={120} priority className="md:w-[180px] md:h-[180px]" />
           </div>
-          <h1 className="text-4xl font-bold text-[#2c3e50] mb-2">OCCACIA</h1>
-          <p className="text-xl text-[#5a6c7d] font-medium">VENDOR PORTAL</p>
+          <h1 className="text-2xl md:text-4xl font-bold text-[#2c3e50] mb-2">OCCACIA</h1>
+          <p className="text-base md:text-xl text-[#5a6c7d] font-medium">VENDOR PORTAL</p>
         </div>
 
-        <div className="w-3/5 p-12 flex flex-col justify-center">
-          <h2 className="text-3xl font-semibold text-[#5a6c7d] mb-8 text-center">VENDOR SIGN IN</h2>
+        <div className="w-full md:w-3/5 p-6 md:p-12 flex flex-col justify-center">
+          <h2 className="text-2xl md:text-3xl font-semibold text-[#5a6c7d] mb-6 md:mb-8 text-center">VENDOR SIGN IN</h2>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <input
