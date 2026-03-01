@@ -43,6 +43,7 @@ class AuthService:
             password_hash=get_password_hash(payload.password),
             phone=payload.phone,
             address=payload.address,
+            locale=getattr(payload, "locale", None),
             email_verified=False,
             status="PENDING_VERIFICATION",
             verification_token=verification_token,

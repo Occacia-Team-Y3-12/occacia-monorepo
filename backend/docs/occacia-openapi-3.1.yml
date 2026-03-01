@@ -1044,6 +1044,7 @@ components:
         full_name: { type: string }
         phone: { type: string }
         address: { type: string }
+        locale: { type: string }
 
     VendorRegisterRequest:
       type: object
@@ -1054,6 +1055,8 @@ components:
         password: { type: string, minLength: 6 }
         location_base: { type: string }
         phone: { type: string }
+        display_name: { type: string }
+        contact_phone: { type: string }
 
     RegisterResponse:
       type: object
@@ -1067,11 +1070,16 @@ components:
       required: [id, business_name, email, location_base, is_verified]
       properties:
         id: { type: integer }
+        vendor_id: { type: string }
         business_name: { type: string }
         email: { type: string, format: email }
         location_base: { type: string }
         is_verified: { type: boolean }
         phone: { type: string }
+        display_name: { type: string }
+        contact_phone: { type: string }
+        approval_status: { type: string }
+        approved_at: { $ref: "#/components/schemas/ISODateTime" }
 
     ForgotPasswordRequest:
       type: object

@@ -21,9 +21,11 @@ class VendorService:
         vendor = Vendor(
             business_name=getattr(vendor_data, "business_name", None)
             or getattr(vendor_data, "display_name", None),
+            display_name=getattr(vendor_data, "display_name", None),
             email=vendor_data.email,
             location_base=getattr(vendor_data, "location_base", None) or "Unknown",
             phone=getattr(vendor_data, "phone", None),
+            contact_phone=getattr(vendor_data, "contact_phone", None),
             is_verified=False,
         )
         db.add(vendor)
@@ -83,4 +85,3 @@ class VendorService:
 
 
 vendor_service = VendorService()
-
