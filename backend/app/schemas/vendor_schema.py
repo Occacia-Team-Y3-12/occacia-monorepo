@@ -1,40 +1,36 @@
-from datetime import datetime
-from typing import Optional
+from typing import Optional, List
+from pydantic import BaseModel, EmailStr, Field
+from app.common.enums import VendorStatus
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+# contains fields common to both reading and writing vendor data
+class VendorBase(BaseModel):
+    business_name: str = Field(..., min_length=2, max_length=100)
+    contact_name: str = Field(..., min_length=2, max_length=100)
+    phone_number: str = Field(..., min_length=5, max_length=20)
+    description: Optional[str] = Field(None, max_length=500)
+    website: Optional[str] = None
 
-# 1. Registration Input
-class VendorRegisterRequest(BaseModel):
-    business_name: str
+class VendorCreate(VendorBase):
     email: EmailStr
-    password: str
-    location_base: str
-    phone: Optional[str] = None
-    display_name: Optional[str] = None
-    contact_phone: Optional[str] = None
+    password: str = Field(..., min_length=8)
 
-# 2. Login Input
-class VendorLoginRequest(BaseModel):
-    email: EmailStr
-    password: str
+# VendorUpdate is used for patch requests to modify existing profiles
+class VendorUpdate(BaseModel):
+    business_name: Optional[str] = None
+    contact_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    description: Optional[str] = None
+    website: Optional[str] = None
+    # status: Allows admins to approve/reject by updating the enum value
+    status: Optional[VendorStatus] = None
 
-# 3. Standard Output (Safe Response)
-class VendorResponse(BaseModel):
-    id: int
-    vendor_id: Optional[str] = None
-    business_name: str
-    email: EmailStr
-    location_base: str
-    is_verified: bool
-    phone: Optional[str] = None
-    display_name: Optional[str] = None
-    contact_phone: Optional[str] = None
-    approval_status: Optional[str] = None
-    approved_at: Optional[datetime] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-# 4. Token Output
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+# VendorResponse defines the structure of data sent back to the client
+class VendorResponse(VendorBase):
+    id: str
+    user_id: str
+    # status: The current approval state (PENDING, APPROVED, etc.)
+    status: VendorStatus
+    
+    # this enables something ( Pydantic to read data directly from SQLAlchemy model objects)
+    class Config:
+        from_attributes = True
