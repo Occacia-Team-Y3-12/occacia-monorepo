@@ -10,6 +10,66 @@ from app.models.vendor import Vendor
 
 
 class VendorService:
+    
+    @staticmethod
+    def register_vendor(db: Session, vendor_in: VendorCreate) -> Vendor:
+        """
+        Logic to handle the creation of a new vendor and their associated user account.
+        """
+        # checking if the email is already in the 'users' table
+        existing_user = db.query(User).filter(User.email == vendor_in.email).first()
+        if existing_user:
+            # Throw 400 error if email exists
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User with this email already exists."
+            )
+
+        #  Create the User record
+        user_id = f"USR-{generate_id()}"
+        new_user = User(
+            id=user_id,
+            email=vendor_in.email,
+            hashed_password=get_password_hash(vendor_in.password),
+            # Explicitly set the role to VENDOR
+            role=UserRole.VENDOR,
+            # though the Vendor profile logic might restrict access later based on status
+            is_active=True 
+        )
+        # Add the user to the database session (not committed yet)
+        db.add(new_user)
+        
+        # Step 3: Create the Vendor record (The "profile" layer)
+        # Generate a unique VEN- prefix ID
+        vendor_id = f"VEN-{generate_id()}"
+        new_vendor = Vendor(
+            id=vendor_id,
+            user_id=user_id, # Link this profile to the user we just created
+            business_name=vendor_in.business_name,
+            contact_name=vendor_in.contact_name,
+            phone_number=vendor_in.phone_number,
+            description=vendor_in.description,
+            website=vendor_in.website,
+            # REQUIREMENT: New registrations must always start as 'PENDING' for admin review
+            status=VendorStatus.PENDING
+        )
+        # Add the vendor to the database session
+        db.add(new_vendor)
+        
+        try:
+            # Commit both records as a single atomic transaction
+            # If either the User or Vendor creation fails, nothing is saved
+            db.commit()
+            db.refresh(new_vendor)
+            return new_vendor
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"An error occurred during registration: {str(e)}"
+            )
+
+    
     def get_vendor_by_email(self, db: Session, email: str) -> Vendor | None:
         return db.query(Vendor).filter(Vendor.email == email).first()
 
