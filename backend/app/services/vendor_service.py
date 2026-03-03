@@ -68,6 +68,11 @@ class VendorService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"An error occurred during registration: {str(e)}"
             )
+        
+    @staticmethod
+    def get_vendor_by_user_id(db: Session, user_id: str) -> Vendor:
+        """Helper to find a vendor profile based on an authenticated user's ID"""
+        return db.query(Vendor).filter(Vendor.user_id == user_id).first()
 
     
     def get_vendor_by_email(self, db: Session, email: str) -> Vendor | None:
