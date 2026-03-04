@@ -10,8 +10,6 @@ import { ROUTES } from '@/lib/routes';
 export default function VendorLogin() {
   const router = useRouter();
   const [formData, setFormData] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,18 +67,11 @@ export default function VendorLogin() {
             </div>
 
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium py-3 rounded-lg transition-colors duration-200 disabled:opacity-50"
+              className="w-full bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium py-3 rounded-lg transition-colors duration-200"
             >
-              {loading ? 'Logging in...' : 'Login →'}
+              Login →
             </button>
           </form>
 
