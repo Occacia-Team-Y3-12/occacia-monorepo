@@ -1,5 +1,7 @@
+from app.common.utils import now_utc
 from app.core.database import SessionLocal
-from app.models.marketplace import Vendor, Package
+from app.models.package import Package
+from app.models.vendor import Vendor
 
 def seed_data():
     db = SessionLocal()
@@ -18,9 +20,13 @@ def seed_data():
     # ✅ FIXED: Using 'business_name', 'email', 'phone' to match your DB
     v1 = Vendor(
         business_name="The Colonial Bungalow", 
+        display_name="The Colonial Bungalow",
         location_base="Kandy", 
         email="stay@colonial.lk", 
         phone="+94771234567",
+        contact_phone="+94771234567",
+        approval_status="APPROVED",
+        approved_at=now_utc(),
         is_verified=True
     )
     db.add(v1)
@@ -42,9 +48,13 @@ def seed_data():
     # ==========================================
     v2 = Vendor(
         business_name="TechHub Business Center", 
+        display_name="TechHub Business Center",
         location_base="Colombo", 
         email="book@techhub.lk", 
         phone="+94112345678",
+        contact_phone="+94112345678",
+        approval_status="APPROVED",
+        approved_at=now_utc(),
         is_verified=True
     )
     db.add(v2)
@@ -66,9 +76,13 @@ def seed_data():
     # ==========================================
     v3 = Vendor(
         business_name="Cloud9 Rooftop", 
+        display_name="Cloud9 Rooftop",
         location_base="Galle", 
         email="love@cloud9.lk", 
         phone="+94779998888",
+        contact_phone="+94779998888",
+        approval_status="APPROVED",
+        approved_at=now_utc(),
         is_verified=True
     )
     db.add(v3)
@@ -90,9 +104,13 @@ def seed_data():
     # ==========================================
     v4 = Vendor(
         business_name="Burger Shack", 
+        display_name="Burger Shack",
         location_base="Colombo", 
         email="hey@burgershack.lk", 
         phone="+94775554444",
+        contact_phone="+94775554444",
+        approval_status="APPROVED",
+        approved_at=now_utc(),
         is_verified=True
     )
     db.add(v4)
@@ -114,9 +132,13 @@ def seed_data():
     # ==========================================
     v5 = Vendor(
         business_name="Palm Grove Resort", 
+        display_name="Palm Grove Resort",
         location_base="Bentota", 
         email="fam@palmgrove.lk", 
         phone="+94342223333",
+        contact_phone="+94342223333",
+        approval_status="APPROVED",
+        approved_at=now_utc(),
         is_verified=True
     )
     db.add(v5)
@@ -138,9 +160,13 @@ def seed_data():
     # ==========================================
     v6 = Vendor(
         business_name="Wild Trails Camp", 
+        display_name="Wild Trails Camp",
         location_base="Ella", 
         email="wild@trails.lk", 
         phone="+94711112222",
+        contact_phone="+94711112222",
+        approval_status="APPROVED",
+        approved_at=now_utc(),
         is_verified=True
     )
     db.add(v6)

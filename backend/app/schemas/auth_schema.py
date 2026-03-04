@@ -1,7 +1,9 @@
 from typing import Annotated, Literal
-
 from pydantic import BaseModel, EmailStr, Field
 
+# ==========================================
+# 🛠️ BASE & REGISTRATION SCHEMAS
+# ==========================================
 
 class RegisterBase(BaseModel):
     email: EmailStr
@@ -12,23 +14,42 @@ class CustomerRegister(RegisterBase):
     full_name: str = Field(min_length=2)
     phone: str | None = None
     address: str | None = None
+    locale: str | None = None
 
 class VendorRegister(RegisterBase):
     role: Literal["VENDOR"] = "VENDOR"
     display_name: str = Field(min_length=2)
     contact_phone: str | None = None
 
+RegisterRequest = Annotated[
+    CustomerRegister | VendorRegister,
+    Field(discriminator="role")
+]
+
+# ==========================================
+# 🔐 PASSWORD RESET SCHEMAS (UC-07)
+# ==========================================
+
+class ForgotPasswordRequest(BaseModel):
+    """Payload to initiate reset: Customer provides their email."""
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    """Payload to finalize reset: Customer provides token and new password."""
+    token: str
+    new_password: str = Field(min_length=6)
+
+# ==========================================
+# 🚀 RESPONSE SCHEMAS
+# ==========================================
 
 class RegisterResponse(BaseModel):
     message: str
     email: EmailStr
 
-
 class VerifyEmailResponse(BaseModel):
     message: str
 
-
-RegisterRequest = Annotated[
-    CustomerRegister | VendorRegister,
-    Field(discriminator="role")
-]
+class AuthMessageResponse(BaseModel):
+    """Generic success/failure message response."""
+    message: str

@@ -16,7 +16,9 @@ services:
       - .env
     environment:
       POSTGRES_USER: ${DB_USER:-admin}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      # If you change credentials after the volume is created, you must reset it:
+      # `docker compose -f docker-compose-local.yml down -v`
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       POSTGRES_DB: ${DB_NAME:-occacia_db}
     ports:
       - "5432:5432"
@@ -27,6 +29,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *default-logging
+
+  # ===========================
+  # 🧾 MIGRATIONS (One-off)
+  # ===========================
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Alembic `migrations/env.py` prefers DATABASE_URL.
+      # Use internal service name `db` for container-to-container networking.
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD}@db:5432/${DB_NAME:-occacia_db}
+    command: ["sh", "-c", "alembic upgrade head"]
+    restart: "no"
+    profiles: ["tools"]
     logging: *default-logging
 
 volumes:

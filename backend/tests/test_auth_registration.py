@@ -2,14 +2,21 @@ from uuid import uuid4
 
 import jwt
 import pytest
+from sqlalchemy import text
 
 from app.core.database import SessionLocal, engine
 from app.core.security import ALGORITHM, SECRET_KEY
-from app.models.marketplace import Customer, Vendor
+from app.models.customer import Customer
+from app.models.vendor import Vendor
 
 
 @pytest.fixture(autouse=True)
 def prepare_customer_table():
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS packages"))
+        conn.execute(text("DROP TABLE IF EXISTS vendors"))
+        conn.execute(text("DROP TABLE IF EXISTS customers"))
+
     Customer.__table__.create(bind=engine, checkfirst=True)
     Vendor.__table__.create(bind=engine, checkfirst=True)
     db = SessionLocal()
@@ -37,7 +44,7 @@ def test_customer_registration_and_email_verification_success(client):
         "address": "123 Main St",
     }
 
-    register_response = client.post("/api/v1/auth/register", json=payload)
+    register_response = client.post("/api/v1/auth/customers/register", json=payload)
 
     assert register_response.status_code == 201
     assert register_response.json()["message"] == "Verification email sent"
@@ -74,8 +81,8 @@ def test_customer_registration_rejects_duplicate_email(client):
         "password": "StrongPass123!",
     }
 
-    first_response = client.post("/api/v1/auth/register", json=payload)
-    second_response = client.post("/api/v1/auth/register", json=payload)
+    first_response = client.post("/api/v1/auth/customers/register", json=payload)
+    second_response = client.post("/api/v1/auth/customers/register", json=payload)
 
     assert first_response.status_code == 201
     assert second_response.status_code == 400
