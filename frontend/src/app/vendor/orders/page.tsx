@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 export default function VendorOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
-  const orders = [];
+  const orders: any[] = [];
 
   const statuses = [
     { value: 'all', label: 'All Orders', count: 0 },
@@ -55,7 +55,7 @@ export default function VendorOrdersPage() {
               <p className="text-gray-600 text-sm md:text-base">Orders will appear here once customers place them</p>
             </div>
           ) : (
-            orders.map((order, index) => (
+            orders.map((_, index) => (
               <div key={index} className="bg-white rounded-lg shadow-md p-4 md:p-6 hover:shadow-lg transition-shadow">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4">
                   <div className="flex-1">

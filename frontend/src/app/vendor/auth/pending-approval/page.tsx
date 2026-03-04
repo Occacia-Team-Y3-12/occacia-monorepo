@@ -9,12 +9,12 @@ export default function PendingApproval() {
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
       <Image src="/images/background.png" alt="Background" fill className="object-cover" priority />
 
-      <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-12 max-w-md w-full relative z-10 text-center">
+      <div className="bg-white rounded-3xl shadow-2xl p-8 sm:p-10 md:p-12 max-w-md sm:max-w-lg w-full relative z-10 text-center">
         <div className="mb-6 md:mb-8 flex justify-center">
-          <Image src="/images/logo.png" alt="Occacia Logo" width={80} height={80} priority className="md:w-[120px] md:h-[120px]" />
+          <Image src="/images/logo.png" alt="Occacia Logo" width={100} height={100} priority className="sm:w-[120px] sm:h-[120px] md:w-[140px] md:h-[140px]" />
         </div>
 
-        <h1 className="text-2xl md:text-3xl font-bold text-[#2c3e50] mb-3 md:mb-4">Pending Approval</h1>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#2c3e50] mb-3 md:mb-4">Pending Approval</h1>
 
         <div className="mb-6">
           <div className="w-12 h-12 md:w-16 md:h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
@@ -32,7 +32,7 @@ export default function PendingApproval() {
 
         <Link
           href={ROUTES.VENDOR.LOGIN}
-          className="inline-block bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium px-4 md:px-6 py-2 md:py-3 rounded-lg transition-colors duration-200 text-sm md:text-base"
+          className="inline-block bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium px-6 md:px-8 py-3 md:py-4 text-base md:text-lg rounded-lg transition-colors duration-200"
         >
           Back to Login
         </Link>

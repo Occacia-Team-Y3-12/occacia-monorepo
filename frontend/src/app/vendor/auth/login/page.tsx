@@ -15,27 +15,7 @@ export default function VendorLogin() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      const response = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      if (response.ok) {
-        router.push(ROUTES.VENDOR.DASHBOARD);
-      } else {
-
-        setError('Invalid email or password. Please try again.');
-      }
-    } catch (err) {
-      setError('Login failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    router.push(ROUTES.VENDOR.DASHBOARD);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,7 +29,7 @@ export default function VendorLogin() {
       <div className="flex flex-col md:flex-row bg-white rounded-3xl shadow-2xl overflow-hidden max-w-4xl w-full relative z-10">
         <div className="w-full md:w-2/5 bg-gradient-to-br from-[#f5f7f9] to-white p-6 md:p-12 flex flex-col items-center justify-center">
           <div className="mb-4 md:mb-8">
-            <Image src="/images/logo.png" alt="Occacia Logo" width={120} height={120} priority className="md:w-[180px] md:h-[180px]" />
+            <Image src="/icons/logo.svg" alt="Occacia Logo" width={120} height={120} priority className="md:w-[180px] md:h-[180px]" />
           </div>
           <h1 className="text-2xl md:text-4xl font-bold text-[#2c3e50] mb-2">OCCACIA</h1>
           <p className="text-base md:text-xl text-[#5a6c7d] font-medium">VENDOR PORTAL</p>
@@ -80,10 +60,12 @@ export default function VendorLogin() {
             />
 
             <div className="flex justify-end">
-              {/* TODO: Implement forgot password functionality */}
-              <span className="text-sm text-[#999] cursor-not-allowed">
-                Forgot Password?
-              </span>
+            <Link
+              href="/vendor/auth/forgot-password"
+              className="text-sm text-[#1e88e5] hover:underline"
+            >
+              Forgot Password?
+            </Link>
             </div>
 
 

@@ -3,13 +3,16 @@ export const ROUTES = {
   CUSTOMER: {
     DASHBOARD: '/customer/dashboard',
     REGISTER: '/customer/register',
+    PRODUCTS: '/customer/products',
+    CART: '/customer/cart',
+    ORDERS: '/customer/orders',
   },
   VENDOR: {
-    LOGIN: '/vendor/login',
-    REGISTER: '/vendor/register',
-    VERIFY_EMAIL: '/vendor/verify-email',
+    LOGIN: '/vendor/auth/login',
+    REGISTER: '/vendor/auth/register',
+    VERIFY_EMAIL: '/vendor/auth/verify-email',
     DASHBOARD: '/vendor/dashboard',
-    PENDING_APPROVAL: '/vendor/pending-approval',
+    PENDING_APPROVAL: '/vendor/auth/pending-approval',
     ACTIVATED: '/vendor/activated',
     PRODUCTS: '/vendor/products',
     ORDERS: '/vendor/orders',
@@ -21,6 +24,8 @@ export const ROUTES = {
   ADMIN: {
     DASHBOARD: '/admin',
     APPROVALS: '/admin/approvals',
+    USERS: '/admin/users',
+    SETTINGS: '/admin/settings',
   },
 } as const;
 

@@ -10,10 +10,10 @@ export default function Home() {
       <Image src="/images/background.png" alt="Background" fill className="object-cover" priority />
 
       <div className="relative z-10 w-full max-w-6xl px-4 sm:px-6 md:px-8">
-        <div className="flex justify-center mb-8 md:mb-16">
-          <div className="flex items-center gap-3 md:gap-4">
-            <Image src="/images/logo.png" alt="Occacia Logo" width={120} height={120} priority className="md:w-[150px] md:h-[200px]" />
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#2c3e50]">OCCACIA</h1>
+        <div className="flex justify-center mb-12 md:mb-16">
+          <div className="flex items-center gap-4 md:gap-6">
+            <Image src="/icons/logo.svg" alt="Occacia Logo" width={120} height={120} priority className="sm:w-[140px] sm:h-[140px] md:w-[180px] md:h-[180px] lg:w-[200px] lg:h-[200px]" />
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-[#2c3e50]">OCCACIA</h1>
           </div>
         </div>
 
