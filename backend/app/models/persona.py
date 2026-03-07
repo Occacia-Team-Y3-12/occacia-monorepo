@@ -1,10 +1,7 @@
 from __future__ import annotations
-
 from sqlalchemy import JSON, Column, DateTime, Integer, String, Text
-
 from app.common.utils import generate_prefixed_id, now_utc
 from app.core.database import Base
-
 
 class Persona(Base):
     __tablename__ = "personas"
@@ -14,9 +11,10 @@ class Persona(Base):
 
     customer_id = Column(String, index=True, nullable=False)
     name = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
-    preferences_json = Column(JSON, nullable=True)
+    relationship = Column(String, nullable=True)        # e.g. girlfriend, mom, colleague
+    birthday = Column(DateTime(timezone=True), nullable=True)
+    personality = Column(Text, nullable=True)           # e.g. "introverted, loves cozy things"
+    preferences_json = Column(JSON, nullable=True)      # hobbies, interests list
 
     created_at = Column(DateTime(timezone=True), default=now_utc, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False)
-
