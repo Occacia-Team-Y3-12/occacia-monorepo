@@ -74,78 +74,54 @@ export default function RegisterPage() {
 
   // Registration Form Screen
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      {/* Left Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 lg:px-12">
-        <div className="max-w-md w-full">
-          {/* Logo */}
-          <div className="flex items-center gap-2 mb-10">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/images/customer/background.jpeg')" }}>
+      <div className="w-full max-w-4xl bg-white/95 backdrop-blur rounded-xl shadow-xl flex overflow-hidden">
+        
+        {/* Left Section - Form */}
+        <div className="flex-1 p-8">
+          <div className="flex items-center gap-2 mb-6">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 rounded-lg flex items-center justify-center shadow-md">
               <span className="text-white font-bold text-xl">O</span>
             </div>
             <span className="text-2xl font-bold text-gray-900">OCCACIA</span>
           </div>
 
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Create an account
-            </h1>
-            <p className="text-gray-600">Let's create magic together.</p>
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold text-gray-900 mb-1">Create an account</h1>
+            <p className="text-gray-500 text-sm">Let's create magic together.</p>
           </div>
 
-          {/* Registration Form */}
           <RegisterForm onSubmit={onSubmit} isLoading={isLoading} />
 
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-gray-50 text-gray-500">Or continue with</span>
-            </div>
+          <div className="mt-4 space-y-2">
+            <SocialLoginButtons />
           </div>
 
-          {/* Social Login Buttons */}
-          <SocialLoginButtons />
-
-          {/* Login Link */}
-          <p className="text-center text-sm text-gray-600 mt-8">
+          <p className="text-sm text-center text-gray-500 mt-4">
             Already have an account?{' '}
-            <Link href="/customer/auth/login" className="text-blue-600 hover:text-blue-700 font-semibold hover:underline">
+            <Link href="/customer/auth/login" className="text-blue-600 cursor-pointer hover:underline">
               Login
             </Link>
           </p>
         </div>
-      </div>
 
-      {/* Right Side - Image/Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-purple-700">
-          {/* Background Pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="1"/>
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#grid)" />
-            </svg>
-          </div>
-
-          {/* Content */}
-          <div className="relative h-full flex items-center justify-center p-12">
-            <div className="text-white max-w-lg">
-              <h2 className="text-6xl font-bold mb-6 leading-tight">
-                <span className="text-yellow-300">P</span>lan<br />
-                meaningful<br />
-                moments,<br />
-                effortlessly with
-              </h2>
-              <p className="text-7xl font-bold">Occacia</p>
-            </div>
+        {/* Right Section - Image */}
+        <div className="relative hidden md:block w-80 flex-shrink-0">
+          <Image
+            src="/images/customer/customer register pic.png"
+            alt="Customer Register"
+            fill
+            className="object-cover rounded-r-xl"
+            priority
+          />
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center px-6 rounded-r-xl">
+            <h2 className="text-white text-2xl font-semibold leading-snug text-center">
+              <span className="text-yellow-300 text-3xl">P</span>lan<br />
+              meaningful<br />
+              moments,<br />
+              effortlessly with<br />
+              <span className="text-3xl font-bold">Occacia</span>
+            </h2>
           </div>
         </div>
       </div>

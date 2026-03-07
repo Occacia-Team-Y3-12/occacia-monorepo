@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
 import { RegisterFormValues, registerSchema } from '@/lib/validators';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface RegisterFormProps {
   onSubmit: (data: RegisterFormValues) => Promise<void>;
@@ -19,12 +18,12 @@ export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps)
     password: '',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof RegisterFormValues, string>>>({});
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Clear error when user starts typing
     if (errors[name as keyof RegisterFormValues]) {
       setErrors(prev => ({ ...prev, [name]: undefined }));
     }
@@ -49,67 +48,79 @@ export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps)
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <Input
-        label="Username"
+      <input
+        type="text"
         name="username"
         value={formData.username}
         onChange={handleChange}
-        error={errors.username}
-        placeholder="Enter your username"
+        placeholder="Username"
         disabled={isLoading}
+        className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
       />
+      {errors.username && <p className="text-xs text-red-500 -mt-2">{errors.username}</p>}
 
-      <Input
-        label="Full Name"
+      <input
+        type="text"
         name="fullName"
         value={formData.fullName}
         onChange={handleChange}
-        error={errors.fullName}
-        placeholder="Enter your full name"
+        placeholder="Full Name"
         disabled={isLoading}
+        className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
       />
+      {errors.fullName && <p className="text-xs text-red-500 -mt-2">{errors.fullName}</p>}
 
-      <Input
-        label="Email"
-        name="email"
+      <input
         type="email"
+        name="email"
         value={formData.email}
         onChange={handleChange}
-        error={errors.email}
-        placeholder="Enter your email"
+        placeholder="Email Address"
         disabled={isLoading}
+        className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
       />
+      {errors.email && <p className="text-xs text-red-500 -mt-2">{errors.email}</p>}
 
-      <Input
-        label="Mobile Number"
+      <input
+        type="tel"
         name="mobileNumber"
         value={formData.mobileNumber}
         onChange={handleChange}
-        error={errors.mobileNumber}
-        placeholder="Enter your mobile number"
+        placeholder="Mobile Number"
         disabled={isLoading}
+        className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
       />
+      {errors.mobileNumber && <p className="text-xs text-red-500 -mt-2">{errors.mobileNumber}</p>}
 
-      <Input
-        label="Password"
-        name="password"
-        type="password"
-        value={formData.password}
-        onChange={handleChange}
-        error={errors.password}
-        placeholder="Enter your password"
-        showPasswordToggle
-        disabled={isLoading}
-      />
+      <div className="relative">
+        <input
+          type={showPassword ? "text" : "password"}
+          name="password"
+          value={formData.password}
+          onChange={handleChange}
+          placeholder="Password"
+          disabled={isLoading}
+          className="w-full border border-gray-300 rounded-md px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+        >
+          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+      {errors.password && <p className="text-xs text-red-500 -mt-2">{errors.password}</p>}
 
-      <Button
+      <p className="text-xs text-gray-400 -mt-2">Must be at least 8 characters</p>
+
+      <button
         type="submit"
-        variant="primary"
-        loading={isLoading}
-        className="w-full mt-6"
+        disabled={isLoading}
+        className="w-full bg-blue-600 text-white py-2.5 rounded-md font-medium hover:bg-blue-700 transition disabled:bg-blue-400 disabled:cursor-not-allowed"
       >
-        Create Account
-      </Button>
+        {isLoading ? 'Creating Account...' : 'Create Account'}
+      </button>
     </form>
   );
 }
