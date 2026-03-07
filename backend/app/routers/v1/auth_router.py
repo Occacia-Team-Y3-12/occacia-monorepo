@@ -1,8 +1,8 @@
 from datetime import timedelta
 import jwt
 import os
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import PyJWTError as JWTError
 from sqlalchemy.orm import Session
@@ -20,16 +20,11 @@ from app.services.vendor_service import vendor_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# ── Three separate OAuth2 schemes so Swagger shows all three login buttons ───
 oauth2_vendor_scheme   = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/vendors/login",   scheme_name="VendorAuth")
 oauth2_customer_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/customers/login", scheme_name="CustomerAuth")
 oauth2_admin_scheme    = OAuth2PasswordBearer(tokenUrl="/api/v1/admin/login",           scheme_name="AdminAuth")
-
-# Keep this alias so existing code that imports oauth2_scheme still works
 oauth2_scheme = oauth2_vendor_scheme
 
-
-# ── HTML helpers ──────────────────────────────────────────────────────────────
 
 def _success_page(title: str, message: str) -> str:
     return f"""<!DOCTYPE html>
@@ -55,7 +50,7 @@ def _success_page(title: str, message: str) -> str:
 </head>
 <body>
   <div class="card">
-    <div class="icon">✅</div>
+    <div class="icon">&#10003;</div>
     <h1>{title}</h1>
     <p>{message}</p>
     <div class="badge">You can close this tab</div>
@@ -88,7 +83,7 @@ def _error_page(title: str, message: str) -> str:
 </head>
 <body>
   <div class="card">
-    <div class="icon">❌</div>
+    <div class="icon">&#10007;</div>
     <h1>{title}</h1>
     <p>{message}</p>
     <div class="badge">Please request a new verification email</div>
@@ -97,7 +92,14 @@ def _error_page(title: str, message: str) -> str:
 </html>"""
 
 
-# ── Auth dependencies ─────────────────────────────────────────────────────────
+def _wants_json(request: Request) -> bool:
+    accept = request.headers.get("accept", "")
+    # If no Accept header or not explicitly requesting HTML, return JSON.
+    # Browsers always send text/html in Accept; test clients typically don't.
+    if not accept or accept == "*/*":
+        return True
+    return "application/json" in accept and "text/html" not in accept
+
 
 def get_current_vendor(
     token: str = Depends(oauth2_vendor_scheme), db: Session = Depends(get_db)
@@ -154,8 +156,6 @@ def get_current_admin(
     return admin
 
 
-# ── Login helper ──────────────────────────────────────────────────────────────
-
 def verify_user_login(user, form_data: OAuth2PasswordRequestForm):
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect email or password",
@@ -168,8 +168,6 @@ def verify_user_login(user, form_data: OAuth2PasswordRequestForm):
         if not getattr(user, 'email_verified', True) and not getattr(user, 'is_verified', True):
             raise HTTPException(status_code=403, detail="Email not verified.")
 
-
-# ── Registration ──────────────────────────────────────────────────────────────
 
 @router.post("/vendors/register", response_model=VendorResponse, status_code=201)
 def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(get_db)):
@@ -187,43 +185,52 @@ def register_customer(payload: CustomerRegister, db: Session = Depends(get_db)):
     return auth_service.register_customer(db, payload)
 
 
-# ── Email verification ────────────────────────────────────────────────────────
-
-@router.get("/customers/verify-email", response_class=HTMLResponse)
-def verify_customer_email(token: str = Query(...), db: Session = Depends(get_db)):
+@router.get("/customers/verify-email")
+def verify_customer_email(request: Request, token: str = Query(...), db: Session = Depends(get_db)):
     try:
-        auth_service.verify_customer_email(db, token)
+        result = auth_service.verify_customer_email(db, token)
+        # verify_customer_email returns a dict e.g. {"message": "Email already verified"}
+        # or {"message": "Email verified successfully"}
+        msg = result.get("message", "Email verified successfully") if isinstance(result, dict) else "Email verified successfully"
+        if _wants_json(request):
+            return JSONResponse(content={"message": msg})
         return HTMLResponse(content=_success_page(
             "Email Verified!",
             "Your Occacia account has been activated. You can now log in."
         ))
     except HTTPException as e:
+        if _wants_json(request):
+            return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
         return HTMLResponse(status_code=e.status_code,
                             content=_error_page("Verification Failed", e.detail))
     except Exception:
+        if _wants_json(request):
+            return JSONResponse(status_code=400, content={"detail": "Invalid verification token."})
         return HTMLResponse(status_code=400,
-                            content=_error_page("Verification Failed",
-                                                "Link invalid or expired."))
+                            content=_error_page("Verification Failed", "Link invalid or expired."))
 
 
-@router.get("/vendors/verify-email", response_class=HTMLResponse)
-def verify_vendor_email(token: str = Query(...), db: Session = Depends(get_db)):
+@router.get("/vendors/verify-email")
+def verify_vendor_email(request: Request, token: str = Query(...), db: Session = Depends(get_db)):
     try:
         auth_service.verify_vendor_email(db, token)
+        if _wants_json(request):
+            return JSONResponse(content={"message": "Email verified successfully"})
         return HTMLResponse(content=_success_page(
             "Vendor Email Verified!",
             "Your vendor email has been verified. Our team will review your application."
         ))
     except HTTPException as e:
+        if _wants_json(request):
+            return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
         return HTMLResponse(status_code=e.status_code,
                             content=_error_page("Verification Failed", e.detail))
     except Exception:
+        if _wants_json(request):
+            return JSONResponse(status_code=400, content={"detail": "Invalid verification token."})
         return HTMLResponse(status_code=400,
-                            content=_error_page("Verification Failed",
-                                                "Link invalid or expired."))
+                            content=_error_page("Verification Failed", "Link invalid or expired."))
 
-
-# ── Password reset ────────────────────────────────────────────────────────────
 
 @router.post("/customers/forgot-password", response_model=AuthMessageResponse)
 async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
@@ -234,8 +241,6 @@ async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(
 async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
     return auth_service.confirm_password_reset(db, request)
 
-
-# ── Login ─────────────────────────────────────────────────────────────────────
 
 @router.post("/customers/login", tags=["Authentication"])
 def login_customer(form_data: OAuth2PasswordRequestForm = Depends(),
@@ -256,8 +261,6 @@ def login_vendor(form_data: OAuth2PasswordRequestForm = Depends(),
                                 expires_delta=timedelta(minutes=60))
     return {"access_token": token, "token_type": "bearer"}
 
-
-# ── Me endpoints ──────────────────────────────────────────────────────────────
 
 @router.get("/vendors/me", response_model=VendorResponse)
 def read_current_vendor(current_vendor=Depends(get_current_vendor)):

@@ -121,7 +121,7 @@ class AIService:
             full_input = raw_query
 
         cache_seed = full_input + (tag_block or "")
-        cache_key = f"ai_cache:{hashlib.md5(cache_seed.encode()).hexdigest()}"
+        cache_key = f"ai_cache:{hashlib.md5(cache_seed.encode(), usedforsecurity=False).hexdigest()}"
         r = _get_redis()
         if r:
             try:
