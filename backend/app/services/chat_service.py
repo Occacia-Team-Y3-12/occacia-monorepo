@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-SUMMARY_THRESHOLD = 8   # summarise when history exceeds this many turns
-RECENT_TURNS_KEPT  = 4  # always keep the last N turns verbatim
+CONTEXT_RECENT_TURNS = 5   # always keep the last N turns verbatim
+                            # (hard cap — prevents token bloat after turn 10+)
 
 
 class ChatService:
@@ -56,48 +56,62 @@ class ChatService:
             return last.missing_info
         return []
 
-    # ── FIX 1: Conversation summary compression ───────────────────────────────
+    # ── Context compression (hard cap) ───────────────────────────────────────
 
     def build_context_string(self, history: List[ChatMessage]) -> str:
         """
-        Convert chat history into a context string for the AI prompt.
+        Convert chat history into a compact context string for the AI prompt.
 
-        If the conversation is short (≤ SUMMARY_THRESHOLD turns) we include
-        every turn verbatim.  Once it grows beyond that we compress the older
-        portion into a one-paragraph summary and keep only the most-recent
-        RECENT_TURNS_KEPT turns verbatim.  This stops the prompt from ballooning
-        after many exchanges.
+        Strategy (prevents Langflow token-limit issues after ~10 turns):
+          • Turn 1 is ALWAYS included verbatim — it contains the original
+            event requirements (location, budget, guest count, occasion type).
+          • Turns 2 … (N-CONTEXT_RECENT_TURNS) are compressed into a one-line
+            factual summary extracted by _build_summary().
+          • The last CONTEXT_RECENT_TURNS turns are always included verbatim
+            so the AI has full conversational context for the current reply.
+
+        For short conversations (≤ CONTEXT_RECENT_TURNS+1 turns) everything
+        is included verbatim — no compression needed.
         """
         if not history:
             return ""
 
-        if len(history) <= SUMMARY_THRESHOLD:
-            # Short conversation — include everything verbatim
+        # Short path — no compression needed
+        if len(history) <= CONTEXT_RECENT_TURNS + 1:
             lines = ["CONVERSATION HISTORY:"]
             for msg in history:
                 lines.append(f"User: {msg.user_message}")
                 lines.append(f"Assistant: {msg.ai_message}")
             return "\n".join(lines)
 
-        # Long conversation — summarise the old part, keep recent turns verbatim
-        old_turns   = history[:-RECENT_TURNS_KEPT]
-        recent_turns = history[-RECENT_TURNS_KEPT:]
-
-        summary = self._build_summary(old_turns)
+        # Long path — anchor turn 1, compress middle, keep tail verbatim
+        turn_1      = history[0]
+        middle      = history[1:-CONTEXT_RECENT_TURNS]   # may be empty if len==N+2
+        recent      = history[-CONTEXT_RECENT_TURNS:]
 
         lines = [
-            "CONVERSATION SUMMARY (earlier turns):",
-            summary,
-            "",
-            "RECENT CONVERSATION (verbatim):",
+            "ORIGINAL REQUIREMENTS (turn 1 — always keep):",
+            f"User: {turn_1.user_message}",
+            f"Assistant: {turn_1.ai_message}",
         ]
-        for msg in recent_turns:
+
+        if middle:
+            summary = self._build_summary(middle)
+            lines += [
+                "",
+                f"CONVERSATION SUMMARY ({len(middle)} middle turns compressed):",
+                summary,
+            ]
+
+        lines += ["", "RECENT CONVERSATION (last 5 turns — verbatim):"]
+        for msg in recent:
             lines.append(f"User: {msg.user_message}")
             lines.append(f"Assistant: {msg.ai_message}")
 
         logger.info(
-            f"📝 CONTEXT COMPRESSED: {len(old_turns)} old turns → summary "
-            f"+ {len(recent_turns)} recent turns verbatim."
+            f"📝 CONTEXT COMPRESSED: turn-1 anchored + "
+            f"{len(middle)} middle turns → summary + "
+            f"{len(recent)} recent turns verbatim."
         )
         return "\n".join(lines)
 

@@ -10,6 +10,169 @@ from app.services.chat_service import chat_service
 
 logger = logging.getLogger(__name__)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Persona preference → package tag mapping
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Maps freeform preference keywords to known vendor package tags.
+# A persona who loves "nature" and "adventure" will bias matches toward
+# packages tagged with those exact strings.
+_PREFERENCE_TO_TAGS: dict[str, list[str]] = {
+    # food preferences
+    "fine dining":    ["fine-dining", "luxury"],
+    "fine-dining":    ["fine-dining", "luxury"],
+    "casual dining":  ["casual"],
+    "brunch":         ["brunch"],
+    "vegan":          ["wellness", "nature"],
+    "seafood":        ["beach", "fine-dining"],
+    # color / vibe preferences
+    "nature":         ["nature", "outdoor", "wellness"],
+    "blue":           ["beach", "pool", "nature"],
+    "green":          ["nature", "outdoor", "hiking"],
+    "red":            ["romantic", "luxury"],
+    "purple":         ["luxury", "spa"],
+    "pastel":         ["wellness", "brunch"],
+    "dark":           ["nightlife", "luxury"],
+    # music preferences
+    "jazz":           ["fine-dining", "luxury", "romantic"],
+    "pop":            ["party", "nightlife"],
+    "classical":      ["luxury", "fine-dining", "cultural"],
+    "electronic":     ["nightlife", "party"],
+    "acoustic":       ["romantic", "nature", "wellness"],
+    "live music":     ["music", "party"],
+    # personality / vibe tags (direct passthrough)
+    "adventure":      ["adventure", "hiking", "outdoor"],
+    "romantic":       ["romantic"],
+    "luxury":         ["luxury", "spa"],
+    "sporty":         ["fitness", "sports", "outdoor"],
+    "artistic":       ["art", "photography", "cultural"],
+    "spiritual":      ["wellness", "cultural"],
+    "family":         ["family", "kids"],
+    "social":         ["party", "brunch", "music"],
+    "relaxed":        ["spa", "wellness", "sunset"],
+    "photography":    ["photography", "sunset", "nature"],
+    "travel":         ["travel", "adventure"],
+    "nightlife":      ["nightlife", "party"],
+    "outdoor":        ["outdoor", "nature", "hiking"],
+    "indoor":         ["indoor", "spa", "fine-dining"],
+    "beach":          ["beach", "pool", "sunset"],
+    "wellness":       ["wellness", "spa", "fitness"],
+    "cultural":       ["cultural", "art"],
+    "kids":           ["kids", "family"],
+    "pet-friendly":   ["pet-friendly", "outdoor"],
+    "corporate":      ["corporate", "luxury"],
+    "wedding":        ["wedding", "romantic", "luxury"],
+    "birthday":       ["birthday", "party"],
+}
+
+
+def _build_structured_persona_context(personas: list) -> str:
+    """
+    Convert persona objects into a structured AI prompt block.
+
+    Reads four preference fields from each persona:
+        food_preferences    – list[str] or comma-separated str
+        color_preferences   – list[str] or comma-separated str
+        music_preferences   – list[str] or comma-separated str
+        personality_tags    – list[str] or comma-separated str
+
+    Falls back to legacy `preferences_json` (list of hobby strings) when the
+    new fields are absent, so existing personas keep working.
+
+    Returns a single prompt string that instructs the AI to bias tag selection
+    toward the derived package tags.
+    """
+    if not personas:
+        return ""
+
+    blocks = []
+    all_bias_tags: list[str] = []
+
+    for persona in personas:
+        name = getattr(persona, "name", "Unknown") or "Unknown"
+        relationship = getattr(persona, "relationship", "") or ""
+        personality = getattr(persona, "personality", "") or ""
+
+        # ── Collect raw preferences from new structured fields ────────────
+        def _to_list(val) -> list[str]:
+            if not val:
+                return []
+            if isinstance(val, list):
+                return [str(v).strip().lower() for v in val if v]
+            return [s.strip().lower() for s in str(val).split(",") if s.strip()]
+
+        food   = _to_list(getattr(persona, "food_preferences",  None))
+        colors = _to_list(getattr(persona, "color_preferences", None))
+        music  = _to_list(getattr(persona, "music_preferences", None))
+        ptags  = _to_list(getattr(persona, "personality_tags",  None))
+
+        # ── Legacy fallback: preferences_json (list of hobby strings) ─────
+        if not any([food, colors, music, ptags]):
+            legacy = getattr(persona, "preferences_json", None) or []
+            if isinstance(legacy, str):
+                import json as _j
+                try:
+                    legacy = _j.loads(legacy)
+                except Exception:
+                    legacy = [s.strip() for s in legacy.split(",") if s.strip()]
+            ptags = [str(v).strip().lower() for v in legacy if v]
+
+        # ── Map preferences → package tags ───────────────────────────────
+        derived_tags: list[str] = []
+        for pref_list in [food, colors, music, ptags]:
+            for pref in pref_list:
+                mapped = _PREFERENCE_TO_TAGS.get(pref, [pref])  # passthrough if unknown
+                derived_tags.extend(mapped)
+
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        unique_tags: list[str] = []
+        for t in derived_tags:
+            if t not in seen:
+                seen.add(t)
+                unique_tags.append(t)
+
+        all_bias_tags.extend(unique_tags)
+
+        # ── Build per-persona description block ───────────────────────────
+        lines = [f"RECIPIENT PROFILE — {name}"]
+        if relationship:
+            lines.append(f"  Relationship : {relationship}")
+        if personality:
+            lines.append(f"  Personality  : {personality}")
+        if food:
+            lines.append(f"  Food prefs   : {', '.join(food)}")
+        if colors:
+            lines.append(f"  Colour prefs : {', '.join(colors)}")
+        if music:
+            lines.append(f"  Music prefs  : {', '.join(music)}")
+        if ptags:
+            lines.append(f"  Vibe / tags  : {', '.join(ptags)}")
+        if unique_tags:
+            lines.append(f"  → Suggested package tags: {', '.join(unique_tags)}")
+        blocks.append("\n".join(lines))
+
+    # De-dup global bias tags
+    seen_global: set[str] = set()
+    global_bias: list[str] = []
+    for t in all_bias_tags:
+        if t not in seen_global:
+            seen_global.add(t)
+            global_bias.append(t)
+
+    header = (
+        "RECIPIENT PROFILES — use the details below to personalise venue and gift suggestions.\n"
+        "CRITICAL: When selecting venue_tags, PRIORITISE tags from the 'Suggested package tags' "
+        "list for each recipient. Do NOT ignore these even if the user did not mention them "
+        "explicitly.\n"
+    )
+    footer = (
+        f"\nGLOBAL TAG BIAS (union of all recipient preferences): {', '.join(global_bias)}\n"
+        "Blend these into your venue_tags selection wherever they are available in "
+        "AVAILABLE_VENUE_TAGS."
+    )
+    return header + "\n\n".join(blocks) + footer
+
 
 def _get_redis():
     try:
@@ -69,8 +232,7 @@ class AIService:
 
         persona_context = ""
         if personas:
-            from app.services.persona_service import persona_service
-            persona_context = persona_service.build_persona_context(personas)
+            persona_context = _build_structured_persona_context(personas)
             logger.info(f"👤 PERSONAS LOADED: {len(personas)} profiles injected into prompt.")
 
         tag_block = ""
@@ -121,7 +283,7 @@ class AIService:
             full_input = raw_query
 
         cache_seed = full_input + (tag_block or "")
-        cache_key = f"ai_cache:{hashlib.md5(cache_seed.encode()).hexdigest()}"
+        cache_key = f"ai_cache:{hashlib.md5(cache_seed.encode(), usedforsecurity=False).hexdigest()}"
         r = _get_redis()
         if r:
             try:
@@ -141,12 +303,31 @@ class AIService:
 
         logger.info(f"📡 OUTGOING TO LANGFLOW | Payload length: {len(full_input)} chars")
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=25.0) as client:
             try:
                 response = await client.post(
-                    self.base_url, json=payload, headers=headers, timeout=120.0
+                    self.base_url, json=payload, headers=headers
                 )
                 response.raise_for_status()
+            except httpx.TimeoutException:
+                logger.warning("⏱️ LANGFLOW TIMEOUT — returning immediate fallback after 25 s.")
+                return {
+                    "intent": "chat",
+                    "reasoning": "Langflow did not respond within 25 seconds.",
+                    "personality_profile": None,
+                    "chat_response": (
+                        "I'm having a little trouble reaching my planning brain right now 🙈 "
+                        "Could you try again in a moment? In the meantime, tell me more about "
+                        "what you're celebrating!"
+                    ),
+                    "gift_suggestion": None,
+                    "event_type": None,
+                    "location": None,
+                    "budget_per_head": None,
+                    "guest_count": None,
+                    "venue_tags": [],
+                    "missing_info": [],
+                }
             except Exception as e:
                 logger.error(f"🔥 LANGFLOW CONNECTION ERROR: {type(e).__name__}: {repr(e)}")
                 raise
@@ -181,8 +362,8 @@ class AIService:
 
                 if r:
                     try:
-                        r.setex(cache_key, 300, json.dumps(parsed_data))
-                        logger.info("💾 AI response cached for 5 minutes.")
+                        r.setex(cache_key, 7200, json.dumps(parsed_data))
+                        logger.info("💾 AI response cached for 2 hours.")
                     except Exception:
                         pass
 
