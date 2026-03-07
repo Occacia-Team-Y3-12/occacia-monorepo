@@ -312,3 +312,7 @@ async def generate_plan(
     )
 
 
+
+
+def check_rate_limit(customer_id: str, session_id: str) -> bool:
+    return True

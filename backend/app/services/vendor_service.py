@@ -215,3 +215,8 @@ class VendorService:
 
 
 vendor_service = VendorService()
+
+def normalize_tags(tags):
+    if not tags:
+        return []
+    return [t.strip().lower() for t in tags if t.strip()]
