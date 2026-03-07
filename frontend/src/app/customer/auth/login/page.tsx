@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
-import Button from '@/components/ui/Button';
 import LoginForm from '@/components/customer/auth/RegisterForm';
 import SocialLoginButtons from '@/components/ui/SocialLoginButtons';
 import { LoginFormValues } from '@/lib/validators';
