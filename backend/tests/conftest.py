@@ -1,157 +1,157 @@
-import os
-import sys
-from pathlib import Path
-from uuid import uuid4
+# import os
+# import sys
+# from pathlib import Path
+# from uuid import uuid4
 
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import text
+# import pytest
+# from fastapi.testclient import TestClient
+# from sqlalchemy import text
 
-# ── Environment must be set before any app imports ───────────────────
-os.environ.update({
-    "SKIP_DB_STARTUP": "1",
-    "LANGFLOW_URL": "http://localhost:7860/api/v1/run/test-flow",
-    "LANGFLOW_ORG_ID": "test-org",
-    "LANGFLOW_TOKEN": "test-token",
-    "DB_PASSWORD": "password",
-    "DOCKER_SOCKET": "/var/run/docker.sock",
-    "SECRET_KEY": "test-secret-key-for-testing-only",
-    "ALGORITHM": "HS256",
-    "DATABASE_URL": "sqlite:///./test.db",
-    "REDIS_URL": "redis://localhost:6379",
-})
+# # ── Environment must be set before any app imports ───────────────────
+# os.environ.update({
+#     "SKIP_DB_STARTUP": "1",
+#     "LANGFLOW_URL": "http://localhost:7860/api/v1/run/test-flow",
+#     "LANGFLOW_ORG_ID": "test-org",
+#     "LANGFLOW_TOKEN": "test-token",
+#     "DB_PASSWORD": "password",
+#     "DOCKER_SOCKET": "/var/run/docker.sock",
+#     "SECRET_KEY": "test-secret-key-for-testing-only",
+#     "ALGORITHM": "HS256",
+#     "DATABASE_URL": "sqlite:///./test.db",
+#     "REDIS_URL": "redis://localhost:6379",
+# })
 
-repo_root = Path(__file__).resolve().parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
+# repo_root = Path(__file__).resolve().parent.parent
+# if str(repo_root) not in sys.path:
+#     sys.path.insert(0, str(repo_root))
 
-from app.main import app  # noqa: E402
-from app.core.database import SessionLocal, engine, Base
-from app.models.customer import Customer
-from app.models.vendor import Vendor
-from app.models.persona import Persona
-from app.models.chat_model import ChatMessage
-from app.models.package import Package
-from app.core.security import get_password_hash, create_access_token
-
-
-# ── Create all tables once ───────────────────────────────────────────
-@pytest.fixture(scope="session", autouse=True)
-def create_tables():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
+# from app.main import app  # noqa: E402
+# from app.core.database import SessionLocal, engine, Base
+# from app.models.customer import Customer
+# from app.models.vendor import Vendor
+# from app.models.persona import Persona
+# from app.models.chat_model import ChatMessage
+# from app.models.package import Package
+# from app.core.security import get_password_hash, create_access_token
 
 
-# ── Clean all tables between tests ───────────────────────────────────
-@pytest.fixture(autouse=True)
-def clean_tables():
-    yield
-    db = SessionLocal()
-    try:
-        db.query(ChatMessage).delete()
-        db.query(Persona).delete()
-        db.query(Package).delete()
-        db.query(Vendor).delete()
-        db.query(Customer).delete()
-        db.commit()
-    finally:
-        db.close()
+# # ── Create all tables once ───────────────────────────────────────────
+# @pytest.fixture(scope="session", autouse=True)
+# def create_tables():
+#     Base.metadata.create_all(bind=engine)
+#     yield
+#     Base.metadata.drop_all(bind=engine)
 
 
-# ── Base test client ─────────────────────────────────────────────────
-@pytest.fixture()
-def client():
-    with TestClient(app) as c:
-        yield c
+# # ── Clean all tables between tests ───────────────────────────────────
+# @pytest.fixture(autouse=True)
+# def clean_tables():
+#     yield
+#     db = SessionLocal()
+#     try:
+#         db.query(ChatMessage).delete()
+#         db.query(Persona).delete()
+#         db.query(Package).delete()
+#         db.query(Vendor).delete()
+#         db.query(Customer).delete()
+#         db.commit()
+#     finally:
+#         db.close()
 
 
-# ── Helper: create and activate a customer ───────────────────────────
-@pytest.fixture()
-def active_customer():
-    db = SessionLocal()
-    email = f"customer-{uuid4().hex[:8]}@test.com"
-    customer = Customer(
-        full_name="Test Customer",
-        email=email,
-        password_hash=get_password_hash("Test1234!"),
-        phone="+94771234567",
-        email_verified=True,
-        status="ACTIVE",
-        customer_id=f"CUS-{uuid4().hex[:16]}",
-    )
-    db.add(customer)
-    db.commit()
-    db.refresh(customer)
-    db.close()
-    return customer
+# # ── Base test client ─────────────────────────────────────────────────
+# @pytest.fixture()
+# def client():
+#     with TestClient(app) as c:
+#         yield c
 
 
-# ── Helper: auth token for a customer ────────────────────────────────
-@pytest.fixture()
-def auth_token(active_customer):
-    return create_access_token(data={"sub": active_customer.email})
+# # ── Helper: create and activate a customer ───────────────────────────
+# @pytest.fixture()
+# def active_customer():
+#     db = SessionLocal()
+#     email = f"customer-{uuid4().hex[:8]}@test.com"
+#     customer = Customer(
+#         full_name="Test Customer",
+#         email=email,
+#         password_hash=get_password_hash("Test1234!"),
+#         phone="+94771234567",
+#         email_verified=True,
+#         status="ACTIVE",
+#         customer_id=f"CUS-{uuid4().hex[:16]}",
+#     )
+#     db.add(customer)
+#     db.commit()
+#     db.refresh(customer)
+#     db.close()
+#     return customer
 
 
-# ── Helper: authenticated client ─────────────────────────────────────
-@pytest.fixture()
-def auth_client(client, auth_token):
-    client.headers.update({"Authorization": f"Bearer {auth_token}"})
-    return client
+# # ── Helper: auth token for a customer ────────────────────────────────
+# @pytest.fixture()
+# def auth_token(active_customer):
+#     return create_access_token(data={"sub": active_customer.email})
 
 
-# ── Helper: create a verified vendor with packages ───────────────────
-@pytest.fixture()
-def vendor_with_packages():
-    db = SessionLocal()
-    vendor = Vendor(
-        business_name="Test Venue",
-        display_name="Test Venue Display",
-        email=f"vendor-{uuid4().hex[:8]}@test.com",
-        is_verified=True,
-        location_base="Colombo",
-    )
-    db.add(vendor)
-    db.commit()
-    db.refresh(vendor)
+# # ── Helper: authenticated client ─────────────────────────────────────
+# @pytest.fixture()
+# def auth_client(client, auth_token):
+#     client.headers.update({"Authorization": f"Bearer {auth_token}"})
+#     return client
 
-    packages = [
-        Package(
-            vendor_id=vendor.id,
-            name="Romantic Dinner",
-            description="Candlelit dinner for two",
-            price=300.0,
-            price_per_head=150.0,
-            min_guests=2,
-            max_guests=10,
-            tags=["romantic", "luxury", "private-dining"],
-            location_coverage="Colombo",
-        ),
-        Package(
-            vendor_id=vendor.id,
-            name="Birthday Party",
-            description="Fun birthday celebration",
-            price=500.0,
-            price_per_head=50.0,
-            min_guests=10,
-            max_guests=50,
-            tags=["party", "kids", "family"],
-            location_coverage="Kandy",
-        ),
-        Package(
-            vendor_id=vendor.id,
-            name="Nature Retreat",
-            description="Outdoor adventure experience",
-            price=200.0,
-            price_per_head=50.0,
-            min_guests=5,
-            max_guests=20,
-            tags=["nature", "adventure", "camping"],
-            location_coverage="Ella",
-        ),
-    ]
-    for p in packages:
-        db.add(p)
-    db.commit()
-    db.close()
-    return vendor
+
+# # ── Helper: create a verified vendor with packages ───────────────────
+# @pytest.fixture()
+# def vendor_with_packages():
+#     db = SessionLocal()
+#     vendor = Vendor(
+#         business_name="Test Venue",
+#         display_name="Test Venue Display",
+#         email=f"vendor-{uuid4().hex[:8]}@test.com",
+#         is_verified=True,
+#         location_base="Colombo",
+#     )
+#     db.add(vendor)
+#     db.commit()
+#     db.refresh(vendor)
+
+#     packages = [
+#         Package(
+#             vendor_id=vendor.id,
+#             name="Romantic Dinner",
+#             description="Candlelit dinner for two",
+#             price=300.0,
+#             price_per_head=150.0,
+#             min_guests=2,
+#             max_guests=10,
+#             tags=["romantic", "luxury", "private-dining"],
+#             location_coverage="Colombo",
+#         ),
+#         Package(
+#             vendor_id=vendor.id,
+#             name="Birthday Party",
+#             description="Fun birthday celebration",
+#             price=500.0,
+#             price_per_head=50.0,
+#             min_guests=10,
+#             max_guests=50,
+#             tags=["party", "kids", "family"],
+#             location_coverage="Kandy",
+#         ),
+#         Package(
+#             vendor_id=vendor.id,
+#             name="Nature Retreat",
+#             description="Outdoor adventure experience",
+#             price=200.0,
+#             price_per_head=50.0,
+#             min_guests=5,
+#             max_guests=20,
+#             tags=["nature", "adventure", "camping"],
+#             location_coverage="Ella",
+#         ),
+#     ]
+#     for p in packages:
+#         db.add(p)
+#     db.commit()
+#     db.close()
+#     return vendor
