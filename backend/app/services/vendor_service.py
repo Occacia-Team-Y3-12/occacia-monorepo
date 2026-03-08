@@ -283,7 +283,7 @@ class VendorService:
             business_name=vendor_data.business_name,
             phone=getattr(vendor_data, "phone", None),
             is_verified=False,
-            hashed_password=get_password_hash(vendor_data.password)
+            hashed_password=get_password_hash(vendor_data.password),
             approval_status="PENDING",
         )
         db.add(vendor)
