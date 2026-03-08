@@ -102,14 +102,14 @@ export default function AdminSettingsPage() {
         </div>
 
         {/* Save Button */}
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
           <button
             onClick={handleSave}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors"
+            className="w-full rounded-lg bg-indigo-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-indigo-700 sm:w-auto"
           >
             Save Settings
           </button>
-          <button className="bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 px-8 rounded-lg transition-colors">
+          <button className="w-full rounded-lg bg-gray-200 px-8 py-3 font-semibold text-gray-900 transition-colors hover:bg-gray-300 sm:w-auto">
             Cancel
           </button>
         </div>

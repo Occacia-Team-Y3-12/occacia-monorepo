@@ -27,7 +27,7 @@ export default function VendorOrdersPage() {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 md:py-12">
         {/* Status Tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8">
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-5 md:mb-8">
           {statuses.map((status) => (
             <button
               key={status.value}

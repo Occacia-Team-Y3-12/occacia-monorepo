@@ -20,7 +20,7 @@ const CustomerSidebar = ({ isOpen }: CustomerSidebarProps) => {
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-40 h-screen w-[240px] border-r border-[#ECECF0] bg-[#F5F5F8] px-4 py-5 transition-transform duration-300 ${
+      className={`fixed left-0 top-0 z-40 h-screen w-[240px] max-w-[85vw] overflow-y-auto border-r border-[#ECECF0] bg-[#F5F5F8] px-4 py-5 transition-transform duration-300 ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}
     >

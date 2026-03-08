@@ -211,7 +211,7 @@ export default function VendorRegister() {
                 {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <input
                     type="password"
@@ -254,7 +254,7 @@ export default function VendorRegister() {
                 {errors.address && <p className="text-red-600 text-sm mt-1">{errors.address}</p>}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <input
                     type="text"
@@ -392,7 +392,7 @@ export default function VendorRegister() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <input
                         type="tel"
@@ -428,18 +428,18 @@ export default function VendorRegister() {
                 </>
               )}
 
-              <div className="flex justify-between pt-4">
+              <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-between">
                 <button
                   type="button"
                   onClick={() => setStep('account')}
-                  className="bg-gray-300 hover:bg-gray-400 text-[#2c3e50] font-medium px-8 py-3 rounded-lg transition-colors duration-200"
+                  className="w-full rounded-lg bg-gray-300 px-8 py-3 font-medium text-[#2c3e50] transition-colors duration-200 hover:bg-gray-400 sm:w-auto"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={!isFinalValid}
-                  className="bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium px-8 py-3 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full rounded-lg bg-[#1565c0] px-8 py-3 font-medium text-white transition-colors duration-200 hover:bg-[#0d47a1] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   Create vendor account
                 </button>

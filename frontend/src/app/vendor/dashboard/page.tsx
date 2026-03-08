@@ -22,16 +22,16 @@ export default function VendorDashboardPage() {
       <Image src="/images/background.png" alt="Background" fill className="object-cover" priority />
       
       {/* Header */}
-      <div className="bg-white/25 backdrop-blur-sm border-b border-white/30 px-8 py-3 relative z-30">
-        <div className="flex items-center justify-between">
+      <div className="relative z-30 border-b border-white/30 bg-white/25 px-4 py-3 backdrop-blur-sm sm:px-8">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center -my-2">
             <img src="/icons/logo.svg" alt="Occacia Logo" className="h-16" />
           </div>
-          <div className="flex items-center gap-12">
-            <nav className="flex gap-12">
-              <a href="#" className="text-blue-600 font-semibold border-b-2 border-blue-600 pb-1 text-sm">DASHBOARD</a>
-              <a href="#" className="text-gray-600 hover:text-blue-600 text-sm">ORDERS</a>
-              <a href="#" className="text-gray-600 hover:text-blue-600 text-sm">ITEMS & SERVICES</a>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <nav className="flex flex-wrap gap-4 sm:gap-8">
+              <a href="#" className="border-b-2 border-blue-600 pb-1 text-xs font-semibold text-blue-600 sm:text-sm">DASHBOARD</a>
+              <a href="#" className="text-xs text-gray-600 hover:text-blue-600 sm:text-sm">ORDERS</a>
+              <a href="#" className="text-xs text-gray-600 hover:text-blue-600 sm:text-sm">ITEMS & SERVICES</a>
             </nav>
             <div className="relative" ref={dropdownRef}>
               <div 
@@ -64,12 +64,12 @@ export default function VendorDashboardPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="px-8 py-8 relative z-10">
-        <div className="grid grid-cols-4 gap-5 mb-8">
+      <div className="relative z-10 px-4 py-6 sm:px-8 sm:py-8">
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 sm:gap-5">
           <div className="bg-white rounded-xl shadow-lg p-5 min-h-[130px] flex items-center justify-between">
             <div className="min-w-0 pr-2">
-              <div className="text-[22px] font-bold leading-none text-gray-800 whitespace-nowrap">100,205.00 LKR</div>
-              <div className="text-[14px] tracking-wide text-gray-500 mt-2 whitespace-nowrap">TOTAL PROFIT THIS MONTH</div>
+              <div className="text-xl font-bold leading-none text-gray-800 sm:text-[22px]">100,205.00 LKR</div>
+              <div className="mt-2 text-sm tracking-wide text-gray-500">TOTAL PROFIT THIS MONTH</div>
             </div>
             <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
               <img src="/icons/vendor/dashboard/profit.svg" alt="Profit" className="w-7 h-7" />
@@ -78,9 +78,9 @@ export default function VendorDashboardPage() {
 
           <div className="bg-white rounded-xl shadow-lg p-5 min-h-[130px] flex items-center justify-between">
             <div className="min-w-0 pr-2 pt-2">
-              <div className="text-[22px] font-bold leading-none text-gray-800 whitespace-nowrap">1025</div>
+              <div className="text-xl font-bold leading-none text-gray-800 sm:text-[22px]">1025</div>
               <div className="text-[13px] text-gray-500 mt-2 leading-tight">
-                <span className="block whitespace-nowrap">COMPLETED ORDERS THIS</span>
+                    <span className="block">COMPLETED ORDERS THIS</span>
                 <span className="block">MONTH</span>
               </div>
             </div>
@@ -93,8 +93,8 @@ export default function VendorDashboardPage() {
 
           <div className="bg-white rounded-xl shadow-lg p-5 min-h-[130px] flex items-center justify-between">
             <div className="min-w-0 pr-2 -mt-1">
-              <div className="text-[22px] font-bold leading-none text-gray-800 whitespace-nowrap">25</div>
-              <div className="text-[14px] tracking-wide text-gray-500 mt-2 whitespace-nowrap">ONGOING ORDERS</div>
+              <div className="text-xl font-bold leading-none text-gray-800 sm:text-[22px]">25</div>
+              <div className="mt-2 text-sm tracking-wide text-gray-500">ONGOING ORDERS</div>
             </div>
             <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
               <svg className="w-7 h-7 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,8 +105,8 @@ export default function VendorDashboardPage() {
 
           <div className="bg-white rounded-xl shadow-lg p-5 min-h-[130px] flex items-center justify-between">
             <div className="min-w-0 pr-2 -mt-1">
-              <div className="text-[22px] font-bold leading-none text-gray-800 whitespace-nowrap">4.5 / 5 <span className="text-[10px] text-gray-500">(1200 USERS)</span></div>
-              <div className="text-[14px] tracking-wide text-gray-500 mt-2 whitespace-nowrap">YOUR SCORE</div>
+              <div className="text-xl font-bold leading-none text-gray-800 sm:text-[22px]">4.5 / 5 <span className="text-[10px] text-gray-500">(1200 USERS)</span></div>
+              <div className="mt-2 text-sm tracking-wide text-gray-500">YOUR SCORE</div>
             </div>
             <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
               <svg className="w-7 h-7 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
@@ -117,11 +117,11 @@ export default function VendorDashboardPage() {
         </div>
 
         {/* Bottom Section */}
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           {/* Platform Overview */}
           <div className="col-span-2">
-            <h2 className="text-xl font-bold text-gray-700 mb-6">Platform Overview</h2>
-            <div className="grid grid-cols-3 gap-6">
+            <h2 className="mb-6 text-xl font-bold text-gray-700">Platform Overview</h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 xl:gap-6">
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -174,7 +174,7 @@ export default function VendorDashboardPage() {
 
           {/* Recent Activity */}
           <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-700 mb-6">Recent Activity Feed</h2>
+            <h2 className="mb-6 text-xl font-bold text-gray-700">Recent Activity Feed</h2>
             <div className="bg-blue-50 rounded-lg p-4">
               <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
                 <div className="bg-white rounded-lg p-4 border border-gray-200 h-[72px] flex flex-col justify-center">
