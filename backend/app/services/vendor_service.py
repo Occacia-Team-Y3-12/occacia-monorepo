@@ -9,6 +9,37 @@ from app.models.vendor import Vendor
 
 logger = logging.getLogger(__name__)
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Redis cache invalidation helper
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _flush_ai_cache() -> int:
+    """
+    Delete all keys matching 'ai_cache:*' from Redis.
+    Called whenever vendor package data changes so customers never receive
+    stale AI recommendations.
+    Returns the number of keys deleted (0 on failure / no Redis).
+    """
+    try:
+        import redis as redis_lib
+        from app.core.config import settings
+        client = redis_lib.from_url(
+            getattr(settings, "REDIS_URL", "redis://redis:6379"),
+            decode_responses=True,
+            socket_connect_timeout=2,
+        )
+        client.ping()
+        keys = client.keys("ai_cache:*")
+        if keys:
+            deleted = client.delete(*keys)
+            logger.info(f"🗑️ CACHE INVALIDATED: {deleted} AI cache key(s) flushed after package update.")
+            return deleted
+        return 0
+    except Exception as exc:
+        logger.debug(f"Cache flush skipped (Redis unavailable): {exc}")
+        return 0
+
 _CITY_ALIASES = {
     "colombo": "colombo", "col": "colombo",
     "kandy": "kandy", "candy": "kandy",
@@ -123,6 +154,7 @@ class VendorService:
         db.add(pkg)
         db.commit()
         db.refresh(pkg)
+        _flush_ai_cache()   # new package changes what AI can recommend
         return pkg
 
     def update_package(self, db: Session, package_id: int, package_data):
@@ -136,6 +168,7 @@ class VendorService:
                 setattr(pkg, field, val)
         db.commit()
         db.refresh(pkg)
+        _flush_ai_cache()   # price/tags changed — old AI responses are stale
         return pkg
 
     def delete_package(self, db: Session, package_id: int) -> bool:
