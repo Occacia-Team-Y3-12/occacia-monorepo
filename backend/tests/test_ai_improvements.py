@@ -975,6 +975,11 @@ class TestConfidenceScore:
     match_score_label for every venue in matched_venues so the UI can show
     e.g. '3 of 4 tags matched' instead of every result looking identical."""
 
+    @pytest.fixture()
+    def vs(self):
+        from app.services.vendor_service import vendor_service
+        return vendor_service
+
     def _pkg(self, tags, name="Test Package"):
         p = MagicMock()
         p.id = 1
