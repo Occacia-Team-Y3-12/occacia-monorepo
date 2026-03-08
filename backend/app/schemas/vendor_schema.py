@@ -13,7 +13,7 @@ class VendorBase(BaseModel):
 class VendorCreate(VendorBase):
     email: EmailStr
     password: str = Field(..., min_length=8)
-
+#test
 # VendorUpdate is used for patch requests to modify existing profiles
 class VendorUpdate(BaseModel):
     business_name: Optional[str] = None
