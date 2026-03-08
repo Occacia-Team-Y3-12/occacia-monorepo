@@ -2,16 +2,12 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import OperationalError
-
 from app.core.database import Base, engine
 from app.core.exceptions import add_exception_handlers
-from app.routers import auth_router
-from app.routers import health_router
-from app.routers import planning_router
+from app.routers import api_router
 from app.scripts.seed import seed_data
 
 logging.basicConfig(
@@ -28,10 +24,11 @@ async def lifespan(_: FastAPI):
         yield
         return
 
-    logger.info("Starting up... waiting for database...")
+    from app.models import registry  # noqa: F401
 
+    logger.info("Starting up... waiting for database...")
     db_connected = False
-    for i in range(15):  # Try 15 times (30 seconds total)
+    for i in range(15):
         try:
             Base.metadata.create_all(bind=engine)
             db_connected = True
@@ -51,16 +48,44 @@ async def lifespan(_: FastAPI):
     except Exception as e:
         logger.warning("Seeding warning: %s", e)
 
+    # ── Start background cleanup task ────────────────────────────────
+    cleanup_task = asyncio.create_task(_run_cleanup_job())
+    logger.info("🧹 Chat history cleanup job started.")
+
     yield
+
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
+
+async def _run_cleanup_job():
+    """Runs every 24 hours to delete chat messages older than 30 days."""
+    from app.core.database import SessionLocal
+    from app.services.chat_service import chat_service
+
+    while True:
+        await asyncio.sleep(86400)  # 24 hours
+        try:
+            db = SessionLocal()
+            chat_service.cleanup_old_sessions(db, days=30)
+            db.close()
+        except Exception as e:
+            logger.error(f"🧹 Cleanup job error: {e}")
 
 
 def create_app() -> FastAPI:
     application = FastAPI(
         title="Occacia Event Backend",
-        root_path="/api",
+        description="Occacia backend APIs",
+        version="1.0.0",
+        docs_url="/api/docs",
+        redoc_url="/api/redoc",
+        openapi_url="/api/openapi.json",
         lifespan=lifespan,
     )
-
     application.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -68,11 +93,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
     add_exception_handlers(application)
-    application.include_router(auth_router.router)
-    application.include_router(health_router.router)
-    application.include_router(planning_router.router)
+    application.include_router(api_router)
     return application
 
 

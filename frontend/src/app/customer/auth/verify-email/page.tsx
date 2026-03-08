@@ -1,147 +1,115 @@
-// src/app/(customer)/auth/verify-email/page.tsx
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import Button from '@/components/ui/Button';
-import { customerAuthService } from '@/services/customer/authServices';
+import { useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense } from 'react';
+import Image from 'next/image';
+import { ROUTES } from '@/lib/routes';
 
-type VerificationStatus = 'loading' | 'success' | 'error' | 'already-verified';
+// Mock verification simulation
+const simulateEmailVerification = (token: string | null): Promise<boolean> => {
+  return new Promise((resolve) => {
+    // Simulate API delay (2 seconds)
+    setTimeout(() => {
+      // Mock logic: token must be present and follow pattern
+      const isValid: boolean = token ? token.startsWith('mock_') : false;
+      resolve(isValid);
+    }, 2000);
+  });
+};
 
 function VerifyEmailContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [status, setStatus] = useState<VerificationStatus>('loading');
-  const [message, setMessage] = useState('');
+  const router = useRouter();
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
 
   useEffect(() => {
     const token = searchParams.get('token');
+    let redirectTimer: NodeJS.Timeout;
     
-    if (!token) {
-      setStatus('error');
-      setMessage('Invalid verification link. No token provided.');
-      return;
-    }
-
-    verifyEmail(token);
-  }, [searchParams]);
-
-  const verifyEmail = async (token: string) => {
-    try {
-      const response = await customerAuthService.verifyEmail(token);
-      setStatus('success');
-      setMessage(response.message || 'Your email has been verified successfully!');
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Verification failed';
-      
-      if (error.response?.status === 410 || errorMessage.includes('expired')) {
-        setStatus('error');
-        setMessage('This verification link has expired or is invalid.');
-      } else if (errorMessage.includes('already verified')) {
-        setStatus('already-verified');
-        setMessage('This account is already verified.');
+    // Start verification simulation
+    simulateEmailVerification(token).then((isValid) => {
+      if (isValid) {
+        setStatus('success');
+        // Auto-redirect after 2 seconds
+        redirectTimer = setTimeout(() => {
+          router.push(ROUTES.VENDOR.PENDING_APPROVAL);
+        }, 2000);
       } else {
         setStatus('error');
-        setMessage(errorMessage);
       }
-    }
-  };
+    });
+
+    // Cleanup function to clear timeout on unmount
+    return () => {
+      if (redirectTimer) clearTimeout(redirectTimer);
+    };
+  }, [searchParams, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center">
-        {/* Loading State */}
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+      <Image src="/images/background.png" alt="Background" fill className="object-cover" priority/>
+
+      <div className="bg-white rounded-3xl shadow-2xl p-8 sm:p-10 md:p-12 max-w-md sm:max-w-lg w-full relative z-10 text-center">
+        <div className="mb-6 md:mb-8 flex justify-center">
+          <Image src="/images/logo.png" alt="Occacia Logo" width={100} height={100} priority className="sm:w-[120px] sm:h-[120px] md:w-[140px] md:h-[140px]" />
+        </div>
+        
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#2c3e50] mb-3 md:mb-4">Email Verification</h1>
+        
         {status === 'loading' && (
-          <>
-            <Loader2 className="w-20 h-20 text-blue-600 animate-spin mx-auto mb-6" />
-            <h1 className="text-3xl font-bold text-gray-900 mb-3">
-              Verifying your email...
-            </h1>
-            <p className="text-gray-600">Please wait a moment.</p>
-          </>
+          <div>
+            <p className="text-[#5a6c7d] mb-4 md:mb-6 text-sm md:text-base">Verifying your email...</p>
+            <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-[#1e88e5] mx-auto"></div>
+          </div>
         )}
-
-        {/* Success State */}
+        
         {status === 'success' && (
-          <>
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="w-12 h-12 text-green-600" />
+          <div>
+            <div className="w-12 h-12 md:w-16 md:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6">
+              <svg className="w-6 h-6 md:w-8 md:h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-3">
-              Email Verified!
-            </h1>
-            <p className="text-gray-600 mb-8">{message}</p>
-            <Button
-              onClick={() => router.push('/auth/login')}
-              variant="primary"
-              className="w-full"
-            >
-              Go to Login
-            </Button>
-          </>
+            <p className="text-green-600 mb-3 md:mb-4 text-sm md:text-base font-semibold">Email verified successfully!</p>
+            <p className="text-[#5a6c7d] text-sm md:text-base">Redirecting to pending approval...</p>
+          </div>
         )}
-
-        {/* Already Verified State */}
-        {status === 'already-verified' && (
-          <>
-            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="w-12 h-12 text-blue-600" />
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-3">
-              Already Verified
-            </h1>
-            <p className="text-gray-600 mb-8">{message}</p>
-            <Button
-              onClick={() => router.push('/auth/login')}
-              variant="primary"
-              className="w-full"
-            >
-              Go to Login
-            </Button>
-          </>
-        )}
-
-        {/* Error State */}
+        
         {status === 'error' && (
-          <>
-            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <XCircle className="w-12 h-12 text-red-600" />
+          <div>
+            <div className="w-12 h-12 md:w-16 md:h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6">
+              <svg className="w-6 h-6 md:w-8 md:h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-3">
-              Verification Failed
-            </h1>
-            <p className="text-gray-600 mb-8">{message}</p>
-            <div className="space-y-3">
-              <Button
-                onClick={() => router.push('/auth/login')}
-                variant="primary"
-                className="w-full"
-              >
-                Go to Login
-              </Button>
-              <Button
-                onClick={() => router.push('/auth/register')}
-                variant="outline"
-                className="w-full"
-              >
-                Register Again
-              </Button>
-            </div>
-          </>
+            <p className="text-red-600 mb-3 md:mb-4 text-sm md:text-base font-semibold">Verification failed</p>
+            <p className="text-[#5a6c7d] text-sm md:text-base mb-6">The verification link is invalid or expired. Please try registering again.</p>
+            <a href={ROUTES.VENDOR.REGISTER} className="inline-block bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium px-6 md:px-8 py-3 md:py-4 text-base md:text-lg rounded-lg transition-colors duration-200">
+              Back to Registration
+            </a>
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-export default function VerifyEmailPage() {
+export default function VerifyEmail() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+          <Image src="/images/background.png" alt="Background" fill className="object-cover" priority />
+          <div className="bg-white rounded-3xl shadow-2xl p-8 sm:p-10 md:p-12 max-w-md sm:max-w-lg w-full relative z-10 text-center">
+            <div className="mb-6 md:mb-8 flex justify-center">
+              <Image src="/images/logo.png" alt="Occacia Logo" width={100} height={100} priority className="sm:w-[120px] sm:h-[120px] md:w-[140px] md:h-[140px]" />
+            </div>
+            <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-[#1e88e5] mx-auto"></div>
+          </div>
+        </div>
+      }
+    >
       <VerifyEmailContent />
     </Suspense>
   );

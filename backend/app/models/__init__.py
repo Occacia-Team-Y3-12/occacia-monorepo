@@ -1,2 +1,5 @@
-from .marketplace import Vendor, Package
-# This lets you do: from app.models import Vendor
+from .customer import Customer
+from .package import Package
+from .vendor import Vendor
+
+__all__ = ["Customer", "Package", "Vendor"]

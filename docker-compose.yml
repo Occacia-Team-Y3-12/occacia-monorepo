@@ -19,7 +19,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-admin} -d ${DB_NAME:-occacia_db}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-admin} -d ${DB_NAME:-occacia_db}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,6 +28,11 @@ services:
   # ===========================
   # ⚙️ BACKEND API (The Engine)
   # ===========================
+  redis:
+    image: redis:7-alpine
+    container_name: occacia-redis
+    restart: always
+    logging: *default-logging
   backend:
     build:
       context: ./backend
@@ -40,10 +45,7 @@ services:
     env_file:
       - .env
     environment:
-      # Use internal service name 'db' for container-to-container networking
       DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD}@db:5432/${DB_NAME:-occacia_db}
-
-      # Explicitly expose required app settings (in addition to env_file)
       DB_PASSWORD: ${DB_PASSWORD}
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (required)}
       ALGORITHM: ${ALGORITHM:-HS256}
@@ -51,6 +53,9 @@ services:
       LANGFLOW_TOKEN: ${LANGFLOW_TOKEN}
       LANGFLOW_ORG_ID: ${LANGFLOW_ORG_ID}
       DOCKER_SOCKET: ${DOCKER_SOCKET:-/var/run/docker.sock}
+      REDIS_URL: redis://redis:6379
+      #SKIP_EMAIL_VERIFICATION: "true" ##Remove this after testing
+
     ports:
       - "8000:8000"
     logging: *default-logging

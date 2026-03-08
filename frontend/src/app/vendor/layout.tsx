@@ -1,27 +1,9 @@
-// src/app/layout.tsx
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import '../globals.css';
-import { Toaster } from 'sonner';
+import React from 'react';
 
-const inter = Inter({ subsets: ['latin'] });
-
-export const metadata: Metadata = {
-  title: 'Occacia - Plan meaningful moments',
-  description: 'Create magic together with Occacia',
-};
-
-export default function RootLayout({
+export default function VendorLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <html lang="en">
-      <body className={inter.className}>
-        {children}
-        <Toaster position="top-right" richColors />
-      </body>
-    </html>
-  );
+  return <>{children}</>;
 }
