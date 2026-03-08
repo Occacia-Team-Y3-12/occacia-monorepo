@@ -2,9 +2,17 @@
 
 import { useState } from 'react';
 
+interface VendorOrder {
+  id: string;
+  customerName: string;
+  date: string;
+  amount: number;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+}
+
 export default function VendorOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
-  const orders: any[] = [];
+  const orders: VendorOrder[] = [];
 
   const statuses = [
     { value: 'all', label: 'All Orders', count: 0 },

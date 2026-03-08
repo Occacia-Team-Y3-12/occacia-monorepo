@@ -37,7 +37,7 @@ export default function VendorPage() {
                 {stat.icon}
               </div>
               <p className="text-gray-600 text-sm mb-2">{stat.label}</p>
-              <p className="text-2xl md:text-3xl font-bold ${stat.textColor}">{stat.value}</p>
+              <p className={`text-2xl md:text-3xl font-bold ${stat.textColor}`}>{stat.value}</p>
             </div>
           ))}
         </div>

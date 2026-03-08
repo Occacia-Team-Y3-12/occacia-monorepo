@@ -2,10 +2,40 @@
 
 import { useState } from 'react';
 
+interface AdminSettings {
+  platformName: string;
+  supportEmail: string;
+  supportPhone: string;
+  commissionRate: string;
+  taxRate: string;
+  orderNotifications: boolean;
+  vendorSignupNotifications: boolean;
+  systemAlerts: boolean;
+}
+
 export default function AdminSettingsPage() {
   const [saved, setSaved] = useState(false);
+  const [settings, setSettings] = useState<AdminSettings>({
+    platformName: 'Occacia',
+    supportEmail: 'support@occacia.com',
+    supportPhone: '+1 (555) 000-0000',
+    commissionRate: '10',
+    taxRate: '5',
+    orderNotifications: true,
+    vendorSignupNotifications: true,
+    systemAlerts: true,
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setSettings((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
+  };
 
   const handleSave = () => {
+    // TODO: Replace with actual API call to save settings
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -36,7 +66,9 @@ export default function AdminSettingsPage() {
               <label className="block text-sm font-semibold text-gray-900 mb-2">Platform Name</label>
               <input
                 type="text"
-                defaultValue="Occacia"
+                name="platformName"
+                value={settings.platformName}
+                onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -44,7 +76,9 @@ export default function AdminSettingsPage() {
               <label className="block text-sm font-semibold text-gray-900 mb-2">Support Email</label>
               <input
                 type="email"
-                defaultValue="support@occacia.com"
+                name="supportEmail"
+                value={settings.supportEmail}
+                onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -52,7 +86,9 @@ export default function AdminSettingsPage() {
               <label className="block text-sm font-semibold text-gray-900 mb-2">Support Phone</label>
               <input
                 type="tel"
-                defaultValue="+1 (555) 000-0000"
+                name="supportPhone"
+                value={settings.supportPhone}
+                onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -67,7 +103,9 @@ export default function AdminSettingsPage() {
               <label className="block text-sm font-semibold text-gray-900 mb-2">Vendor Commission Rate (%)</label>
               <input
                 type="number"
-                defaultValue="10"
+                name="commissionRate"
+                value={settings.commissionRate}
+                onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -75,7 +113,9 @@ export default function AdminSettingsPage() {
               <label className="block text-sm font-semibold text-gray-900 mb-2">Tax Rate (%)</label>
               <input
                 type="number"
-                defaultValue="5"
+                name="taxRate"
+                value={settings.taxRate}
+                onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -87,15 +127,33 @@ export default function AdminSettingsPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Notifications</h2>
           <div className="space-y-4">
             <label className="flex items-center">
-              <input type="checkbox" defaultChecked className="w-4 h-4 rounded border-gray-300" />
+              <input
+                type="checkbox"
+                name="orderNotifications"
+                checked={settings.orderNotifications}
+                onChange={handleInputChange}
+                className="w-4 h-4 rounded border-gray-300"
+              />
               <span className="ml-3 text-gray-700">Send order notifications</span>
             </label>
             <label className="flex items-center">
-              <input type="checkbox" defaultChecked className="w-4 h-4 rounded border-gray-300" />
+              <input
+                type="checkbox"
+                name="vendorSignupNotifications"
+                checked={settings.vendorSignupNotifications}
+                onChange={handleInputChange}
+                className="w-4 h-4 rounded border-gray-300"
+              />
               <span className="ml-3 text-gray-700">Send vendor signup notifications</span>
             </label>
             <label className="flex items-center">
-              <input type="checkbox" defaultChecked className="w-4 h-4 rounded border-gray-300" />
+              <input
+                type="checkbox"
+                name="systemAlerts"
+                checked={settings.systemAlerts}
+                onChange={handleInputChange}
+                className="w-4 h-4 rounded border-gray-300"
+              />
               <span className="ml-3 text-gray-700">Send system alerts</span>
             </label>
           </div>

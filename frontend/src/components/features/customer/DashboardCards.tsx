@@ -91,7 +91,7 @@ const DashboardCards = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Status</span>
-                <span className="px-2 py-1 bg-gold-100 text-gold-800 text-xs rounded-full">Premium</span>
+                <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full">Premium</span>
               </div>
             </div>
           </div>
