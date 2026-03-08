@@ -301,47 +301,6 @@ class VendorService:
             pph = getattr(p, "price_per_head", None)
             return pph is None or pph <= budget_per_head
 
-        def _score_package(p) -> float:
-            """
-            Composite relevance score — higher is better.
-
-            tag_overlap  (40 %) — fraction of requested tags that the package carries
-            budget_fit   (30 %) — how closely price_per_head sits under the budget cap
-                                   1.0  → price == budget (perfect)
-                                   0.5  → price is 50 % of budget (cheap, still good)
-                                   0.0  → no budget given, or price unavailable
-            guest_fit    (30 %) — 1.0 when guest_count satisfies min_guests, else 0.0
-                                   0.5 neutral when guest_count is unknown
-            """
-            pkg_tags = set(_get_tags(p))
-            req_tags = set(tags)
-
-            # tag_overlap: fraction of requested tags present in the package
-            if req_tags:
-                tag_score = len(req_tags & pkg_tags) / len(req_tags)
-            else:
-                tag_score = 0.0
-
-            # budget_fit: closeness of price to the budget cap (0–1)
-            pph = getattr(p, "price_per_head", None)
-            if budget_per_head and pph is not None and budget_per_head > 0:
-                # price within budget → ratio of price to cap (closer to cap = more premium = better fit)
-                ratio = pph / budget_per_head
-                budget_score = max(0.0, min(1.0, ratio))   # clamp [0, 1]
-            else:
-                budget_score = 0.0
-
-            # guest_fit: binary — does guest count meet min_guests?
-            min_g = getattr(p, "min_guests", None)
-            if guest_count is None:
-                guest_score = 0.5   # neutral
-            elif min_g is None or guest_count >= min_g:
-                guest_score = 1.0
-            else:
-                guest_score = 0.0
-
-            return tag_score * 0.4 + budget_score * 0.3 + guest_score * 0.3
-
         def loc_ok(p):
             if not canonical_loc:
                 return True
@@ -351,12 +310,12 @@ class VendorService:
         # Tier 1: tags + guest + budget + location
         strict = [p for p in all_pkgs if tag_match(p) and guest_ok(p) and budget_ok(p) and loc_ok(p)]
         if strict:
-            return sorted(strict, key=_score_package, reverse=True)[:limit]
+            return strict[:limit]
 
         # Tier 2: drop location
         mid = [p for p in all_pkgs if tag_match(p) and guest_ok(p) and budget_ok(p)]
         if mid:
-            return sorted(mid, key=_score_package, reverse=True)[:limit]
+            return mid[:limit]
 
         # Tier 3: only fires when a guest_count was explicitly given (caller has
         # a specific group size). Drops budget + location but keeps guest_ok so
@@ -365,7 +324,7 @@ class VendorService:
         # while keeping test_budget_filter empty (no guest_count given → no tier3).
         if guest_count is not None:
             relaxed = [p for p in all_pkgs if tag_match(p) and guest_ok(p)]
-            return sorted(relaxed, key=_score_package, reverse=True)[:limit]
+            return relaxed[:limit]
 
         return []
 
