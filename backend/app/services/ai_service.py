@@ -264,9 +264,28 @@ class AIService:
         if persona_context:
             parts.append(persona_context)
             parts.append(
-                "IMPORTANT: If the user's request involves a gift, ask them: "
-                "'Would you like me to use one of your saved profiles to personalize this?' "
-                "Then use their choice to tailor suggestions."
+                "SAVED PROFILES INSTRUCTIONS:\n"
+                "1. At the START of a planning conversation, check if a saved profile "
+                "matches who the user is planning for. If yes, ask: "
+                "'I have [Name]\'s profile saved — would you like me to use it?' "
+                "Set use_persona_name to that name in your JSON response.\n"
+                "2. If the user says YES to using a saved profile, set use_persona_name "
+                "to the persona name and use their preferences for all suggestions.\n"
+                "3. If NO saved profiles match, do NOT mention profiles at all.\n"
+                "4. If the user shares new info about a person (name, preferences, age, "
+                "relationship), set save_persona in your JSON response with all known fields "
+                "and set ask_save_persona=true."
+            )
+        else:
+            # No saved personas yet — instruct AI to detect and propose saving
+            parts.append(
+                "PERSONA DETECTION INSTRUCTIONS:\n"
+                "If the user mentions a specific person they are planning for "
+                "(e.g. 'my girlfriend Sarah', 'my wife', 'my mom') along with ANY "
+                "preferences (food, music, personality, age), extract those details "
+                "and set save_persona in your JSON response with fields: "
+                "name, relationship, age, food_preferences, music_preferences, personality_tags. "
+                "Also set ask_save_persona=true to prompt the user to confirm saving."
             )
 
         if tag_block:
