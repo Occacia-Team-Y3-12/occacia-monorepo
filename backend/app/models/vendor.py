@@ -24,4 +24,6 @@ class Vendor(Base):
     email = Column(String, unique=True, index=True)
     phone = Column(String, nullable=True)
     is_verified = Column(Boolean, default=False)
+    password_hash = Column(String, nullable=True)
+
 

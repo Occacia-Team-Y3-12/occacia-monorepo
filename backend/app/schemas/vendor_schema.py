@@ -8,7 +8,7 @@ class VendorRegisterRequest(BaseModel):
     business_name: str
     email: EmailStr
     password: str
-    location_base: str
+    location_base: Optional[str] = None
     phone: Optional[str] = None
     display_name: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -24,7 +24,7 @@ class VendorResponse(BaseModel):
     vendor_id: Optional[str] = None
     business_name: str
     email: EmailStr
-    location_base: str
+    location_base: Optional[str] = None
     is_verified: bool
     phone: Optional[str] = None
     display_name: Optional[str] = None
