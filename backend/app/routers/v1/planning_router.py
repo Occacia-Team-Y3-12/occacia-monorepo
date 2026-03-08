@@ -145,13 +145,19 @@ def _extract_date(text: str) -> Optional[date]:
     return None
 
 
-def _package_to_dict(pkg) -> dict:
+def _package_to_dict(pkg, requested_tags: list = None) -> dict:
+    """
+    Serialise a Package (or MagicMock) to a plain dict for the API response.
+
+    requested_tags — the venue_tags the customer asked for.  When provided,
+    we compute a human-readable match_score so the UI can show e.g.
+    "3 of 4 tags matched" instead of leaving every result looking identical.
+    """
     # Use __dict__ to read already-loaded SQLAlchemy state without triggering lazy loads.
     # Falls back to direct attribute access for MagicMock objects (tests).
     state = getattr(pkg, "__dict__", None) or {}
     vendor_name = None
     try:
-        # Only access .vendor if it is already loaded in the instance state
         vendor_loaded = "vendor" in state
         if vendor_loaded:
             v = state["vendor"]
@@ -161,7 +167,6 @@ def _package_to_dict(pkg) -> dict:
                     or getattr(v, "business_name", None)
                 )
         elif hasattr(pkg, "vendor") and not hasattr(type(pkg), "__tablename__"):
-            # MagicMock or plain object — safe to access directly
             v = pkg.vendor
             if v is not None:
                 vendor_name = (
@@ -170,15 +175,39 @@ def _package_to_dict(pkg) -> dict:
                 )
     except Exception:
         vendor_name = None
+
+    # ── Confidence / match score ──────────────────────────────────────────────
+    pkg_tags = pkg.tags or []
+    if isinstance(pkg_tags, str):
+        import json as _json
+        try:
+            pkg_tags = _json.loads(pkg_tags)
+        except Exception:
+            pkg_tags = []
+
+    if requested_tags:
+        matched   = len(set(requested_tags) & set(pkg_tags))
+        total     = len(set(requested_tags))
+        match_score       = matched          # int: how many tags matched
+        match_score_max   = total            # int: how many were requested
+        match_score_label = f"{matched} of {total} tags matched"
+    else:
+        match_score       = None
+        match_score_max   = None
+        match_score_label = None
+
     return {
-        "id":             pkg.id,
-        "name":           pkg.name,
-        "description":    pkg.description,
-        "price":          getattr(pkg, "price", None),
-        "price_per_head": getattr(pkg, "price_per_head", None),
-        "tags":           pkg.tags or [],
-        "location":       getattr(pkg, "location_coverage", None),
-        "vendor_name":    vendor_name,
+        "id":               pkg.id,
+        "name":             pkg.name,
+        "description":      pkg.description,
+        "price":            getattr(pkg, "price", None),
+        "price_per_head":   getattr(pkg, "price_per_head", None),
+        "tags":             pkg_tags,
+        "location":         getattr(pkg, "location_coverage", None),
+        "vendor_name":      vendor_name,
+        "match_score":      match_score,        # e.g. 3
+        "match_score_max":  match_score_max,    # e.g. 4
+        "match_score_label": match_score_label, # e.g. "3 of 4 tags matched"
     }
 
 
@@ -290,14 +319,70 @@ async def generate_plan(
     gift_suggestion = ai_result.get("gift_suggestion")
     event_type      = ai_result.get("event_type")
 
+    # ── Fix #6: Multi-intent detection ───────────────────────────────────────
+    # If the user's message contains BOTH a venue/planning signal AND a gift
+    # signal in the same turn (e.g. "I want a romantic dinner AND a gift for
+    # my wife"), upgrade intent to "multi" so both matchers run below.
+    _query_lower = (user_query or "").lower()
+    _GIFT_SIGNALS = ["gift", "present", "buy", "surprise", "something for",
+                     "get her", "get him"]
+    _PLAN_SIGNALS = ["venue", "dinner", "restaurant", "party", "book", "plan",
+                     "celebrate", "event", "wedding", "birthday", "anniversary",
+                     "arrange", "find a place"]
+    _has_gift_signal = any(s in _query_lower for s in _GIFT_SIGNALS)
+    _has_plan_signal = any(s in _query_lower for s in _PLAN_SIGNALS)
+
+    if _has_gift_signal and _has_plan_signal:
+        intent = "multi"
+        logger.info("\U0001f500 MULTI-INTENT DETECTED: running both venue + gift matchers.")
+
     # 7. Venue / gift matching
     matched_venues   = []
     venue_match_tier = None
 
-    if intent in ("planning", "date", "gift") and venue_tags:
+    budget_for_filter   = ai_result.get("budget_per_head") or extracted_budget
+    location_for_filter = ai_result.get("location") or extracted_location
 
-        budget_for_filter   = ai_result.get("budget_per_head") or extracted_budget
-        location_for_filter = ai_result.get("location") or extracted_location
+    if intent == "multi" and venue_tags:
+        # ── Run venue matching ────────────────────────────────────────────────
+        pkgs = vendor_service.find_perfect_matches(
+            db,
+            criteria={
+                "venue_tags":      venue_tags,
+                "budget_per_head": budget_for_filter,
+                "location":        location_for_filter,
+                "guest_count":     extracted_guests,
+            },
+        )
+        matched_venues = [_package_to_dict(p, requested_tags=venue_tags) for p in pkgs]
+
+        # ── Run gift matching ─────────────────────────────────────────────────
+        gift_tags = list(venue_tags)
+        response_lower = (chat_response or "").lower()
+        for persona in personas:
+            if persona.name and persona.name.lower() in response_lower:
+                hobbies = persona.preferences_json or []
+                gift_tags = list(set(gift_tags + hobbies))
+                logger.info(
+                    f"\U0001f464 PERSONA '{persona.name}' merged hobbies into gift tags: {hobbies}"
+                )
+        gift_pkgs = vendor_service.find_gift_matches(
+            db,
+            gift_tags=gift_tags,
+            budget=budget_for_filter,
+        )
+        if gift_pkgs and not gift_suggestion:
+            first_gift = gift_pkgs[0]
+            gift_suggestion = (
+                f"{first_gift.name} \u2014 {getattr(first_gift, 'description', '') or ''}"
+            ).strip(" \u2014")
+
+        logger.info(
+            f"\U0001f3e0 MULTI VENUES: {len(matched_venues)} | "
+            f"\U0001f381 GIFT: {'yes' if gift_suggestion else 'no'}"
+        )
+
+    elif intent in ("planning", "date", "gift") and venue_tags:
 
         if intent == "gift":
             gift_tags = list(venue_tags)
@@ -307,10 +392,10 @@ async def generate_plan(
                     hobbies = persona.preferences_json or []
                     gift_tags = list(set(gift_tags + hobbies))
                     logger.info(
-                        f"👤 PERSONA '{persona.name}' merged hobbies: {hobbies}"
+                        f"\U0001f464 PERSONA '{persona.name}' merged hobbies: {hobbies}"
                     )
             # NOTE: tests mock find_gift_matches as capture_gift(db, gift_tags, budget=None)
-            # with NO location kwarg — do NOT add location= here
+            # with NO location kwarg \u2014 do NOT add location= here
             pkgs = vendor_service.find_gift_matches(
                 db,
                 gift_tags=gift_tags,
@@ -328,7 +413,7 @@ async def generate_plan(
                 },
             )
 
-        matched_venues = [_package_to_dict(p) for p in pkgs]
+        matched_venues = [_package_to_dict(p, requested_tags=venue_tags) for p in pkgs]
 
         if pkgs:
             canonical_loc = vendor_service.extract_location_from_text(
@@ -354,7 +439,7 @@ async def generate_plan(
                 venue_match_tier = 3
 
         logger.info(
-            f"🏠 VENUES: {len(matched_venues)} matched "
+            f"\U0001f3e0 VENUES: {len(matched_venues)} matched "
             f"(tier={venue_match_tier}, intent={intent}, tags={venue_tags}, "
             f"location={location_for_filter})"
         )

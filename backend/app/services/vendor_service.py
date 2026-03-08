@@ -41,13 +41,123 @@ def _flush_ai_cache() -> int:
         return 0
 
 _CITY_ALIASES = {
-    "colombo": "colombo", "col": "colombo",
-    "kandy": "kandy", "candy": "kandy",
-    "galle": "galle", "negombo": "negombo",
-    "ella": "ella", "nuwara eliya": "nuwara eliya",
-    "nuwaraeliya": "nuwara eliya", "trincomalee": "trincomalee",
-    "trinco": "trincomalee", "jaffna": "jaffna",
-    "bentota": "bentota", "mirissa": "mirissa", "hikkaduwa": "hikkaduwa",
+    # ── Colombo ──────────────────────────────────────────────────────────────
+    "colombo": "colombo",
+    "col": "colombo",
+    "cmb": "colombo",
+    "colomBO": "colombo",        # typo-safe (lowercased at call site)
+    "city": "colombo",           # "in the city" → Colombo
+    "capital": "colombo",
+    "fort": "colombo",           # Colombo Fort
+    "kollupitiya": "colombo",
+    "colpetty": "colombo",
+    "mount lavinia": "colombo",
+    "mt lavinia": "colombo",
+    "dehiwala": "colombo",
+    "nugegoda": "colombo",
+    "maharagama": "colombo",
+    "battaramulla": "colombo",
+    "rajagiriya": "colombo",
+    "kotte": "colombo",
+    "sri jayawardenepura": "colombo",
+
+    # ── Kandy ─────────────────────────────────────────────────────────────────
+    "kandy": "kandy",
+    "candy": "kandy",
+    "kandy city": "kandy",
+    "hill country": "kandy",
+    "highlands": "kandy",
+    "kndy": "kandy",
+    "peradeniya": "kandy",
+    "katugastota": "kandy",
+
+    # ── Galle ─────────────────────────────────────────────────────────────────
+    "galle": "galle",
+    "galle fort": "galle",
+    "southern coast": "galle",
+    "south coast": "galle",
+    "down south": "galle",
+    "the south": "galle",
+    "southern sri lanka": "galle",
+    "southern province": "galle",
+    "south": "galle",
+
+    # ── Mirissa ───────────────────────────────────────────────────────────────
+    "mirissa": "mirissa",
+    "mirissa beach": "mirissa",
+    "whale watching": "mirissa",
+
+    # ── Negombo ───────────────────────────────────────────────────────────────
+    "negombo": "negombo",
+    "negambo": "negombo",
+    "airport area": "negombo",
+    "near airport": "negombo",
+    "katunayake": "negombo",
+
+    # ── Ella ──────────────────────────────────────────────────────────────────
+    "ella": "ella",
+    "ella rock": "ella",
+    "nine arch": "ella",
+    "nine arches": "ella",
+
+    # ── Nuwara Eliya ──────────────────────────────────────────────────────────
+    "nuwara eliya": "nuwara eliya",
+    "nuwaraeliya": "nuwara eliya",
+    "nuwara-eliya": "nuwara eliya",
+    "nuwara": "nuwara eliya",
+    "nuware": "nuwara eliya",
+    "little england": "nuwara eliya",
+    "nuwara eliya city": "nuwara eliya",
+
+    # ── Trincomalee ───────────────────────────────────────────────────────────
+    "trincomalee": "trincomalee",
+    "trinco": "trincomalee",
+    "trinco bay": "trincomalee",
+    "east coast": "trincomalee",
+    "eastern coast": "trincomalee",
+
+    # ── Jaffna ────────────────────────────────────────────────────────────────
+    "jaffna": "jaffna",
+    "jaffna city": "jaffna",
+    "north": "jaffna",
+    "northern sri lanka": "jaffna",
+
+    # ── Bentota ───────────────────────────────────────────────────────────────
+    "bentota": "bentota",
+    "bentota beach": "bentota",
+    "south western coast": "bentota",
+
+    # ── Hikkaduwa ─────────────────────────────────────────────────────────────
+    "hikkaduwa": "hikkaduwa",
+    "hikka": "hikkaduwa",
+    "hikkaduwa beach": "hikkaduwa",
+
+    # ── Sigiriya ──────────────────────────────────────────────────────────────
+    "sigiriya": "sigiriya",
+    "sigiri": "sigiriya",
+    "lion rock": "sigiriya",
+    "dambulla": "sigiriya",
+    "cultural triangle": "sigiriya",
+
+    # ── Polonnaruwa ───────────────────────────────────────────────────────────
+    "polonnaruwa": "polonnaruwa",
+    "ancient city": "polonnaruwa",
+
+    # ── Arugam Bay ────────────────────────────────────────────────────────────
+    "arugam bay": "arugam bay",
+    "arugambay": "arugam bay",
+    "a-bay": "arugam bay",
+    "surf coast": "arugam bay",
+
+    # ── Unawatuna ─────────────────────────────────────────────────────────────
+    "unawatuna": "unawatuna",
+    "una": "unawatuna",
+
+    # ── Weligama ──────────────────────────────────────────────────────────────
+    "weligama": "weligama",
+    "weligama bay": "weligama",
+    "near mirissa": "weligama",
+    "near galle": "galle",
 }
 
 _KNOWN_TAGS = {
@@ -301,6 +411,47 @@ class VendorService:
             pph = getattr(p, "price_per_head", None)
             return pph is None or pph <= budget_per_head
 
+        def _score_package(p) -> float:
+            """
+            Composite relevance score — higher is better.
+
+            tag_overlap  (40 %) — fraction of requested tags that the package carries
+            budget_fit   (30 %) — how closely price_per_head sits under the budget cap
+                                   1.0  → price == budget (perfect)
+                                   0.5  → price is 50 % of budget (cheap, still good)
+                                   0.0  → no budget given, or price unavailable
+            guest_fit    (30 %) — 1.0 when guest_count satisfies min_guests, else 0.0
+                                   0.5 neutral when guest_count is unknown
+            """
+            pkg_tags = set(_get_tags(p))
+            req_tags = set(tags)
+
+            # tag_overlap: fraction of requested tags present in the package
+            if req_tags:
+                tag_score = len(req_tags & pkg_tags) / len(req_tags)
+            else:
+                tag_score = 0.0
+
+            # budget_fit: closeness of price to the budget cap (0–1)
+            pph = getattr(p, "price_per_head", None)
+            if budget_per_head and pph is not None and budget_per_head > 0:
+                # price within budget → ratio of price to cap (closer to cap = more premium = better fit)
+                ratio = pph / budget_per_head
+                budget_score = max(0.0, min(1.0, ratio))   # clamp [0, 1]
+            else:
+                budget_score = 0.0
+
+            # guest_fit: binary — does guest count meet min_guests?
+            min_g = getattr(p, "min_guests", None)
+            if guest_count is None:
+                guest_score = 0.5   # neutral
+            elif min_g is None or guest_count >= min_g:
+                guest_score = 1.0
+            else:
+                guest_score = 0.0
+
+            return tag_score * 0.4 + budget_score * 0.3 + guest_score * 0.3
+
         def loc_ok(p):
             if not canonical_loc:
                 return True
@@ -310,12 +461,12 @@ class VendorService:
         # Tier 1: tags + guest + budget + location
         strict = [p for p in all_pkgs if tag_match(p) and guest_ok(p) and budget_ok(p) and loc_ok(p)]
         if strict:
-            return strict[:limit]
+            return sorted(strict, key=_score_package, reverse=True)[:limit]
 
         # Tier 2: drop location
         mid = [p for p in all_pkgs if tag_match(p) and guest_ok(p) and budget_ok(p)]
         if mid:
-            return mid[:limit]
+            return sorted(mid, key=_score_package, reverse=True)[:limit]
 
         # Tier 3: only fires when a guest_count was explicitly given (caller has
         # a specific group size). Drops budget + location but keeps guest_ok so
@@ -324,7 +475,7 @@ class VendorService:
         # while keeping test_budget_filter empty (no guest_count given → no tier3).
         if guest_count is not None:
             relaxed = [p for p in all_pkgs if tag_match(p) and guest_ok(p)]
-            return relaxed[:limit]
+            return sorted(relaxed, key=_score_package, reverse=True)[:limit]
 
         return []
 
