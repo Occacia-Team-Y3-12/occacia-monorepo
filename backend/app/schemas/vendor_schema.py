@@ -5,8 +5,7 @@ from app.common.enums import VendorStatus
 # contains fields common to both reading and writing vendor data
 class VendorBase(BaseModel):
     business_name: str = Field(..., min_length=2, max_length=100)
-    contact_name: str = Field(..., min_length=2, max_length=100)
-    phone_number: str = Field(..., min_length=5, max_length=20)
+    phone: str = Field(..., min_length=5, max_length=20)
     description: Optional[str] = Field(None, max_length=500)
     website: Optional[str] = None
 
@@ -21,8 +20,6 @@ class VendorUpdate(BaseModel):
     phone_number: Optional[str] = None
     description: Optional[str] = None
     website: Optional[str] = None
-    # status: Allows admins to approve/reject by updating the enum value
-    status: Optional[VendorStatus] = None
 
 # VendorResponse defines the structure of data sent back to the client
 class VendorResponse(VendorBase):
