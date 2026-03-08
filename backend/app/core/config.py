@@ -60,5 +60,16 @@ class Settings(BaseSettings):
     ):
         return init_settings, env_settings, dotenv_settings
 
+    # ✅ Redis
+    REDIS_URL: Optional[str] = "redis://redis:6379"
+
+    # ✅ Email (SendGrid)
+    SENDGRID_API_KEY: Optional[str] = None
+    FROM_EMAIL: str = "noreply@occacia.com"
+
+    # ✅ Feature flags — replaces raw os.getenv() calls
+    SKIP_EMAIL_VERIFICATION: bool = False
+    SKIP_DB_STARTUP: bool = False
+
 # Initialize settings
 settings = Settings()
