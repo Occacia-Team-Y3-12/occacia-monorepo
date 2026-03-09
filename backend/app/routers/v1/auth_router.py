@@ -20,8 +20,8 @@ from app.services.vendor_service import vendor_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-oauth2_vendor_scheme   = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/vendors/login",   scheme_name="VendorAuth")
-oauth2_customer_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/customers/login", scheme_name="CustomerAuth")
+oauth2_vendor_scheme   = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/vendor/login",    scheme_name="VendorAuth")
+oauth2_customer_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/customer/login",  scheme_name="CustomerAuth")
 oauth2_admin_scheme    = OAuth2PasswordBearer(tokenUrl="/api/v1/admin/login",           scheme_name="AdminAuth")
 oauth2_scheme = oauth2_vendor_scheme
 
@@ -169,7 +169,7 @@ def verify_user_login(user, form_data: OAuth2PasswordRequestForm):
             raise HTTPException(status_code=403, detail="Email not verified.")
 
 
-@router.post("/vendors/register", response_model=VendorResponse, status_code=201)
+@router.post("/vendor/register", response_model=VendorResponse, status_code=201)
 def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(get_db)):
     if vendor_service.get_vendor_by_email(db, email=vendor_data.email):
         raise HTTPException(status_code=400, detail="Email already taken!")
@@ -180,12 +180,12 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
     return vendor
 
 
-@router.post("/customers/register", response_model=RegisterResponse, status_code=201)
+@router.post("/customer/register", response_model=RegisterResponse, status_code=201)
 def register_customer(payload: CustomerRegister, db: Session = Depends(get_db)):
     return auth_service.register_customer(db, payload)
 
 
-@router.get("/customers/verify-email")
+@router.get("/customer/verify-email")
 def verify_customer_email(request: Request, token: str = Query(...), db: Session = Depends(get_db)):
     try:
         result = auth_service.verify_customer_email(db, token)
@@ -210,7 +210,7 @@ def verify_customer_email(request: Request, token: str = Query(...), db: Session
                             content=_error_page("Verification Failed", "Link invalid or expired."))
 
 
-@router.get("/vendors/verify-email")
+@router.get("/vendor/verify-email")
 def verify_vendor_email(request: Request, token: str = Query(...), db: Session = Depends(get_db)):
     try:
         auth_service.verify_vendor_email(db, token)
@@ -232,17 +232,17 @@ def verify_vendor_email(request: Request, token: str = Query(...), db: Session =
                             content=_error_page("Verification Failed", "Link invalid or expired."))
 
 
-@router.post("/customers/forgot-password", response_model=AuthMessageResponse)
+@router.post("/customer/password/forgot", response_model=AuthMessageResponse)
 async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
     return auth_service.request_password_reset(db, request)
 
 
-@router.post("/customers/reset-password", response_model=AuthMessageResponse)
+@router.post("/customer/password/reset", response_model=AuthMessageResponse)
 async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
     return auth_service.confirm_password_reset(db, request)
 
 
-@router.post("/customers/login", tags=["Authentication"])
+@router.post("/customer/login", tags=["Authentication"])
 def login_customer(form_data: OAuth2PasswordRequestForm = Depends(),
                    db: Session = Depends(get_db)):
     customer = customer_service.get_customer_by_email(db, email=form_data.username)
@@ -252,7 +252,7 @@ def login_customer(form_data: OAuth2PasswordRequestForm = Depends(),
     return {"access_token": token, "token_type": "bearer"}
 
 
-@router.post("/vendors/login", tags=["Authentication"])
+@router.post("/vendor/login", tags=["Authentication"])
 def login_vendor(form_data: OAuth2PasswordRequestForm = Depends(),
                  db: Session = Depends(get_db)):
     vendor = vendor_service.get_vendor_by_email(db, email=form_data.username)
@@ -260,18 +260,3 @@ def login_vendor(form_data: OAuth2PasswordRequestForm = Depends(),
     token = create_access_token(data={"sub": vendor.email},
                                 expires_delta=timedelta(minutes=60))
     return {"access_token": token, "token_type": "bearer"}
-
-
-@router.get("/vendors/me", response_model=VendorResponse)
-def read_current_vendor(current_vendor=Depends(get_current_vendor)):
-    return current_vendor
-
-
-@router.get("/customers/me")
-def read_current_customer(current_customer=Depends(get_current_customer)):
-    return {
-        "id": current_customer.id,
-        "email": current_customer.email,
-        "full_name": current_customer.full_name,
-        "status": current_customer.status,
-    }
