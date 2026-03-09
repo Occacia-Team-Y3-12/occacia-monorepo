@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ROUTES } from '@/lib/routes';
+import Modal from '@/components/ui/Modal';
 
 type SidebarItem = {
 	label: string;
@@ -98,6 +99,7 @@ export default function VendorDashboard() {
   const router = useRouter();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -112,6 +114,12 @@ export default function VendorDashboard() {
   }, []);
 
   const handleLogout = () => {
+    setIsProfileMenuOpen(false);
+    setIsLogoutModalOpen(true);
+  };
+
+  const handleConfirmLogout = () => {
+    setIsLogoutModalOpen(false);
     router.push(ROUTES.VENDOR.LOGIN);
   };
 
@@ -381,6 +389,45 @@ export default function VendorDashboard() {
           </section>
           </div>
         </main>
+
+        <Modal
+          isOpen={isLogoutModalOpen}
+          onClose={() => setIsLogoutModalOpen(false)}
+          size="md"
+          className="rounded-2xl"
+        >
+          <div className="text-center">
+            <div className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+              <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                <path d="M8 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2" strokeLinecap="round" />
+                <path d="M16 17l4-5-4-5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M10 12h10" strokeLinecap="round" />
+              </svg>
+            </div>
+
+            <h3 className="text-2xl font-semibold text-slate-900">Log Out</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Are you sure you want to log out from the vendor portal?
+            </p>
+
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsLogoutModalOpen(false)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmLogout}
+                className="rounded-lg bg-[#1565c0] px-4 py-2 text-sm font-medium text-white hover:bg-[#0d47a1]"
+              >
+                Yes, Log Out
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   );
