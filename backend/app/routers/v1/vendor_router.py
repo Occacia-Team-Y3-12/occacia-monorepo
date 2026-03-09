@@ -27,7 +27,7 @@ from app.schemas.package_schema import PackageCreate, PackageUpdate, PackageResp
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/vendors", tags=["Vendors"])
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/vendors/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/vendor/login")
 
 
 # ── Auth dependency ──────────────────────────────────────────────────
@@ -70,6 +70,23 @@ def require_approved_vendor(vendor: Vendor = Depends(get_current_vendor)) -> Ven
 
 @router.get("/me", response_model=VendorResponse)
 def get_my_profile(vendor: Vendor = Depends(get_current_vendor)):
+    """Get current vendor profile. Spec: GET /vendors/me"""
+    return vendor
+
+
+@router.put("/me", response_model=VendorResponse)
+def update_my_profile(
+    body: dict,
+    vendor: Vendor = Depends(get_current_vendor),
+    db: Session = Depends(get_db),
+):
+    """Update current vendor profile. Spec: PUT /vendors/me"""
+    if body.get("displayName"):
+        vendor.display_name = body["displayName"]
+    if "contactPhone" in body:
+        vendor.contact_phone = body.get("contactPhone")
+    db.commit()
+    db.refresh(vendor)
     return vendor
 
 
