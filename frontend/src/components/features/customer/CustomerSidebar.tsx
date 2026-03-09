@@ -22,7 +22,7 @@ const CustomerSidebar = ({ isOpen }: CustomerSidebarProps) => {
     <aside
       className={`fixed left-0 top-0 z-40 h-screen w-[240px] max-w-[85vw] overflow-y-auto border-r border-[#ECECF0] bg-[#F5F5F8] px-4 py-5 transition-transform duration-300 ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}
+      } lg:translate-x-0`}
     >
       <div className="mb-8 flex items-center gap-3 px-2">
         <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="h-[59px] w-[59px]" />

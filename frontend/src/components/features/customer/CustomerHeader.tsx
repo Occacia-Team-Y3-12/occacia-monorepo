@@ -25,15 +25,13 @@ const CustomerHeader = ({ isSidebarOpen, onToggleSidebar }: CustomerHeaderProps)
 
   return (
     <header
-      className={`flex min-h-[88px] flex-col gap-3 border-b border-[#ECECF0] bg-[#F7F7FA] px-4 py-3 transition-all duration-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-0 ${
-        isSidebarOpen ? 'lg:ml-[240px]' : 'ml-0'
-      }`}
+      className="flex min-h-[88px] flex-col gap-3 border-b border-[#ECECF0] bg-[#F7F7FA] px-4 py-3 transition-all duration-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-0 lg:ml-[240px]"
     >
       <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-5">
         {isSidebarOpen ? (
           <button
             onClick={onToggleSidebar}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#E2E5EC] bg-white text-[#5B6478]"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#E2E5EC] bg-white text-[#5B6478] lg:hidden"
             aria-label="Close sidebar"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
@@ -41,7 +39,7 @@ const CustomerHeader = ({ isSidebarOpen, onToggleSidebar }: CustomerHeaderProps)
             </svg>
           </button>
         ) : (
-          <button onClick={onToggleSidebar} className="flex shrink-0 items-center gap-3 self-start" aria-label="Open sidebar">
+          <button onClick={onToggleSidebar} className="flex shrink-0 items-center gap-3 self-start lg:hidden" aria-label="Open sidebar">
             <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="h-[59px] w-[59px]" />
             <span className="whitespace-nowrap text-[22px] font-extrabold tracking-tight text-[#1562CC]">OCCACIA</span>
           </button>
