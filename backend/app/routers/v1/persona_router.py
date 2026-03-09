@@ -54,7 +54,11 @@ class PersonaCreate(BaseModel):
 
 
 class PersonaUpdate(BaseModel):
-    """All fields optional — partial update."""
+    """All fields optional — partial update.
+
+    When name is provided it must not be empty or whitespace-only (OCA-250).
+    None means "leave this field unchanged" (exclude_unset semantics).
+    """
     name:              Optional[str]        = None
     relationship:      Optional[str]        = None
     birthday:          Optional[str]        = None
@@ -64,6 +68,14 @@ class PersonaUpdate(BaseModel):
     color_preferences: Optional[List[str]]  = None
     music_preferences: Optional[List[str]]  = None
     personality_tags:  Optional[List[str]]  = None
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v: Optional[str]) -> Optional[str]:
+        """Reject empty string or whitespace-only name on update."""
+        if v is not None and not v.strip():
+            raise ValueError("name must not be empty or whitespace")
+        return v.strip() if v is not None else v
 
 
 class PersonaResponse(BaseModel):
