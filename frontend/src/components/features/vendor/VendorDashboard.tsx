@@ -1,183 +1,386 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useVendorDashboardMenu } from '@/hooks/vendor/useVendorDashboardMenu';
+import { ROUTES } from '@/lib/routes';
+
+type SidebarItem = {
+	label: string;
+  icon: string;
+	badge?: number;
+	active?: boolean;
+};
+
+type StatCard = {
+	title: string;
+	value: string;
+	note: string;
+	noteTone: 'green' | 'orange';
+	iconBg: string;
+	icon: string;
+};
+
+type OrderRow = {
+	id: string;
+	occasion: string;
+	recipient: string;
+	recipientMeta: string;
+	budget: string;
+	status: 'New Order' | 'Preparing' | 'Ready' | 'Delivered';
+};
+
+const sidebarItems: SidebarItem[] = [
+  { label: 'Dashboard', icon: '/icons/vendor/dashboard/dashboard.svg', active: true },
+  { label: 'Orders', icon: '/icons/vendor/dashboard/shopping-cart.svg', badge: 12 },
+  { label: 'Packages', icon: '/icons/vendor/dashboard/clipboard.svg' },
+  { label: 'Analytics', icon: '/icons/vendor/dashboard/calendar.svg' },
+  { label: 'Recipients', icon: '/icons/vendor/dashboard/users.svg' },
+];
+
+const statCards: StatCard[] = [
+  { title: 'New Orders Today', value: '24', note: '+12%', noteTone: 'green', iconBg: 'bg-blue-100', icon: '/icons/vendor/dashboard/stat-bag.svg' },
+  { title: 'Awaiting Preparation', value: '8', note: 'Pending', noteTone: 'orange', iconBg: 'bg-amber-100', icon: '/icons/vendor/dashboard/stat-clock.svg' },
+  { title: 'Revenue This Week', value: '$4,280', note: '+8%', noteTone: 'green', iconBg: 'bg-violet-100', icon: '/icons/vendor/dashboard/stat-currency.svg' },
+  { title: 'Vendor Rating', value: '4.9', note: 'Excellent', noteTone: 'green', iconBg: 'bg-emerald-100', icon: '/icons/vendor/dashboard/stat-star.svg' },
+];
+
+const orders: OrderRow[] = [
+	{
+		id: '#OCC-7829',
+		occasion: 'Birthday Surprise',
+		recipient: 'Sarah (28, Artist)',
+		recipientMeta: 'Loves minimalist design, vegan',
+		budget: '$150',
+		status: 'New Order',
+	},
+	{
+		id: '#OCC-7828',
+		occasion: 'Date Night',
+		recipient: 'Couple - Alex & Jordan',
+		recipientMeta: 'Adventurous, foodies, jazz lovers',
+		budget: '$200',
+		status: 'Preparing',
+	},
+	{
+		id: '#OCC-7827',
+		occasion: 'Hospital Visit',
+		recipient: 'Grandpa Joe (78)',
+		recipientMeta: 'Gardening enthusiast, diabetic',
+		budget: '$85',
+		status: 'Ready',
+	},
+	{
+		id: '#OCC-7826',
+		occasion: 'Dinner Out',
+		recipient: 'Family of 4',
+		recipientMeta: 'Kids ages 5 & 8, picky eaters',
+		budget: '$120',
+		status: 'Delivered',
+	},
+];
+
+const statusPillClass: Record<OrderRow['status'], string> = {
+	'New Order': 'bg-amber-100 text-amber-800',
+	Preparing: 'bg-blue-100 text-blue-800',
+	Ready: 'bg-violet-100 text-violet-800',
+	Delivered: 'bg-emerald-100 text-emerald-800',
+};
+
+const recipientTypes = [
+	{ label: 'Birthday Celebrants', value: 45, color: 'bg-blue-500' },
+	{ label: 'Date Night Couples', value: 30, color: 'bg-violet-500' },
+	{ label: 'Elderly Visits', value: 15, color: 'bg-emerald-500' },
+];
 
 export default function VendorDashboard() {
-  const { isDropdownOpen, setIsDropdownOpen, dropdownRef } = useVendorDashboardMenu();
+  const router = useRouter();
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    router.push(ROUTES.VENDOR.LOGIN);
+  };
 
   return (
-    <div className="min-h-screen relative">
-      <Image src="/images/background.png" alt="Background" fill className="object-cover" priority />
-
-      <div className="relative z-30 border-b border-white/30 bg-white/25 px-4 py-3 backdrop-blur-sm sm:px-8">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center -my-2">
-            <Image src="/icons/logo.svg" alt="Occacia Logo" width={64} height={64} className="h-16 w-auto" />
+    <div className="min-h-screen bg-[#f4f6fb] text-slate-900">
+      <div className="mx-auto flex w-full max-w-[1600px]">
+        <aside
+          className={`fixed inset-y-0 left-0 z-40 flex w-[250px] shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-2 transform transition-transform duration-300 lg:static lg:min-h-screen lg:translate-x-0 ${
+            isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <div className="mb-2 flex items-center gap-3 px-2 py-1">
+          <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="h-[59px] w-[59px]" priority />
+          <span className="text-[22px] font-extrabold tracking-tight text-[#1562CC]">OCCACIA</span>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-            <nav className="flex flex-wrap gap-4 sm:gap-8">
-              <a href="#" className="border-b-2 border-blue-600 pb-1 text-xs font-semibold text-blue-600 sm:text-sm">DASHBOARD</a>
-              <a href="#" className="text-xs text-gray-600 hover:text-blue-600 sm:text-sm">ORDERS</a>
-              <a href="#" className="text-xs text-gray-600 hover:text-blue-600 sm:text-sm">ITEMS & SERVICES</a>
-            </nav>
-            <div className="relative" ref={dropdownRef}>
-              <div className="flex items-center gap-2 cursor-pointer hover:opacity-80" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
-                <Image src="/icons/vendor/dashboard/Spring & Summer logo.svg" alt="Spring & Summer" width={32} height={32} className="h-8 w-auto" />
-                <span className="text-gray-700 text-sm mb-2">Spring & Summer</span>
+
+          <nav className="mt-6 space-y-1">
+            {sidebarItems.map((item) => (
+              <button
+                key={item.label}
+                onClick={() => setIsSidebarOpen(false)}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-base transition-colors xl:text-[18px]
+                  ${item.active ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}
+                `}
+                type="button"
+              >
+                <span className="flex items-center gap-3 font-medium">
+                  <Image src={item.icon} alt="" width={20} height={20} className="h-5 w-5 opacity-90" />
+                  {item.label}
+                </span>
+                {item.badge ? (
+                  <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">{item.badge}</span>
+                ) : null}
+              </button>
+            ))}
+          </nav>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-auto flex items-center gap-3 rounded-xl px-3 py-3 text-base font-medium text-slate-600 hover:bg-slate-100 xl:text-[18px]"
+          >
+            <Image src="/icons/vendor/dashboard/logout.svg" alt="" aria-hidden="true" width={20} height={20} className="h-5 w-5" />
+            Logout
+          </button>
+        </aside>
+
+        {isSidebarOpen && (
+          <button
+            type="button"
+            aria-label="Close sidebar overlay"
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 z-30 bg-black/25 lg:hidden"
+          />
+        )}
+
+        <main className="min-w-0 flex-1 overflow-x-hidden">
+        <header className="w-full border-b border-[#ECECF0] bg-[#F7F7FA] px-4 py-3 sm:px-6 sm:py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:gap-5 lg:w-auto">
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen((prev) => !prev)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#E2E5EC] bg-white text-[#5B6478] lg:hidden"
+              aria-label="Toggle sidebar"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+            </button>
+        <div className="relative w-full sm:w-[320px] md:w-[360px]">
+                  <input
+                    type="search"
+              placeholder="Search orders, recipients.."
+              className="h-11 w-full rounded-full border border-[#E2E5EC] bg-[#EFF1F6] px-5 text-sm text-[#4A4F5C] outline-none placeholder:text-[#99A0AF]"
+                  />
+                </div>
               </div>
 
-              {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[60]">
-                  <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
+          <div className="flex items-center justify-between gap-2 sm:justify-end sm:gap-4">
+                <button
+                  type="button"
+                  aria-label="Notifications"
+                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E0E7F2] bg-white text-[#5B6478]"
+                >
+                  <Image src="/icons/vendor/dashboard/header-notification.svg" alt="" aria-hidden="true" width={20} height={20} className="h-5 w-5" />
+                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#0D47A1]" />
+                </button>
+
+          <div className="hidden h-10 w-px bg-[#D9DEE8] sm:block" aria-hidden="true" />
+
+                <div className="relative" ref={profileMenuRef}>
+                  <button
+                  type="button"
+                  onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-2 sm:gap-3"
+                  aria-label="Open vendor profile menu"
+                  >
+                  <span className="hidden text-[16px] font-semibold text-[#182039] sm:inline">Spring & Summer</span>
+                  <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-white shadow-[0_6px_18px_rgba(25,35,72,0.18)]">
+                    <Image
+                    src="/icons/vendor/dashboard/Spring & Summer logo.svg"
+                    alt="Spring & Summer"
+                    width={40}
+                    height={40}
+                    className="h-10 w-10 object-contain"
+                    />
+                  </span>
+                  </button>
+
+                  {isProfileMenuOpen && (
+                  <div className="absolute right-0 top-full z-50 mt-2 w-40 rounded-xl border border-[#E5E8F0] bg-white p-2 shadow-[0_14px_28px_rgba(23,34,73,0.12)] sm:w-44">
+                    <button
+                    type="button"
+                    className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#1F293F] transition-colors hover:bg-[#F3F5FA]"
+                    >
                     My Profile
+                    </button>
+                    <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#C22525] transition-colors hover:bg-[#FFF1F1]"
+                    >
+                    Logout
+                    </button>
+                  </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          </header>
+
+          <div className="p-4 sm:p-6">
+
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {statCards.map((card) => (
+            <article key={card.title} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:p-5">
+                <div className="mb-5 flex items-start justify-between">
+                  <span className={`inline-flex h-11 w-11 items-center justify-center rounded-xl ${card.iconBg} text-slate-700`}>
+                    <Image src={card.icon} alt="" aria-hidden="true" width={20} height={20} className="h-5 w-5" />
+                  </span>
+                  <span
+                    className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                      card.noteTone === 'green' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {card.note}
+                  </span>
+                </div>
+                <p className="text-4xl font-semibold leading-none tracking-tight text-slate-900 sm:text-[44px]">{card.value}</p>
+                <p className="mt-2 text-base text-slate-500 sm:text-xl lg:text-2xl">{card.title}</p>
+              </article>
+            ))}
+          </section>
+
+          <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1.85fr_0.85fr]">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Recent Orders</h2>
+                  <p className="text-sm text-slate-500 sm:text-base lg:text-2xl">Manage and fulfill customer orders</p>
+                </div>
+                <div className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-slate-100 p-1 text-sm sm:w-auto sm:text-base lg:text-[18px]">
+                  <button type="button" className="rounded-lg bg-white px-3 py-2 font-medium text-blue-700 shadow-sm inline-flex items-center gap-2 sm:px-4">
+                    <Image src="/icons/vendor/dashboard/filter-all-orders.svg" alt="All orders" width={16} height={16} className="h-4 w-4" />
+                    All Orders
                   </button>
-                  <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Log Out
+                  <button type="button" className="rounded-lg px-3 py-2 text-slate-600 inline-flex items-center gap-2 sm:px-4">
+                    <Image src="/icons/vendor/dashboard/filter-pending.svg" alt="Pending" width={16} height={16} className="h-4 w-4" />
+                    Pending
+                  </button>
+                  <button type="button" className="rounded-lg px-3 py-2 text-slate-600 inline-flex items-center gap-2 sm:px-4">
+                    <Image src="/icons/vendor/dashboard/filter-completed.svg" alt="Completed" width={16} height={16} className="h-4 w-4" />
+                    Completed
                   </button>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="relative z-10 px-4 py-6 sm:px-8 sm:py-8">
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 sm:gap-5">
-          <div className="bg-white rounded-xl shadow-lg p-5 min-h-[130px] flex items-center justify-between">
-            <div className="min-w-0 pr-2">
-              <div className="text-xl font-bold leading-none text-gray-800 sm:text-[22px]">100,205.00 LKR</div>
-              <div className="mt-2 text-sm tracking-wide text-gray-500">TOTAL PROFIT THIS MONTH</div>
-            </div>
-            <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-              <Image src="/icons/vendor/dashboard/profit.svg" alt="Profit" width={28} height={28} className="w-7 h-7" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-5 min-h-[130px] flex items-center justify-between">
-            <div className="min-w-0 pr-2 pt-2">
-              <div className="text-xl font-bold leading-none text-gray-800 sm:text-[22px]">1025</div>
-              <div className="text-[13px] text-gray-500 mt-2 leading-tight">
-                <span className="block">COMPLETED ORDERS THIS</span>
-                <span className="block">MONTH</span>
-              </div>
-            </div>
-            <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-              <svg className="w-7 h-7 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-              </svg>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-5 min-h-[130px] flex items-center justify-between">
-            <div className="min-w-0 pr-2 -mt-1">
-              <div className="text-xl font-bold leading-none text-gray-800 sm:text-[22px]">25</div>
-              <div className="mt-2 text-sm tracking-wide text-gray-500">ONGOING ORDERS</div>
-            </div>
-            <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-              <svg className="w-7 h-7 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-              </svg>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-5 min-h-[130px] flex items-center justify-between">
-            <div className="min-w-0 pr-2 -mt-1">
-              <div className="text-xl font-bold leading-none text-gray-800 sm:text-[22px]">4.5 / 5 <span className="text-[10px] text-gray-500">(1200 USERS)</span></div>
-              <div className="mt-2 text-sm tracking-wide text-gray-500">YOUR SCORE</div>
-            </div>
-            <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-              <svg className="w-7 h-7 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <div className="col-span-2">
-            <h2 className="mb-6 text-xl font-bold text-gray-700">Platform Overview</h2>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 xl:gap-6">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <div className="text-4xl font-bold">342</div>
-                    <div className="text-sm mt-1">Total Orders</div>
-                  </div>
-                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
-                  </svg>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between"><span>Completion Rate:</span><span>87%</span></div>
-                  <div className="flex justify-between"><span>Avg Response:</span><span>2.3 min</span></div>
-                </div>
               </div>
 
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <div className="text-4xl font-bold">42</div>
-                    <div className="text-sm mt-1">Active Orders</div>
-                  </div>
-                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between"><span>On process:</span><span>18</span></div>
-                  <div className="flex justify-between"><span>Prepared:</span><span>360</span></div>
-                </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[680px] border-separate border-spacing-y-2 sm:min-w-[760px]">
+                  <thead>
+                    <tr className="text-left text-[12px] font-semibold uppercase tracking-wide text-slate-400">
+                      <th className="px-2 py-1">Order ID</th>
+                      <th className="px-2 py-1">Occasion</th>
+                      <th className="px-2 py-1">Recipient Profile</th>
+                      <th className="px-2 py-1">Budget</th>
+                      <th className="px-2 py-1">Status</th>
+                      <th className="px-2 py-1">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((order) => (
+                      <tr key={order.id} className="rounded-xl bg-slate-50">
+                    <td className="rounded-l-xl px-2 py-3 text-xs font-semibold text-blue-700 sm:text-sm">{order.id}</td>
+                    <td className="px-2 py-3 text-sm font-semibold text-slate-800 sm:text-base">{order.occasion}</td>
+                        <td className="px-2 py-3">
+                      <div className="text-sm font-semibold text-slate-800 sm:text-base">{order.recipient}</div>
+                      <div className="text-xs text-slate-500 sm:text-sm">{order.recipientMeta}</div>
+                        </td>
+                    <td className="px-2 py-3 text-lg font-semibold text-slate-800 sm:text-[22px]">{order.budget}</td>
+                        <td className="px-2 py-3">
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusPillClass[order.status]}`}>{order.status}</span>
+                        </td>
+                        <td className="rounded-r-xl px-2 py-3 text-blue-600">
+                          <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm">
+                            <Image src="/icons/vendor/dashboard/table-action-view.svg" alt="View" width={18} height={18} className="h-[18px] w-[18px]" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
 
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <div className="text-4xl font-bold">4.6</div>
-                    <div className="text-sm mt-1">Average Rating</div>
-                  </div>
-                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between"><span>Total Reviews:</span><span>1,247</span></div>
-                  <div className="flex justify-between"><span>Pending Moderation:</span><span>23</span></div>
-                </div>
+              <div className="mt-2 text-center">
+                <Link href={ROUTES.VENDOR.ORDERS} className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-800">
+                  View All Orders
+                  <Image src="/icons/vendor/dashboard/link-view-orders.svg" alt="" aria-hidden="true" width={16} height={16} className="h-4 w-4" />
+                </Link>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="mb-6 text-xl font-bold text-gray-700">Recent Activity Feed</h2>
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
-                <div className="bg-white rounded-lg p-4 border border-gray-200 h-[72px] flex flex-col justify-center">
-                  <div className="text-sm text-gray-700">New order received from Thisal</div>
-                  <div className="text-xs text-gray-500 mt-1">2 min ago</div>
+            <div className="space-y-5">
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:p-5">
+              <h3 className="mb-4 text-xl font-semibold text-slate-900 sm:text-2xl">Quick Actions</h3>
+              <div className="space-y-3 text-base sm:text-[18px]">
+              <button className="w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white shadow-md hover:bg-blue-700 inline-flex items-center justify-center gap-2" type="button">
+                    <Image src="/icons/vendor/dashboard/quick-package.svg" alt="" aria-hidden="true" width={18} height={18} className="h-[18px] w-[18px]" />
+                    Create New Package
+                  </button>
+                  <button className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-2" type="button">
+                    <Image src="/icons/vendor/dashboard/quick-inventory.svg" alt="" aria-hidden="true" width={18} height={18} className="h-[18px] w-[18px]" />
+                    Update Inventory
+                  </button>
+                  <button className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-2" type="button">
+                    <Image src="/icons/vendor/dashboard/quick-delivery.svg" alt="" aria-hidden="true" width={18} height={18} className="h-[18px] w-[18px]" />
+                    Schedule Delivery
+                  </button>
                 </div>
-                <div className="bg-white rounded-lg p-4 border border-gray-200 h-[72px] flex flex-col justify-center">
-                  <div className="text-sm text-gray-700">Payment received for Order #1025 : 8,500 LKR</div>
-                  <div className="text-xs text-gray-500 mt-1">12 min ago</div>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:p-5">
+                <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">Top Recipient Types</h3>
+                  <button type="button" className="text-sm font-semibold text-blue-700 hover:text-blue-800 inline-flex items-center gap-1.5">
+                    <Image src="/icons/vendor/dashboard/link-report.svg" alt="" aria-hidden="true" width={16} height={16} className="h-4 w-4" />
+                    View Report
+                  </button>
                 </div>
-                <div className="bg-white rounded-lg p-4 border border-gray-200 h-[72px] flex flex-col justify-center">
-                  <div className="text-sm text-gray-700">New order received from Janith</div>
-                  <div className="text-xs text-gray-500 mt-1">17min ago</div>
+
+                <div className="space-y-4">
+                  {recipientTypes.map((item) => (
+                    <div key={item.label}>
+                      <div className="mb-1 flex items-center justify-between text-sm text-slate-700">
+                        <span>{item.label}</span>
+                        <span className="font-semibold">{item.value}%</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-slate-200">
+                        <div className={`h-2 rounded-full ${item.color}`} style={{ width: `${item.value}%` }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="bg-white rounded-lg p-4 border border-gray-200 h-[72px] flex flex-col justify-center">
-                  <div className="text-sm text-gray-700">Order #1024 completed</div>
-                  <div className="text-xs text-gray-500 mt-1">25 min ago</div>
-                </div>
-              </div>
+              </section>
             </div>
+          </section>
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );
