@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+
 import os
 import sys
 from pathlib import Path
@@ -5,7 +7,6 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
 
 # ── Environment must be set before any app imports ───────────────────
 os.environ.update({
@@ -25,14 +26,16 @@ repo_root = Path(__file__).resolve().parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
+from app.core.database import Base, SessionLocal, engine
+from app.core.security import create_access_token, get_password_hash
 from app.main import app  # noqa: E402
-from app.core.database import SessionLocal, engine, Base
-from app.models.customer import Customer
-from app.models.vendor import Vendor
-from app.models.persona import Persona
 from app.models.chat_model import ChatMessage
+from app.models.customer import Customer
+from app.models.event import Event
+from app.models.event_persona import EventPersona
 from app.models.package import Package
-from app.core.security import get_password_hash, create_access_token
+from app.models.persona import Persona
+from app.models.vendor import Vendor
 
 
 # ── Create all tables once ───────────────────────────────────────────
@@ -50,6 +53,8 @@ def clean_tables():
     db = SessionLocal()
     try:
         db.query(ChatMessage).delete()
+        db.query(EventPersona).delete()
+        db.query(Event).delete()
         db.query(Persona).delete()
         db.query(Package).delete()
         db.query(Vendor).delete()
