@@ -51,7 +51,7 @@ No `make`?
 
 ```bash
 cd backend
-poetry install --sync --no-root
+poetry sync --no-root
 ```
 
 4) Run the API
@@ -85,12 +85,12 @@ poetry run alembic upgrade head
 ## Troubleshooting
 
 - Poetry using wrong Python: `cd backend && poetry env use python3.11`
-- `.venv` not created in `backend/`: ensure `backend/poetry.toml` has `virtualenvs.in-project = true`, then reinstall: `make clean-venv && make install` (Windows: `Remove-Item -Recurse -Force .venv; poetry install --sync --no-root`)
+- `.venv` not created in `backend/`: ensure `backend/poetry.toml` has `virtualenvs.in-project = true`, then reinstall: `make clean-venv && make install` (Windows: `Remove-Item -Recurse -Force .venv; poetry sync --no-root`)
 - PowerShell can’t activate venv: run once `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (or skip activation and use `poetry run ...`)
 - `.env` not being read: confirm `backend/.env` exists (symlink or copy from `../.env`)
 - DB connection errors: confirm Postgres is running and `DATABASE_URL` matches the exposed host/port (`localhost:5432` by default)
 - Port already in use: stop the conflicting process or change the Uvicorn port (`--port 8001`)
-- Lock/deps out of sync: `poetry lock` then `poetry install --sync --no-root`
+- Lock/deps out of sync: `poetry lock` then `poetry sync --no-root`
 
 ## URLs
 
