@@ -1,0 +1,79 @@
+'use client';
+
+import Image from 'next/image';
+import Link from 'next/link';
+import { ROUTES } from '@/lib/routes';
+import { useVendorLogin } from '@/hooks/vendor/useVendorLogin';
+
+export default function VendorLoginForm() {
+	const { formData, loading, error, handleChange, handleSubmit } = useVendorLogin();
+
+	return (
+		<div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+			<Image src="/images/background.png" alt="Background" fill className="object-cover" priority />
+
+			<div className="flex flex-col md:flex-row bg-white rounded-3xl shadow-2xl overflow-hidden max-w-4xl w-full relative z-10">
+				<div className="w-full md:w-2/5 bg-gradient-to-br from-[#f5f7f9] to-white p-6 md:p-12 flex flex-col items-center justify-center">
+					<div className="mb-4 md:mb-8">
+						<Image src="/icons/logo.svg" alt="Occacia Logo" width={120} height={120} priority className="md:w-[180px] md:h-[180px]" />
+					</div>
+					<h1 className="text-2xl md:text-4xl font-bold text-[#2c3e50] mb-2">OCCACIA</h1>
+					<p className="text-base md:text-xl text-[#5a6c7d] font-medium">VENDOR PORTAL</p>
+				</div>
+
+				<div className="w-full md:w-3/5 p-6 md:p-12 flex flex-col justify-center">
+					<h2 className="text-2xl md:text-3xl font-semibold text-[#5a6c7d] mb-6 md:mb-8 text-center">VENDOR SIGN IN</h2>
+
+					<form onSubmit={handleSubmit} className="space-y-6">
+						<input
+							type="email"
+							name="email"
+							placeholder="Email Address"
+							value={formData.email}
+							onChange={handleChange}
+							required
+							className="w-full px-4 py-3 border border-[#d1dce5] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb]"
+						/>
+
+						<input
+							type="password"
+							name="password"
+							placeholder="Password"
+							value={formData.password}
+							onChange={handleChange}
+							required
+							className="w-full px-4 py-3 border border-[#d1dce5] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e88e5] text-[#2c3e50] placeholder-[#8b9db0] bg-[#f8fafb]"
+						/>
+
+						{error && <p className="text-sm text-red-600">{error}</p>}
+
+						<div className="flex justify-end">
+							<Link href="/vendor/auth/forgot-password" className="text-sm text-[#1e88e5] hover:underline">
+								Forgot Password?
+							</Link>
+						</div>
+
+						<button
+							type="submit"
+							disabled={loading}
+							className="w-full bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium py-3 rounded-lg transition-colors duration-200 disabled:opacity-50"
+						>
+							{loading ? 'Logging in...' : 'Login →'}
+						</button>
+					</form>
+
+					<div className="mt-6 text-center">
+						<p className="text-[#5a6c7d] text-sm">
+							Don&apos;t have an account?{' '}
+							<Link href={ROUTES.VENDOR.REGISTER} className="text-[#1e88e5] hover:underline font-medium">
+								Register
+							</Link>
+						</p>
+					</div>
+
+					<div className="mt-8 text-center text-xs text-[#8b9db0]">Copyright © 2025 Occacia</div>
+				</div>
+			</div>
+		</div>
+	);
+}
