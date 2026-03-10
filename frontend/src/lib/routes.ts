@@ -3,6 +3,8 @@ export const ROUTES = {
   CUSTOMER: {
     DASHBOARD: '/customer/dashboard',
     REGISTER: '/customer/register',
+    EVENTS: '/customer/events',
+    EVENT_CHAT: (eventId: string) => `/customer/events/${eventId}/chat`,
     PRODUCTS: '/customer/products',
     CART: '/customer/cart',
     ORDERS: '/customer/orders',

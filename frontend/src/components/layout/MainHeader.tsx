@@ -14,7 +14,7 @@ const MainHeader = () => {
           <div className="relative">
             <input
               type="text"
-              placeholder="Search events,peoples..."
+              placeholder="Search events,people..."
               className="w-80 pl-10 pr-4 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <svg className="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

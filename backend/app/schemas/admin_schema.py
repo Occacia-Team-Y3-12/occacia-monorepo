@@ -30,6 +30,9 @@ class VendorAdminView(BaseModel):
     approval_status: str
     is_verified: bool
     approved_at: Optional[datetime]
+    # Spec: AccountStatus — ACTIVE / SUSPENDED / DISABLED
+    # Falls back to None if the column doesn't exist on older DB rows
+    status: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 

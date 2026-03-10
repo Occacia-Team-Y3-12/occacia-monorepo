@@ -33,7 +33,7 @@ def _uid():
 
 
 PLAN_URL = "/api/v1/planning/generate"
-AUTH_URL = "/api/v1/auth/customers"
+AUTH_URL = "/api/v1/auth/customer"   # ← FIX: singular (was /auth/customers)
 
 
 def _plan_payload(message="Plan a romantic dinner", session_id=None):
@@ -101,7 +101,7 @@ class TestEmailSending:
         assert callable(_send_email)
 
     def test_customer_registration_triggers_email(self, client):
-        """POST /v1/auth/customers/register must succeed (email mocked out)."""
+        """POST /v1/auth/customer/register must succeed (email mocked out)."""
         payload = {
             "full_name": "Email Test",
             "email": f"test-{_uid()}@example.com",
@@ -117,7 +117,7 @@ class TestEmailSending:
         """POST forgot-password must call _send_email for known accounts."""
         with patch("app.services.auth_service._send_email", return_value=False) as mock_send:
             resp = client.post(
-                AUTH_URL + "/forgot-password",
+                AUTH_URL + "/password/forgot",
                 json={"email": active_customer.email},
             )
         if resp.status_code in (200, 202):

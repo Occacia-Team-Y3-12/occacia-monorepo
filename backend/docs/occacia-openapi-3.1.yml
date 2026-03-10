@@ -3,8 +3,8 @@ info:
   title: Occacia API
   version: "1.0.0"
   description: >
-    API contract aligned with Occacia Planning use cases, EERD, and class diagram.
-    Core flow: Event -> Tasks -> Recommendations -> Packages -> Confirm Package -> Vendor execution.
+    Occacia API contract aligned with use cases, EERD, and class diagram.
+    Core flow: Event -> Tasks -> Recommendations -> Packages -> Confirm Package -> Package Order -> Vendor Fulfillment Requests -> Task execution.
 servers:
   - url: https://app.occacia.com/api/v1
     description: Production (example)
@@ -15,137 +15,793 @@ security:
   - bearerAuth: []
 
 tags:
-  - name: Auth
+  - name: Authentication
+  - name: User Profile
   - name: Customer
   - name: Vendor
   - name: Admin
+  - name: "Support & Inquiries"
+  - name: Metadata
+  - name: "System & Ops"
 
 paths:
 
   # =========================
-  # Auth (minimal)
+  # Auth
   # =========================
-  /auth/customers/register:
+  /auth/customer/register:
     post:
-      tags: [Auth]
+      tags: [Authentication]
       summary: Register customer
       security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/CustomerRegisterRequest"
+            schema: { $ref: "#/components/schemas/CustomerRegisterRequest" }
       responses:
         "201":
-          description: Registered
+          description: Registered (customer created as PENDING)
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/RegisterResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/RegisterResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
 
-  /auth/vendors/register:
+  /auth/customer/verify-email:
+    get:
+      tags: [Authentication]
+      summary: Verify customer email
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Email verified; customer becomes ACTIVE
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /auth/customer/email-verification/resend:
     post:
-      tags: [Auth]
+      tags: [Authentication]
+      summary: Resend customer verification email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResendVerificationRequest" }
+      responses:
+        "200":
+          description: Verification email resent (if account is pending)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /auth/customer/login:
+    post:
+      tags: [Authentication]
+      summary: Customer login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Logged in (tokens issued)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/customer/logout:
+    post:
+      tags: [Authentication]
+      summary: Customer logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/customer/token/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh customer access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshTokenRequest" }
+      responses:
+        "200":
+          description: New access token issued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/customer/password/change:
+    post:
+      tags: [Authentication]
+      summary: Change or reset customer password
+      description: >
+        Supports:
+        (A) Authenticated password change: currentPassword + newPassword
+        (B) Password reset via token: resetToken + newPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordChangeOrResetRequest" }
+      responses:
+        "200":
+          description: Password updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /auth/customer/password/forgot:
+    post:
+      tags: [Authentication]
+      summary: Request customer password reset email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ForgotPasswordRequest" }
+      responses:
+        "200":
+          description: Password reset email requested
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+
+  /auth/customer/password/reset:
+    post:
+      tags: [Authentication]
+      summary: Reset customer password using token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResetPasswordRequest" }
+      responses:
+        "200":
+          description: Password reset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /auth/vendor/register:
+    post:
+      tags: [Authentication]
       summary: Register vendor
       security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/VendorRegisterRequest"
+            schema: { $ref: "#/components/schemas/VendorRegisterRequest" }
       responses:
         "201":
-          description: Registered
+          description: Registered (vendor created as PENDING verification)
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/VendorResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/RegisterResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
 
-  /auth/customers/forgot-password:
-    post:
-      tags: [Auth]
-      summary: Request customer password reset
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ForgotPasswordRequest"
-      responses:
-        "200":
-          description: Password reset link requested
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthMessageResponse"
-
-  /auth/customers/reset-password:
-    post:
-      tags: [Auth]
-      summary: Confirm customer password reset
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ResetPasswordRequest"
-      responses:
-        "200":
-          description: Password reset confirmed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthMessageResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
-  /auth/login:
-    post:
-      tags: [Auth]
-      summary: Login
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LoginRequest"
-      responses:
-        "200":
-          description: Logged in
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-
-  /auth/me:
+  /auth/vendor/verify-email:
     get:
-      tags: [Auth]
-      summary: Get current user profile
+      tags: [Authentication]
+      summary: Verify vendor email
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
       responses:
         "200":
-          description: Current user
+          description: Email verified; vendor becomes PENDING admin approval
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/MeResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /auth/vendor/email-verification/resend:
+    post:
+      tags: [Authentication]
+      summary: Resend vendor verification email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResendVerificationRequest" }
+      responses:
+        "200":
+          description: Verification email resent (if account is pending)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /auth/vendor/login:
+    post:
+      tags: [Authentication]
+      summary: Vendor login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Logged in (tokens issued)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/vendor/logout:
+    post:
+      tags: [Authentication]
+      summary: Vendor logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/vendor/token/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh vendor access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshTokenRequest" }
+      responses:
+        "200":
+          description: New access token issued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/vendor/password/change:
+    post:
+      tags: [Authentication]
+      summary: Change or reset vendor password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordChangeOrResetRequest" }
+      responses:
+        "200":
+          description: Password updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /auth/vendor/password/forgot:
+    post:
+      tags: [Authentication]
+      summary: Request vendor password reset email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ForgotPasswordRequest" }
+      responses:
+        "200":
+          description: Password reset email requested
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+
+  /auth/vendor/password/reset:
+    post:
+      tags: [Authentication]
+      summary: Reset vendor password using token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResetPasswordRequest" }
+      responses:
+        "200":
+          description: Password reset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /auth/admin/register:
+    post:
+      tags: [Authentication]
+      summary: Provision admin account (internal)
+      description: Restricted/internal endpoint; not self-service.
+      responses:
+        "201":
+          description: Admin provisioned
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RegisterResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /auth/admin/login:
+    post:
+      tags: [Authentication]
+      summary: Admin login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Logged in (tokens issued)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/admin/logout:
+    post:
+      tags: [Authentication]
+      summary: Admin logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+
+  /auth/admin/token/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh admin access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshTokenRequest" }
+      responses:
+        "200":
+          description: New access token issued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
   # =========================
-  # Customer - Personas (UC-23)
+  # Profiles
+  # =========================
+  /customers/me:
+    get:
+      tags: ["User Profile"]
+      summary: Get current customer profile
+      responses:
+        "200":
+          description: Customer profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerProfile" }
+    put:
+      tags: ["User Profile"]
+      summary: Update current customer profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomerProfileUpdateRequest" }
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerProfile" }
+
+  /vendors/me:
+    get:
+      tags: ["User Profile"]
+      summary: Get current vendor profile
+      responses:
+        "200":
+          description: Vendor profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorProfile" }
+    put:
+      tags: ["User Profile"]
+      summary: Update current vendor profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VendorProfileUpdateRequest" }
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorProfile" }
+
+  /admin/me:
+    get:
+      tags: ["User Profile"]
+      summary: Get current admin profile
+      responses:
+        "200":
+          description: Admin profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminProfile" }
+
+  # =========================
+  # Admin - Vendor Management (UC-25/26)
+  # =========================
+  /admin/vendors:
+    get:
+      tags: [Admin]
+      summary: List vendors (management)
+      parameters:
+        - name: approval_status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/VendorApprovalStatus" }
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/AccountStatus" }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Vendors
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedVendors" }
+
+  /admin/vendors/{vendorId}:
+    parameters:
+      - $ref: "#/components/parameters/VendorId"
+    get:
+      tags: [Admin]
+      summary: Get vendor detail (management)
+      responses:
+        "200":
+          description: Vendor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorAdminView" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/vendors/{vendorId}/status:
+    parameters:
+      - $ref: "#/components/parameters/VendorId"
+    put:
+      tags: [Admin]
+      summary: Update vendor account status (ACTIVE/SUSPENDED/DISABLED)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VendorStatusUpdateRequest" }
+      responses:
+        "200":
+          description: Updated vendor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorAdminView" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /admin/vendors/{vendorId}/approve:
+    parameters:
+      - $ref: "#/components/parameters/VendorId"
+    post:
+      tags: [Admin]
+      summary: Approve vendor registration
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorAdminView" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /admin/vendors/{vendorId}/reject:
+    parameters:
+      - $ref: "#/components/parameters/VendorId"
+    post:
+      tags: [Admin]
+      summary: Reject vendor registration
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VendorRejectRequest" }
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorAdminView" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  # =========================
+  # Admin - Customer Management (UC-29)
+  # =========================
+  /admin/customers:
+    get:
+      tags: [Admin]
+      summary: List customers (management)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/AccountStatus" }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Customers
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedCustomers" }
+
+  /admin/customers/{customerId}:
+    parameters:
+      - $ref: "#/components/parameters/CustomerId"
+    get:
+      tags: [Admin]
+      summary: Get customer detail (management)
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerAdminView" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/customers/{customerId}/status:
+    parameters:
+      - $ref: "#/components/parameters/CustomerId"
+    put:
+      tags: [Admin]
+      summary: Update customer account status (ACTIVE/SUSPENDED/DISABLED)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomerStatusUpdateRequest" }
+      responses:
+        "200":
+          description: Updated customer
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerAdminView" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  # =========================
+  # Admin - Organization Management (UC-27)
+  # =========================
+  /admin/organizations:
+    get:
+      tags: [Admin]
+      summary: List organizations (management)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/OrganizationStatus" }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Organizations
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedOrganizations" }
+
+  /admin/organizations/{orgId}:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    get:
+      tags: [Admin]
+      summary: Get organization detail (management)
+      responses:
+        "200":
+          description: Organization
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Organization" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/organizations/{orgId}/status:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    put:
+      tags: [Admin]
+      summary: Update organization status (ACTIVE/INACTIVE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrganizationStatusUpdateRequest" }
+      responses:
+        "200":
+          description: Updated organization
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Organization" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  # =========================
+  # Support - Inquiries
+  # =========================
+  /customers/inquiries:
+    post:
+      tags: ["Support & Inquiries"]
+      summary: Create customer inquiry (UC-30)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InquiryCreateRequest" }
+      responses:
+        "201":
+          description: Inquiry created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Inquiry" }
+
+  /vendors/inquiries:
+    post:
+      tags: ["Support & Inquiries"]
+      summary: Create vendor inquiry (UC-30)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InquiryCreateRequest" }
+      responses:
+        "201":
+          description: Inquiry created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Inquiry" }
+
+  /admin/inquiries:
+    get:
+      tags: [Admin]
+      summary: List inquiries (UC-30)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/InquiryStatus" }
+        - name: creatorRole
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/InquiryCreatorRole" }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Inquiries
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedInquiries" }
+
+  /admin/inquiries/{inquiryId}:
+    parameters:
+      - $ref: "#/components/parameters/InquiryId"
+    get:
+      tags: [Admin]
+      summary: Get inquiry
+      responses:
+        "200":
+          description: Inquiry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Inquiry" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Update inquiry (reply / status)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InquiryUpdateRequest" }
+      responses:
+        "200":
+          description: Updated inquiry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Inquiry" }
+
+  # =========================
+  # Admin - Internal Notes (UC-28)
+  # =========================
+  /admin/internal-notes:
+    get:
+      tags: [Admin]
+      summary: List internal notes (UC-28)
+      parameters:
+        - name: eventId
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/UUID" }
+        - name: taskId
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/UUID" }
+        - name: vendorId
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/UUID" }
+        - name: packageOrderId
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/UUID" }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Internal notes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedInternalNotes" }
+    post:
+      tags: [Admin]
+      summary: Create internal note (UC-28)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InternalNoteCreateRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InternalNote" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  # =========================
+  # Customer - Personas
   # =========================
   /customers/personas:
     get:
@@ -159,10 +815,7 @@ paths:
           description: Personas
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PaginatedPersonas"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
+              schema: { $ref: "#/components/schemas/PaginatedPersonas" }
     post:
       tags: [Customer]
       summary: Create persona
@@ -170,17 +823,13 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/PersonaCreateRequest"
+            schema: { $ref: "#/components/schemas/PersonaCreateRequest" }
       responses:
         "201":
           description: Created persona
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Persona"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/Persona" }
 
   /customers/personas/{personaId}:
     parameters:
@@ -193,39 +842,31 @@ paths:
           description: Persona
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Persona"
-        "404":
-          $ref: "#/components/responses/NotFound"
-    patch:
+              schema: { $ref: "#/components/schemas/Persona" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
       tags: [Customer]
       summary: Update persona
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/PersonaUpdateRequest"
+            schema: { $ref: "#/components/schemas/PersonaUpdateRequest" }
       responses:
         "200":
           description: Updated persona
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Persona"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/Persona" }
     delete:
       tags: [Customer]
       summary: Delete persona
       responses:
-        "204":
-          description: Deleted
-        "404":
-          $ref: "#/components/responses/NotFound"
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   # =========================
-  # Customer - Events (UC-12)
+  # Customer - Events
   # =========================
   /customers/events:
     get:
@@ -235,8 +876,7 @@ paths:
         - name: status
           in: query
           required: false
-          schema:
-            $ref: "#/components/schemas/EventStatus"
+          schema: { $ref: "#/components/schemas/EventStatus" }
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
       responses:
@@ -244,27 +884,21 @@ paths:
           description: Events
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PaginatedEvents"
+              schema: { $ref: "#/components/schemas/PaginatedEvents" }
     post:
       tags: [Customer]
-      summary: Create draft event
-      description: UC-12 Create Event (creates Draft, UI routes to chat)
+      summary: Create draft event (UC-12)
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/EventCreateRequest"
+            schema: { $ref: "#/components/schemas/EventCreateRequest" }
       responses:
         "201":
           description: Created event
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/EventCreateResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/EventCreateResponse" }
 
   /customers/events/{eventId}:
     parameters:
@@ -277,38 +911,73 @@ paths:
           description: Event
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Event"
-        "404":
-          $ref: "#/components/responses/NotFound"
-    patch:
+              schema: { $ref: "#/components/schemas/Event" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
       tags: [Customer]
-      summary: Update event (title/type/time/location/personas)
+      summary: Delete draft event
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /customers/events/{eventId}/personas:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    put:
+      tags: [Customer]
+      summary: Set personas linked to an event (replace links)
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/EventUpdateRequest"
+            schema: { $ref: "#/components/schemas/SetEventPersonasRequest" }
       responses:
         "200":
           description: Updated event
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Event"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/Event" }
 
   # =========================
-  # Customer - Event Chat (UC-13)
+  # Customer - Chat
   # =========================
-  /customers/events/{eventId}/chat/messages:
+  /customers/events/{eventId}/chat:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      tags: [Customer]
+      summary: Send chat message + AI reply (UC-13)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatSendRequest" }
+      responses:
+        "200":
+          description: AI reply + suggested tasks
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatSendResponse" }
+
+  /customers/events/{eventId}/summarize:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      tags: [Customer]
+      summary: Summarize event context from chat history (UC-13)
+      responses:
+        "200":
+          description: Summary updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventSummaryResponse" }
+
+  /customers/events/{eventId}/messages:
     parameters:
       - $ref: "#/components/parameters/EventId"
     get:
       tags: [Customer]
-      summary: List chat messages for event
+      summary: List chat messages for event (optional)
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
@@ -317,26 +986,7 @@ paths:
           description: Messages
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PaginatedChatMessages"
-    post:
-      tags: [Customer]
-      summary: Send chat message and receive AI reply + suggestions
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ChatSendRequest"
-      responses:
-        "200":
-          description: AI reply + suggested tasks (draft suggestions)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatSendResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/PaginatedChatMessages" }
 
   # =========================
   # Customer - Tasks
@@ -352,49 +1002,45 @@ paths:
           description: Tasks
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/TaskListResponse"
+              schema: { $ref: "#/components/schemas/TaskListResponse" }
     post:
       tags: [Customer]
-      summary: Create task manually (optional MVP helper)
+      summary: Create task manually
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/TaskCreateRequest"
+            schema: { $ref: "#/components/schemas/TaskCreateRequest" }
       responses:
         "201":
           description: Created task
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Task"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/Task" }
 
   /customers/events/{eventId}/tasks/{taskId}:
     parameters:
       - $ref: "#/components/parameters/EventId"
       - $ref: "#/components/parameters/TaskId"
-    patch:
+    put:
       tags: [Customer]
-      summary: Update task (allowed when editable per status rules)
+      summary: Update task (editable states only)
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/TaskUpdateRequest"
+            schema: { $ref: "#/components/schemas/TaskUpdateRequest" }
       responses:
         "200":
           description: Updated task
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Task"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/Task" }
+    delete:
+      tags: [Customer]
+      summary: Delete task (pre-confirm only)
+      responses:
+        "204": { description: Deleted }
 
   /customers/events/{eventId}/tasks/confirm:
     parameters:
@@ -402,25 +1048,41 @@ paths:
     post:
       tags: [Customer]
       summary: Confirm tasks (UC-13)
-      description: Confirms tasks and activates event (Draft -> Active).
+      description: Confirms tasks and activates event (DRAFT -> ACTIVE).
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/ConfirmTasksRequest"
+            schema: { $ref: "#/components/schemas/ConfirmTasksRequest" }
       responses:
         "200":
           description: Event activated + confirmed tasks
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ConfirmTasksResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/ConfirmTasksResponse" }
+
+  /customers/events/{eventId}/tasks/{taskId}/reassign:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/TaskId"
+    post:
+      tags: [Customer]
+      summary: Reassign rejected task (UC-21)
+      description: Validate shortlist (Atomic reassign) -> set task PENDING -> create new Fulfillment Request attempt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReassignTaskRequest" }
+      responses:
+        "200":
+          description: Reassigned task + new fulfillment request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReassignTaskResponse" }
 
   # =========================
-  # Customer - Recommendations & Packages (UC-14/15/16)
+  # Customer - Recommendations & Packages
   # =========================
   /customers/events/{eventId}/recommendations:
     parameters:
@@ -428,16 +1090,27 @@ paths:
     post:
       tags: [Customer]
       summary: Generate recommendation packages (UC-14)
-      description: Generates 3 packages (Budget/Recommended/High-Quality) and stores shortlist per task.
+      description: Generates 3 packages (BUDGET/RECOMMENDED/HIGH_QUALITY) and stores shortlist per task.
       responses:
         "201":
           description: Packages generated
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/GenerateRecommendationsResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/GenerateRecommendationsResponse" }
+
+  /customers/events/{eventId}/tasks/{taskId}/recommendations:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/TaskId"
+    get:
+      tags: [Customer]
+      summary: Get shortlisted offerings for a task (UC-16)
+      responses:
+        "200":
+          description: Shortlist (top 5)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskRecommendationListResponse" }
 
   /customers/events/{eventId}/packages:
     parameters:
@@ -450,8 +1123,21 @@ paths:
           description: Packages
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PackageListResponse"
+              schema: { $ref: "#/components/schemas/PackageListResponse" }
+    post:
+      tags: [Customer]
+      summary: Create custom package (UC-16)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCustomPackageRequest" }
+      responses:
+        "201":
+          description: Custom package created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PackageDetailsResponse" }
 
   /customers/events/{eventId}/packages/{packageId}:
     parameters:
@@ -460,67 +1146,101 @@ paths:
     get:
       tags: [Customer]
       summary: Get package details (UC-15)
-      description: Includes items, total price, and allowed offerings by task (shortlist) to support customization.
       responses:
         "200":
-          description: Package
+          description: Package details
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PackageDetailsResponse"
-        "404":
-          $ref: "#/components/responses/NotFound"
-    patch:
+              schema: { $ref: "#/components/schemas/PackageDetailsResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
       tags: [Customer]
-      summary: Customize package (UC-16)
-      description: >
-        Changes must use offeringIds from the stored shortlist (TaskRecommendation).
-        Server recalculates unitPrice/lineTotal and packageTotalPrice.
+      summary: Update custom package (UC-16)
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/CustomizePackageRequest"
+            schema: { $ref: "#/components/schemas/UpdateCustomPackageRequest" }
       responses:
         "200":
           description: Updated package
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/RecommendationPackage"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/PackageDetailsResponse" }
 
+  # =========================
+  # Customer - Package Orders (term migration from "orders")
+  # =========================
   /customers/events/{eventId}/packages/{packageId}/confirm:
     parameters:
       - $ref: "#/components/parameters/EventId"
       - $ref: "#/components/parameters/PackageId"
     post:
       tags: [Customer]
-      summary: Confirm package for execution (UC-17)
+      summary: Confirm package -> create Package Order (UC-17)
       description: >
-        Creates a PackageExecutionRequest, locks tasks to selected offerings, sets tasks to PENDING,
-        and creates vendor-facing TaskRequests. Requires Idempotency-Key header.
+        Creates a Package Order (idempotent per eventId+packageId),
+        sets included tasks to PENDING + locks selection,
+        and creates vendor-facing Fulfillment Requests.
       parameters:
         - name: Idempotency-Key
           in: header
           required: true
-          schema:
-            type: string
-            format: uuid
+          schema: { type: string, format: uuid }
       responses:
         "200":
-          description: Execution request created or reused (idempotent)
+          description: Package order created or reused (idempotent)
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ConfirmPackageResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/ConfirmPackageOrderResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /customers/events/{eventId}/package-orders:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      tags: [Customer]
+      summary: List package orders for an event (UC-18)
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Package orders
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedPackageOrders" }
+
+  /customers/package-orders:
+    get:
+      tags: [Customer]
+      summary: List all package orders for current customer (optional)
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Package orders
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedPackageOrders" }
+
+  /customers/package-orders/{packageOrderId}:
+    parameters:
+      - $ref: "#/components/parameters/PackageOrderId"
+    get:
+      tags: [Customer]
+      summary: Get package order detail (optional)
+      responses:
+        "200":
+          description: Package order detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PackageOrderDetailsResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   # =========================
-  # Vendor - Offerings (UC-11)
+  # Vendor - Offerings
   # =========================
   /vendors/offerings:
     get:
@@ -531,8 +1251,7 @@ paths:
           description: Offerings
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/OfferingListResponse"
+              schema: { $ref: "#/components/schemas/OfferingListResponse" }
     post:
       tags: [Vendor]
       summary: Create offering
@@ -540,122 +1259,100 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/OfferingCreateRequest"
+            schema: { $ref: "#/components/schemas/OfferingCreateRequest" }
       responses:
         "201":
           description: Created offering
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Offering"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/Offering" }
+        "400": { $ref: "#/components/responses/BadRequest" }
 
-  /vendors/offerings/{offeringId}:
+  /vendors/offerings/{id}:
     parameters:
       - $ref: "#/components/parameters/OfferingId"
-    patch:
+    get:
+      tags: [Vendor]
+      summary: Get offering details
+      responses:
+        "200":
+          description: Offering
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Offering" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
       tags: [Vendor]
       summary: Update offering
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/OfferingUpdateRequest"
+            schema: { $ref: "#/components/schemas/OfferingUpdateRequest" }
       responses:
         "200":
           description: Updated offering
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Offering"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/Offering" }
+        "400": { $ref: "#/components/responses/BadRequest" }
     delete:
       tags: [Vendor]
-      summary: Delete offering
+      summary: Deactivate offering (soft delete)
       responses:
-        "204":
-          description: Deleted
-        "404":
-          $ref: "#/components/responses/NotFound"
+        "204": { description: Deactivated }
 
   # =========================
-  # Vendor - Task Requests (UC-20)
+  # Vendor - Fulfillment Requests (term migration from "task-requests")
   # =========================
-  /vendors/task-requests:
+  /vendors/fulfillment-requests:
     get:
       tags: [Vendor]
-      summary: List task requests (vendor inbox)
+      summary: List fulfillment requests (vendor inbox) (UC-20)
       parameters:
         - name: status
           in: query
           required: false
-          schema:
-            $ref: "#/components/schemas/TaskRequestStatus"
+          schema: { $ref: "#/components/schemas/FulfillmentRequestStatus" }
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
       responses:
         "200":
-          description: Task requests
+          description: Fulfillment requests
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PaginatedTaskRequests"
+              schema: { $ref: "#/components/schemas/PaginatedFulfillmentRequests" }
 
-  /vendors/task-requests/{requestId}:
+  /vendors/fulfillment-requests/{fulfillmentRequestId}/response:
     parameters:
-      - $ref: "#/components/parameters/RequestId"
-    get:
-      tags: [Vendor]
-      summary: Get task request
-      responses:
-        "200":
-          description: Task request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TaskRequest"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
-  /vendors/task-requests/{requestId}/respond:
-    parameters:
-      - $ref: "#/components/parameters/RequestId"
+      - $ref: "#/components/parameters/FulfillmentRequestId"
     post:
       tags: [Vendor]
-      summary: Respond to task request (accept/reject) (UC-20)
+      summary: Respond to fulfillment request (accept/reject) (UC-20)
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/RespondTaskRequestRequest"
+            schema: { $ref: "#/components/schemas/RespondFulfillmentRequestRequest" }
       responses:
         "200":
           description: Response recorded; task status updated as appropriate
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/RespondTaskRequestResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/RespondFulfillmentRequestResponse" }
 
   # =========================
-  # Vendor - Tasks (UC-19 + progress)
+  # Vendor - Tasks (Assigned/In Progress/Done)
   # =========================
   /vendors/tasks:
     get:
       tags: [Vendor]
-      summary: List vendor tasks (Assigned/In Progress/Done)
+      summary: List vendor tasks (Assigned/In Progress/Done) (UC-19)
       parameters:
         - name: status
           in: query
           required: false
-          schema:
-            $ref: "#/components/schemas/TaskStatus"
+          schema: { $ref: "#/components/schemas/TaskStatus" }
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
       responses:
@@ -663,8 +1360,7 @@ paths:
           description: Vendor tasks
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PaginatedTasks"
+              schema: { $ref: "#/components/schemas/PaginatedTasks" }
 
   /vendors/tasks/{taskId}:
     parameters:
@@ -677,114 +1373,96 @@ paths:
           description: Task
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Task"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
-  /vendors/tasks/{taskId}/status:
-    parameters:
-      - $ref: "#/components/parameters/TaskId"
-    patch:
+              schema: { $ref: "#/components/schemas/Task" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
       tags: [Vendor]
-      summary: Update vendor task status (ASSIGNED -> IN_PROGRESS -> DONE)
+      summary: Update vendor task progress (ASSIGNED -> IN_PROGRESS -> DONE)
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/VendorTaskStatusUpdateRequest"
+            schema: { $ref: "#/components/schemas/VendorTaskUpdateRequest" }
       responses:
         "200":
           description: Updated task
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Task"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/Task" }
 
   # =========================
-  # Admin (UC-24/28)
+  # Admin - Dashboard (UC-24)
   # =========================
   /admin/dashboard:
     get:
       tags: [Admin]
-      summary: Admin dashboard summary (UC-24)
+      summary: Admin dashboard summary
       responses:
         "200":
           description: Summary metrics
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/AdminDashboardResponse"
+              schema: { $ref: "#/components/schemas/AdminDashboardResponse" }
 
-  /admin/monitoring:
+  # =========================
+  # Admin - Package Orders (term migration from "orders/execution-requests")
+  # =========================
+  /admin/package-orders:
     get:
       tags: [Admin]
-      summary: Monitoring dashboard (UC-28)
-      parameters:
-        - name: eventId
-          in: query
-          required: false
-          schema: { type: string, format: uuid }
-        - name: vendorId
-          in: query
-          required: false
-          schema: { type: string, format: uuid }
-        - name: taskStatus
-          in: query
-          required: false
-          schema:
-            $ref: "#/components/schemas/TaskStatus"
-        - $ref: "#/components/parameters/Limit"
-        - $ref: "#/components/parameters/Cursor"
-      responses:
-        "200":
-          description: Monitoring view data
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AdminMonitoringResponse"
-
-  /admin/events:
-    get:
-      tags: [Admin]
-      summary: List events (admin)
+      summary: List package orders (UC-28)
       parameters:
         - name: status
           in: query
           required: false
-          schema:
-            $ref: "#/components/schemas/EventStatus"
+          schema: { $ref: "#/components/schemas/PackageOrderStatus" }
+        - name: eventId
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/UUID" }
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
       responses:
         "200":
-          description: Events
+          description: Package orders
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PaginatedEvents"
+              schema: { $ref: "#/components/schemas/PaginatedPackageOrders" }
 
+  /admin/package-orders/{packageOrderId}:
+    parameters:
+      - $ref: "#/components/parameters/PackageOrderId"
+    get:
+      tags: [Admin]
+      summary: Get package order detail (UC-28)
+      responses:
+        "200":
+          description: Package order detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PackageOrderDetailsResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # =========================
+  # Admin - Tasks (monitoring/support)
+  # =========================
   /admin/tasks:
     get:
       tags: [Admin]
-      summary: List tasks (admin)
+      summary: List tasks (UC-28)
       parameters:
         - name: status
           in: query
           required: false
-          schema:
-            $ref: "#/components/schemas/TaskStatus"
+          schema: { $ref: "#/components/schemas/TaskStatus" }
         - name: eventId
           in: query
           required: false
-          schema: { type: string, format: uuid }
+          schema: { $ref: "#/components/schemas/UUID" }
         - name: vendorId
           in: query
           required: false
-          schema: { type: string, format: uuid }
+          schema: { $ref: "#/components/schemas/UUID" }
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
       responses:
@@ -792,12 +1470,21 @@ paths:
           description: Tasks
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PaginatedTasks"
+              schema: { $ref: "#/components/schemas/PaginatedTasks" }
 
   /admin/tasks/{taskId}:
     parameters:
       - $ref: "#/components/parameters/TaskId"
+    get:
+      tags: [Admin]
+      summary: Get task details (UC-28)
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Task" }
+        "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [Admin]
       summary: Admin support action on a task (UC-28)
@@ -805,86 +1492,89 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/AdminTaskSupportActionRequest"
+            schema: { $ref: "#/components/schemas/AdminTaskSupportActionRequest" }
       responses:
         "200":
           description: Updated task
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Task"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/Task" }
 
-  /admin/execution-requests:
+  /admin/tasks/{taskId}/fulfillment-requests:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
     get:
       tags: [Admin]
-      summary: List package execution requests
-      parameters:
-        - name: status
-          in: query
-          required: false
-          schema:
-            $ref: "#/components/schemas/ExecutionRequestStatus"
-        - name: eventId
-          in: query
-          required: false
-          schema: { type: string, format: uuid }
-        - $ref: "#/components/parameters/Limit"
-        - $ref: "#/components/parameters/Cursor"
+      summary: Fulfillment request attempt history for a task (UC-28)
       responses:
         "200":
-          description: Execution requests
+          description: Fulfillment requests
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PaginatedExecutionRequests"
+              schema: { $ref: "#/components/schemas/PaginatedFulfillmentRequests" }
 
-  /admin/support-notes:
+  # =========================
+  # Metadata
+  # =========================
+  /event-types:
     get:
-      tags: [Admin]
-      summary: List support notes
-      parameters:
-        - name: eventId
-          in: query
-          required: false
-          schema: { type: string, format: uuid }
-        - name: taskId
-          in: query
-          required: false
-          schema: { type: string, format: uuid }
-        - name: vendorId
-          in: query
-          required: false
-          schema: { type: string, format: uuid }
-        - $ref: "#/components/parameters/Limit"
-        - $ref: "#/components/parameters/Cursor"
+      tags: [Metadata]
+      summary: List event types
       responses:
         "200":
-          description: Support notes
+          description: Event types
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PaginatedSupportNotes"
-    post:
-      tags: [Admin]
-      summary: Create support note (UC-28)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SupportNoteCreateRequest"
+              schema: { $ref: "#/components/schemas/StringListResponse" }
+
+  /event-templates:
+    get:
+      tags: [Metadata]
+      summary: List event templates (quick start)
       responses:
-        "201":
-          description: Created
+        "200":
+          description: Templates
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/SupportNote"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+              schema: { $ref: "#/components/schemas/StringListResponse" }
+
+  /offering-categories:
+    get:
+      tags: [Metadata]
+      summary: List offering categories
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StringListResponse" }
+
+  # =========================
+  # System
+  # =========================
+  /health:
+    get:
+      tags: ["System & Ops"]
+      summary: Health check
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+
+  /version:
+    get:
+      tags: ["System & Ops"]
+      summary: Build/version info
+      security: []
+      responses:
+        "200":
+          description: Version
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VersionResponse" }
 
 components:
   securitySchemes:
@@ -908,57 +1598,81 @@ components:
       name: eventId
       in: path
       required: true
-      schema: { type: string, format: uuid }
+      schema: { $ref: "#/components/schemas/UUID" }
     TaskId:
       name: taskId
       in: path
       required: true
-      schema: { type: string, format: uuid }
+      schema: { $ref: "#/components/schemas/UUID" }
     PackageId:
       name: packageId
       in: path
       required: true
-      schema: { type: string, format: uuid }
-    OfferingId:
-      name: offeringId
+      schema: { $ref: "#/components/schemas/UUID" }
+    PackageOrderId:
+      name: packageOrderId
       in: path
       required: true
-      schema: { type: string, format: uuid }
-    RequestId:
-      name: requestId
-      in: path
-      required: true
-      schema: { type: string, format: uuid }
+      schema: { $ref: "#/components/schemas/UUID" }
     PersonaId:
       name: personaId
       in: path
       required: true
-      schema: { type: string, format: uuid }
+      schema: { $ref: "#/components/schemas/UUID" }
+    VendorId:
+      name: vendorId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/UUID" }
+    CustomerId:
+      name: customerId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/UUID" }
+    OrgId:
+      name: orgId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/UUID" }
+    OfferingId:
+      name: id
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/UUID" }
+    InquiryId:
+      name: inquiryId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/UUID" }
+    FulfillmentRequestId:
+      name: fulfillmentRequestId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/UUID" }
 
   responses:
     BadRequest:
       description: Bad request / validation error
       content:
         application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
     Unauthorized:
       description: Unauthorized
       content:
         application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
     NotFound:
       description: Not found
       content:
         application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   schemas:
-    # -------------------------
-    # Common
-    # -------------------------
     UUID:
       type: string
       format: uuid
@@ -984,9 +1698,21 @@ components:
                   field: { type: string }
                   issue: { type: string }
 
-    # -------------------------
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    VersionResponse:
+      type: object
+      required: [version]
+      properties:
+        version: { type: string }
+        commit: { type: string }
+        builtAt: { $ref: "#/components/schemas/ISODateTime" }
+
     # Enums
-    # -------------------------
     UserRole:
       type: string
       enum: [CUSTOMER, VENDOR, ADMIN]
@@ -996,38 +1722,38 @@ components:
     VendorApprovalStatus:
       type: string
       enum: [PENDING, APPROVED, REJECTED]
+    OrganizationStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE]
     EventStatus:
       type: string
       enum: [DRAFT, ACTIVE]
     TaskStatus:
       type: string
       enum: [DRAFT, PENDING, ASSIGNED, IN_PROGRESS, DONE, REJECTED, EXPIRED]
-    TaskRequestStatus:
-      type: string
-      enum: [SENT, ACCEPTED, REJECTED, EXPIRED]
     PackageType:
       type: string
-      enum: [BUDGET, RECOMMENDED, HIGH_QUALITY]
-    ExecutionRequestStatus:
+      enum: [BUDGET, RECOMMENDED, HIGH_QUALITY, CUSTOM]
+    PackageOrderStatus:
       type: string
       enum: [CREATED, COMPLETED, CANCELLED_ADMIN]
+    FulfillmentRequestStatus:
+      type: string
+      enum: [SENT, ACCEPTED, REJECTED, EXPIRED]
     ChatSender:
       type: string
       enum: [CUSTOMER, AI]
     SupportActionType:
       type: string
-      enum:
-        - NOTE_ONLY
-        - REASSIGN_VENDOR
-        - UNASSIGN_VENDOR
-        - UNLOCK_EDITING
-        - EXTEND_EXPIRY
-        - OVERRIDE_STATUS
-        - ESCALATE
+      enum: [NOTE_ONLY, REASSIGN_VENDOR, UNASSIGN_VENDOR, UNLOCK_EDITING, EXTEND_EXPIRY, OVERRIDE_STATUS, ESCALATE]
+    InquiryCreatorRole:
+      type: string
+      enum: [CUSTOMER, VENDOR]
+    InquiryStatus:
+      type: string
+      enum: [OPEN, IN_PROGRESS, RESOLVED]
 
-    # -------------------------
     # Auth
-    # -------------------------
     LoginRequest:
       type: object
       required: [email, password]
@@ -1035,51 +1761,43 @@ components:
         email: { type: string, format: email }
         password: { type: string, minLength: 8 }
 
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+
     CustomerRegisterRequest:
       type: object
-      required: [full_name, email, password]
+      required: [fullName, email, password]
       properties:
+        fullName: { type: string }
         email: { type: string, format: email }
-        password: { type: string, minLength: 6 }
-        full_name: { type: string }
+        password: { type: string, minLength: 8 }
         phone: { type: string }
-        address: { type: string }
         locale: { type: string }
 
     VendorRegisterRequest:
       type: object
-      required: [business_name, email, password, location_base]
+      required: [email, password, displayName]
       properties:
-        business_name: { type: string }
         email: { type: string, format: email }
-        password: { type: string, minLength: 6 }
-        location_base: { type: string }
-        phone: { type: string }
-        display_name: { type: string }
-        contact_phone: { type: string }
+        password: { type: string, minLength: 8 }
+        displayName: { type: string }
+        contactPhone: { type: string }
+        organizationCode: { type: string, description: "If joining existing organization" }
+        organization:
+          type: object
+          description: "If creating a new organization (KYM text-only MVP)"
+          properties:
+            name: { type: string }
+            kymDetails: { type: object, additionalProperties: true }
 
-    RegisterResponse:
+    ResendVerificationRequest:
       type: object
-      required: [message, email]
+      required: [email]
       properties:
-        message: { type: string }
         email: { type: string, format: email }
-
-    VendorResponse:
-      type: object
-      required: [id, business_name, email, location_base, is_verified]
-      properties:
-        id: { type: integer }
-        vendor_id: { type: string }
-        business_name: { type: string }
-        email: { type: string, format: email }
-        location_base: { type: string }
-        is_verified: { type: boolean }
-        phone: { type: string }
-        display_name: { type: string }
-        contact_phone: { type: string }
-        approval_status: { type: string }
-        approved_at: { $ref: "#/components/schemas/ISODateTime" }
 
     ForgotPasswordRequest:
       type: object
@@ -1089,51 +1807,192 @@ components:
 
     ResetPasswordRequest:
       type: object
-      required: [token, new_password]
+      required: [token, newPassword]
       properties:
         token: { type: string }
-        new_password: { type: string, minLength: 6 }
+        newPassword: { type: string, minLength: 8 }
 
-    AuthMessageResponse:
+    RegisterResponse:
       type: object
       required: [message]
       properties:
         message: { type: string }
 
+    PasswordChangeOrResetRequest:
+      oneOf:
+        - type: object
+          required: [currentPassword, newPassword]
+          properties:
+            currentPassword: { type: string, minLength: 8 }
+            newPassword: { type: string, minLength: 8 }
+        - type: object
+          required: [resetToken, newPassword]
+          properties:
+            resetToken: { type: string }
+            newPassword: { type: string, minLength: 8 }
+
     AuthResponse:
       type: object
-      required: [accessToken, user]
+      required: [accessToken, refreshToken, user]
       properties:
         accessToken: { type: string }
+        refreshToken: { type: string }
         user:
           type: object
-          required: [userId, role, status]
+          required: [userId, role, status, email]
           properties:
             userId: { $ref: "#/components/schemas/UUID" }
+            email: { type: string, format: email }
             role: { $ref: "#/components/schemas/UserRole" }
             status: { $ref: "#/components/schemas/AccountStatus" }
 
-    MeResponse:
+    # Profiles
+    CustomerProfile:
       type: object
-      required: [userId, role, status, email]
+      required: [customerId, email, fullName, status]
       properties:
-        userId: { $ref: "#/components/schemas/UUID" }
+        customerId: { $ref: "#/components/schemas/UUID" }
         email: { type: string, format: email }
-        role: { $ref: "#/components/schemas/UserRole" }
+        fullName: { type: string }
+        phone: { type: string }
+        locale: { type: string }
         status: { $ref: "#/components/schemas/AccountStatus" }
 
-    # -------------------------
+    CustomerProfileUpdateRequest:
+      type: object
+      properties:
+        fullName: { type: string }
+        phone: { type: string }
+        locale: { type: string }
+
+    VendorProfile:
+      type: object
+      required: [vendorId, email, displayName, approvalStatus]
+      properties:
+        vendorId: { $ref: "#/components/schemas/UUID" }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        contactPhone: { type: string }
+        approvalStatus: { $ref: "#/components/schemas/VendorApprovalStatus" }
+        organizationId: { $ref: "#/components/schemas/UUID" }
+        approvedAt: { $ref: "#/components/schemas/ISODateTime" }
+
+    VendorProfileUpdateRequest:
+      type: object
+      properties:
+        displayName: { type: string }
+        contactPhone: { type: string }
+
+    AdminProfile:
+      type: object
+      required: [adminId, email, role]
+      properties:
+        adminId: { $ref: "#/components/schemas/UUID" }
+        email: { type: string, format: email }
+        role: { $ref: "#/components/schemas/UserRole" }
+        staffRole: { type: string }
+
+    # Organization (KYM text-only MVP)
+    Organization:
+      type: object
+      required: [orgId, name, code, status, createdAt, updatedAt]
+      properties:
+        orgId: { $ref: "#/components/schemas/UUID" }
+        name: { type: string }
+        code: { type: string, description: "Unique join code" }
+        status: { $ref: "#/components/schemas/OrganizationStatus" }
+        kymDetails: { type: object, additionalProperties: true }
+        createdAt: { $ref: "#/components/schemas/ISODateTime" }
+        updatedAt: { $ref: "#/components/schemas/ISODateTime" }
+
+    PaginatedOrganizations:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Organization" }
+        nextCursor: { type: string }
+
+    # Admin views
+    VendorAdminView:
+      type: object
+      required: [vendorId, email, displayName, approvalStatus, status]
+      properties:
+        vendorId: { $ref: "#/components/schemas/UUID" }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        contactPhone: { type: string }
+        approvalStatus: { $ref: "#/components/schemas/VendorApprovalStatus" }
+        approvedAt: { $ref: "#/components/schemas/ISODateTime" }
+        organizationId: { $ref: "#/components/schemas/UUID" }
+        organization: { $ref: "#/components/schemas/Organization" }
+        status: { $ref: "#/components/schemas/AccountStatus" }
+
+    PaginatedVendors:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/VendorAdminView" }
+        nextCursor: { type: string }
+
+    VendorStatusUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: "#/components/schemas/AccountStatus" }
+
+    VendorRejectRequest:
+      type: object
+      properties:
+        reason: { type: string }
+
+    CustomerAdminView:
+      type: object
+      required: [customerId, email, fullName, status]
+      properties:
+        customerId: { $ref: "#/components/schemas/UUID" }
+        email: { type: string, format: email }
+        fullName: { type: string }
+        phone: { type: string }
+        locale: { type: string }
+        status: { $ref: "#/components/schemas/AccountStatus" }
+
+    PaginatedCustomers:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CustomerAdminView" }
+        nextCursor: { type: string }
+
+    CustomerStatusUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: "#/components/schemas/AccountStatus" }
+
+    OrganizationStatusUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: "#/components/schemas/OrganizationStatus" }
+
     # Persona
-    # -------------------------
     Persona:
       type: object
-      required: [personaId, customerId, name, preferences, createdAt, updatedAt]
+      required: [personaId, customerId, name, preferences, isConfirmed, createdAt, updatedAt]
       properties:
         personaId: { $ref: "#/components/schemas/UUID" }
         customerId: { $ref: "#/components/schemas/UUID" }
         name: { type: string }
         description: { type: string }
         preferences: { type: object, additionalProperties: true }
+        isConfirmed: { type: boolean }
+        confirmedAt: { $ref: "#/components/schemas/ISODateTime" }
         createdAt: { $ref: "#/components/schemas/ISODateTime" }
         updatedAt: { $ref: "#/components/schemas/ISODateTime" }
 
@@ -1161,9 +2020,7 @@ components:
           items: { $ref: "#/components/schemas/Persona" }
         nextCursor: { type: string }
 
-    # -------------------------
     # Event
-    # -------------------------
     Event:
       type: object
       required: [eventId, customerId, eventType, title, status, createdAt, updatedAt]
@@ -1201,15 +2058,10 @@ components:
         eventId: { $ref: "#/components/schemas/UUID" }
         status: { $ref: "#/components/schemas/EventStatus" }
 
-    EventUpdateRequest:
+    SetEventPersonasRequest:
       type: object
+      required: [personaIds]
       properties:
-        eventType: { type: string }
-        title: { type: string, minLength: 3 }
-        description: { type: string }
-        locationText: { type: string }
-        startAt: { $ref: "#/components/schemas/ISODateTime" }
-        endAt: { $ref: "#/components/schemas/ISODateTime" }
         personaIds:
           type: array
           items: { $ref: "#/components/schemas/UUID" }
@@ -1223,15 +2075,12 @@ components:
           items: { $ref: "#/components/schemas/Event" }
         nextCursor: { type: string }
 
-    # -------------------------
     # Chat
-    # -------------------------
     ChatMessage:
       type: object
-      required: [messageId, eventId, sender, content, sentAt]
+      required: [messageId, sender, content, sentAt]
       properties:
         messageId: { $ref: "#/components/schemas/UUID" }
-        eventId: { $ref: "#/components/schemas/UUID" }
         sender: { $ref: "#/components/schemas/ChatSender" }
         content: { type: string }
         sentAt: { $ref: "#/components/schemas/ISODateTime" }
@@ -1271,9 +2120,13 @@ components:
           type: array
           items: { $ref: "#/components/schemas/SuggestedTaskDraft" }
 
-    # -------------------------
+    EventSummaryResponse:
+      type: object
+      required: [summary]
+      properties:
+        summary: { type: string }
+
     # Task
-    # -------------------------
     Task:
       type: object
       required: [taskId, eventId, name, status, currency, createdAt, updatedAt]
@@ -1309,7 +2162,6 @@ components:
         budgetMin: { type: number }
         budgetMax: { type: number }
         currency: { type: string, default: "LKR" }
-        dueAt: { $ref: "#/components/schemas/ISODateTime" }
 
     TaskUpdateRequest:
       type: object
@@ -1320,7 +2172,6 @@ components:
         budgetMin: { type: number }
         budgetMax: { type: number }
         currency: { type: string }
-        dueAt: { $ref: "#/components/schemas/ISODateTime" }
 
     TaskListResponse:
       type: object
@@ -1330,9 +2181,19 @@ components:
           type: array
           items: { $ref: "#/components/schemas/Task" }
 
+    PaginatedTasks:
+      type: object
+      required: [ items ]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        nextCursor:
+          type: string
+
     ConfirmTasksRequest:
       type: object
-      description: If tasks already exist in Draft, server can confirm them; optionally accepts explicit task IDs.
       properties:
         taskIds:
           type: array
@@ -1347,26 +2208,17 @@ components:
           type: array
           items: { $ref: "#/components/schemas/Task" }
 
-    PaginatedTasks:
-      type: object
-      required: [items]
-      properties:
-        items:
-          type: array
-          items: { $ref: "#/components/schemas/Task" }
-        nextCursor: { type: string }
-
-    VendorTaskStatusUpdateRequest:
+    VendorTaskUpdateRequest:
       type: object
       required: [status]
       properties:
         status:
           type: string
           enum: [IN_PROGRESS, DONE]
+        note:
+          type: string
 
-    # -------------------------
     # Offering
-    # -------------------------
     Offering:
       type: object
       required: [offeringId, vendorId, name, category, price, currency, isActive, isAvailable, updatedAt]
@@ -1416,25 +2268,33 @@ components:
           type: array
           items: { $ref: "#/components/schemas/Offering" }
 
-    # -------------------------
     # Recommendations + Packages
-    # -------------------------
-    AllowedOffering:
+    TaskRecommendation:
       type: object
-      required: [offeringId, vendorId, price, currency, score, rank]
+      required: [recommendationId, eventId, taskId, offeringId, score, rank, generatedAt]
       properties:
+        recommendationId: { $ref: "#/components/schemas/UUID" }
+        eventId: { $ref: "#/components/schemas/UUID" }
+        taskId: { $ref: "#/components/schemas/UUID" }
         offeringId: { $ref: "#/components/schemas/UUID" }
-        vendorId: { $ref: "#/components/schemas/UUID" }
-        price: { type: number }
-        currency: { type: string }
         score: { type: number }
         rank: { type: integer }
+        generatedAt: { $ref: "#/components/schemas/ISODateTime" }
+
+    TaskRecommendationListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TaskRecommendation" }
 
     PackageItem:
       type: object
-      required: [packageItemId, taskId, offeringId, quantity, unitPrice, lineTotal]
+      required: [packageItemId, packageId, taskId, offeringId, quantity, unitPrice, lineTotal]
       properties:
         packageItemId: { $ref: "#/components/schemas/UUID" }
+        packageId: { $ref: "#/components/schemas/UUID" }
         taskId: { $ref: "#/components/schemas/UUID" }
         offeringId: { $ref: "#/components/schemas/UUID" }
         quantity: { type: integer, minimum: 1 }
@@ -1443,35 +2303,21 @@ components:
 
     RecommendationPackage:
       type: object
-      required: [packageId, eventId, packageType, currency, packageTotalPrice, isCustomized, generatedAt, updatedAt]
+      required: [packageId, eventId, packageType, currency, packageTotalPrice, generatedAt, updatedAt]
       properties:
         packageId: { $ref: "#/components/schemas/UUID" }
         eventId: { $ref: "#/components/schemas/UUID" }
         packageType: { $ref: "#/components/schemas/PackageType" }
         currency: { type: string }
         packageTotalPrice: { type: number }
-        isCustomized: { type: boolean }
         expiresAt: { $ref: "#/components/schemas/ISODateTime" }
         generatedAt: { $ref: "#/components/schemas/ISODateTime" }
         updatedAt: { $ref: "#/components/schemas/ISODateTime" }
+        basePackageId: { $ref: "#/components/schemas/UUID" }
+        createdByCustomerId: { $ref: "#/components/schemas/UUID" }
         items:
           type: array
           items: { $ref: "#/components/schemas/PackageItem" }
-
-    GenerateRecommendationsResponse:
-      type: object
-      required: [packages]
-      properties:
-        packages:
-          type: array
-          items:
-            type: object
-            required: [packageId, packageType, packageTotalPrice, currency]
-            properties:
-              packageId: { $ref: "#/components/schemas/UUID" }
-              packageType: { $ref: "#/components/schemas/PackageType" }
-              packageTotalPrice: { type: number }
-              currency: { type: string }
 
     PackageListResponse:
       type: object
@@ -1491,78 +2337,113 @@ components:
               type: object
               additionalProperties:
                 type: array
-                items: { $ref: "#/components/schemas/AllowedOffering" }
+                items: { $ref: "#/components/schemas/TaskRecommendation" }
 
-    CustomizePackageRequest:
+    CreateCustomPackageRequest:
       type: object
+      required: [items]
       properties:
-        changes:
+        basePackageId:
+          $ref: "#/components/schemas/UUID"
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PackageItem" }
+
+    UpdateCustomPackageRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PackageItem" }
+
+    GenerateRecommendationsResponse:
+      type: object
+      required: [packages]
+      properties:
+        packages:
           type: array
           items:
             type: object
-            required: [taskId, offeringId]
+            required: [packageId, packageType, packageTotalPrice, currency]
             properties:
-              taskId: { $ref: "#/components/schemas/UUID" }
-              offeringId: { $ref: "#/components/schemas/UUID" }
-        removeTaskIds:
-          type: array
-          items: { $ref: "#/components/schemas/UUID" }
+              packageId: { $ref: "#/components/schemas/UUID" }
+              packageType: { $ref: "#/components/schemas/PackageType" }
+              packageTotalPrice: { type: number }
+              currency: { type: string }
 
-    # -------------------------
-    # Execution + Vendor Requests
-    # -------------------------
-    PackageExecutionRequest:
+    # Package Order + Fulfillment Requests
+    PackageOrder:
       type: object
-      required: [executionRequestId, eventId, packageId, idempotencyKey, currency, packageTotalPrice, status, createdAt, statusUpdatedAt]
+      required: [packageOrderId, eventId, packageId, packageOrderTotalPrice, currency, status, createdAt, statusUpdatedAt]
       properties:
-        executionRequestId: { $ref: "#/components/schemas/UUID" }
+        packageOrderId: { $ref: "#/components/schemas/UUID" }
         eventId: { $ref: "#/components/schemas/UUID" }
         packageId: { $ref: "#/components/schemas/UUID" }
-        idempotencyKey: { type: string, format: uuid }
+        packageOrderTotalPrice: { type: number }
         currency: { type: string }
-        packageTotalPrice: { type: number }
-        status: { $ref: "#/components/schemas/ExecutionRequestStatus" }
+        status: { $ref: "#/components/schemas/PackageOrderStatus" }
         createdAt: { $ref: "#/components/schemas/ISODateTime" }
         statusUpdatedAt: { $ref: "#/components/schemas/ISODateTime" }
         notes: { type: string }
+        idempotencyKey: { type: string, format: uuid }
 
-    TaskRequest:
+    FulfillmentRequest:
       type: object
-      required: [requestId, taskId, vendorId, offeringId, status, requestedAt, attemptNo]
+      required: [fulfillmentRequestId, packageOrderId, taskId, vendorId, offeringId, status, requestedAt, respondBy, attemptNo]
       properties:
-        requestId: { $ref: "#/components/schemas/UUID" }
+        fulfillmentRequestId: { $ref: "#/components/schemas/UUID" }
+        packageOrderId: { $ref: "#/components/schemas/UUID" }
         taskId: { $ref: "#/components/schemas/UUID" }
         vendorId: { $ref: "#/components/schemas/UUID" }
         offeringId: { $ref: "#/components/schemas/UUID" }
-        status: { $ref: "#/components/schemas/TaskRequestStatus" }
+        status: { $ref: "#/components/schemas/FulfillmentRequestStatus" }
         requestedAt: { $ref: "#/components/schemas/ISODateTime" }
         respondBy: { $ref: "#/components/schemas/ISODateTime" }
         respondedAt: { $ref: "#/components/schemas/ISODateTime" }
         responseNote: { type: string }
         attemptNo: { type: integer, minimum: 1 }
 
-    PaginatedTaskRequests:
+    PaginatedPackageOrders:
       type: object
       required: [items]
       properties:
         items:
           type: array
-          items: { $ref: "#/components/schemas/TaskRequest" }
+          items: { $ref: "#/components/schemas/PackageOrder" }
         nextCursor: { type: string }
 
-    ConfirmPackageResponse:
+    PackageOrderDetailsResponse:
       type: object
-      required: [executionRequest, tasks, taskRequests]
+      required: [packageOrder, tasks]
       properties:
-        executionRequest: { $ref: "#/components/schemas/PackageExecutionRequest" }
+        packageOrder: { $ref: "#/components/schemas/PackageOrder" }
         tasks:
           type: array
           items: { $ref: "#/components/schemas/Task" }
-        taskRequests:
-          type: array
-          items: { $ref: "#/components/schemas/TaskRequest" }
 
-    RespondTaskRequestRequest:
+    PaginatedFulfillmentRequests:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/FulfillmentRequest" }
+        nextCursor: { type: string }
+
+    ConfirmPackageOrderResponse:
+      type: object
+      required: [packageOrder, tasks, fulfillmentRequests]
+      properties:
+        packageOrder: { $ref: "#/components/schemas/PackageOrder" }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/Task" }
+        fulfillmentRequests:
+          type: array
+          items: { $ref: "#/components/schemas/FulfillmentRequest" }
+
+    RespondFulfillmentRequestRequest:
       type: object
       required: [decision]
       properties:
@@ -1571,58 +2452,35 @@ components:
           enum: [ACCEPT, REJECT]
         responseNote: { type: string }
 
-    RespondTaskRequestResponse:
+    RespondFulfillmentRequestResponse:
       type: object
-      required: [taskRequest, task]
+      required: [fulfillmentRequest, task]
       properties:
-        taskRequest: { $ref: "#/components/schemas/TaskRequest" }
+        fulfillmentRequest: { $ref: "#/components/schemas/FulfillmentRequest" }
         task: { $ref: "#/components/schemas/Task" }
 
-    PaginatedExecutionRequests:
+    ReassignTaskRequest:
       type: object
-      required: [items]
+      required: [offeringId]
       properties:
-        items:
-          type: array
-          items: { $ref: "#/components/schemas/PackageExecutionRequest" }
-        nextCursor: { type: string }
+        offeringId: { $ref: "#/components/schemas/UUID" }
+        note: { type: string }
 
-    # -------------------------
-    # Admin
-    # -------------------------
-    AdminDashboardResponse:
+    ReassignTaskResponse:
       type: object
+      required: [task, fulfillmentRequest]
       properties:
-        activeEvents: { type: integer }
-        draftEvents: { type: integer }
-        tasksPending: { type: integer }
-        tasksAssigned: { type: integer }
-        tasksInProgress: { type: integer }
-        tasksDone: { type: integer }
-        tasksRejected: { type: integer }
-        tasksExpired: { type: integer }
+        task: { $ref: "#/components/schemas/Task" }
+        fulfillmentRequest: { $ref: "#/components/schemas/FulfillmentRequest" }
 
-    AdminMonitoringResponse:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            type: object
-            properties:
-              eventId: { $ref: "#/components/schemas/UUID" }
-              taskId: { $ref: "#/components/schemas/UUID" }
-              vendorId: { $ref: "#/components/schemas/UUID" }
-              taskStatus: { $ref: "#/components/schemas/TaskStatus" }
-              updatedAt: { $ref: "#/components/schemas/ISODateTime" }
-        nextCursor: { type: string }
-
-    SupportNote:
+    # Internal Notes
+    InternalNote:
       type: object
       required: [noteId, adminId, actionType, note, createdAt]
       properties:
         noteId: { $ref: "#/components/schemas/UUID" }
         adminId: { $ref: "#/components/schemas/UUID" }
+        packageOrderId: { $ref: "#/components/schemas/UUID" }
         eventId: { $ref: "#/components/schemas/UUID" }
         taskId: { $ref: "#/components/schemas/UUID" }
         vendorId: { $ref: "#/components/schemas/UUID" }
@@ -1630,25 +2488,66 @@ components:
         note: { type: string }
         createdAt: { $ref: "#/components/schemas/ISODateTime" }
 
-    SupportNoteCreateRequest:
+    InternalNoteCreateRequest:
       type: object
       required: [actionType, note]
       properties:
+        packageOrderId: { $ref: "#/components/schemas/UUID" }
         eventId: { $ref: "#/components/schemas/UUID" }
         taskId: { $ref: "#/components/schemas/UUID" }
         vendorId: { $ref: "#/components/schemas/UUID" }
         actionType: { $ref: "#/components/schemas/SupportActionType" }
         note: { type: string }
 
-    PaginatedSupportNotes:
+    PaginatedInternalNotes:
       type: object
       required: [items]
       properties:
         items:
           type: array
-          items: { $ref: "#/components/schemas/SupportNote" }
+          items: { $ref: "#/components/schemas/InternalNote" }
         nextCursor: { type: string }
 
+    # Inquiries
+    Inquiry:
+      type: object
+      required: [inquiryId, createdByUserId, createdByRole, message, status, createdAt, updatedAt]
+      properties:
+        inquiryId: { $ref: "#/components/schemas/UUID" }
+        createdByUserId: { $ref: "#/components/schemas/UUID" }
+        createdByRole: { $ref: "#/components/schemas/InquiryCreatorRole" }
+        subject: { type: string }
+        message: { type: string }
+        status: { $ref: "#/components/schemas/InquiryStatus" }
+        handledByAdminId: { $ref: "#/components/schemas/UUID" }
+        adminReply: { type: string }
+        createdAt: { $ref: "#/components/schemas/ISODateTime" }
+        updatedAt: { $ref: "#/components/schemas/ISODateTime" }
+        resolvedAt: { $ref: "#/components/schemas/ISODateTime" }
+
+    InquiryCreateRequest:
+      type: object
+      required: [message]
+      properties:
+        subject: { type: string }
+        message: { type: string }
+
+    InquiryUpdateRequest:
+      type: object
+      properties:
+        status: { $ref: "#/components/schemas/InquiryStatus" }
+        adminReply: { type: string }
+
+    PaginatedInquiries:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Inquiry" }
+        nextCursor: { type: string }
+
+    # Admin support actions
     AdminTaskSupportActionRequest:
       type: object
       required: [action]
@@ -1656,12 +2555,24 @@ components:
         action:
           type: string
           enum: [UNASSIGN_VENDOR, EXTEND_EXPIRY, OVERRIDE_STATUS, UNLOCK_EDITING, REASSIGN_VENDOR]
-        assignedVendorId:
-          type: string
-          format: uuid
-        expiresAt:
-          $ref: "#/components/schemas/ISODateTime"
-        status:
-          $ref: "#/components/schemas/TaskStatus"
-        note:
-          type: string
+        assignedVendorId: { $ref: "#/components/schemas/UUID" }
+        expiresAt: { $ref: "#/components/schemas/ISODateTime" }
+        status: { $ref: "#/components/schemas/TaskStatus" }
+        note: { type: string }
+
+    AdminDashboardResponse:
+      type: object
+      properties:
+        totalCustomers: { type: integer }
+        totalVendors: { type: integer }
+        pendingVendorApprovals: { type: integer }
+        activeEvents: { type: integer }
+        activePackageOrders: { type: integer }
+
+    StringListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { type: string }
