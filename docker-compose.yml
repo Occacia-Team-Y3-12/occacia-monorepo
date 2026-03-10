@@ -33,6 +33,7 @@ services:
     container_name: occacia-redis
     restart: always
     logging: *default-logging
+
   backend:
     build:
       context: ./backend
@@ -55,7 +56,6 @@ services:
       DOCKER_SOCKET: ${DOCKER_SOCKET:-/var/run/docker.sock}
       REDIS_URL: redis://redis:6379
       #SKIP_EMAIL_VERIFICATION: "true" ##Remove this after testing
-
     ports:
       - "8000:8000"
     logging: *default-logging
@@ -69,6 +69,10 @@ services:
       dockerfile: Dockerfile
     container_name: occacia-frontend
     restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000 # ✅ Next.js rewrite target inside Docker
+    depends_on:
+      - backend
     logging: *default-logging
 
   # ===========================
