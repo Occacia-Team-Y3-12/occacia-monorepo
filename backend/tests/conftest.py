@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
 
 # ── Environment must be set before any app imports ───────────────────
 os.environ.update({
@@ -52,13 +53,11 @@ def clean_tables():
     yield
     db = SessionLocal()
     try:
-        db.query(ChatMessage).delete()
-        db.query(EventPersona).delete()
-        db.query(Event).delete()
-        db.query(Persona).delete()
-        db.query(Package).delete()
-        db.query(Vendor).delete()
-        db.query(Customer).delete()
+        for model in (ChatMessage, EventPersona, Event, Persona, Package, Vendor, Customer):
+            try:
+                db.query(model).delete()
+            except OperationalError:
+                db.rollback()
         db.commit()
     finally:
         db.close()
