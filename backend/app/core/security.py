@@ -64,6 +64,19 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def create_refresh_token(data: dict, expires_delta: timedelta | None = None) -> str:
+    """Generates a JWT refresh token for session continuation."""
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=7))
+    to_encode.update({"exp": expire, "type": "refresh"})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_token(token: str) -> dict:
+    """Decodes and validates a JWT token."""
+    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+
 def generate_reset_token() -> str:
     """
     UC-07: Generates a secure, random, URL-safe string.

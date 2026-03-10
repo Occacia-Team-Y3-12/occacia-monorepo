@@ -326,61 +326,61 @@ class TestCustomerLogin:
     URL = "/api/v1/auth/customer/login"
 
     def test_login_success_returns_token(self, client, db_session):
-        """[C03] Correct credentials → access_token + token_type."""
+        """[C03] Correct credentials → AuthResponse tokens + user."""
         cust = _make_customer(db_session, verified=True)
         with patch.dict("os.environ", {"SKIP_EMAIL_VERIFICATION": "true"}):
-            resp = client.post(self.URL, data={
-                "username": cust.email,
-                "password": "Password1!",
-            })
+            resp = client.post(
+                self.URL,
+                json={"email": cust.email, "password": "Password1!"},
+            )
         assert resp.status_code == 200
         body = resp.json()
-        assert "access_token" in body
-        assert body["token_type"] == "bearer"
+        assert "accessToken" in body
+        assert "refreshToken" in body
+        assert body["user"]["email"] == cust.email
+        assert body["user"]["role"] == "CUSTOMER"
+        assert body["user"]["status"] == cust.status
 
     def test_login_wrong_password_401(self, client, db_session):
         """[C03] Wrong password → 401."""
         cust = _make_customer(db_session)
-        resp = client.post(self.URL, data={
-            "username": cust.email,
-            "password": "WrongPass999!",
-        })
+        resp = client.post(
+            self.URL,
+            json={"email": cust.email, "password": "WrongPass999!"},
+        )
         assert resp.status_code == 401
 
     def test_login_unknown_email_401(self, client):
         """[C03] Unknown email → 401."""
-        resp = client.post(self.URL, data={
-            "username": "nobody@test.com",
-            "password": "Password1!",
-        })
+        resp = client.post(
+            self.URL,
+            json={"email": "nobody@test.com", "password": "Password1!"},
+        )
         assert resp.status_code == 401
 
     def test_login_unverified_customer_403(self, client, db_session):
-        """[C03] Unverified customer → 403 when verification is enforced.
-        The router's verify_user_login() raises 403 when email is not verified
-        and SKIP_EMAIL_VERIFICATION != 'true'. We patch verify_user_login to
-        simulate this — the contract is that the endpoint surfaces a 403.
-        """
-        from fastapi import HTTPException as FastAPIHTTPException
+        """[C03] Unverified customer → 403 when verification is enforced."""
         cust = _make_customer(db_session, verified=False, status="PENDING_VERIFICATION")
+        resp = client.post(
+            self.URL,
+            json={"email": cust.email, "password": "Password1!"},
+        )
+        assert resp.status_code == 403
 
-        def raise_403(user, form_data):
-            if not getattr(user, "email_verified", True):
-                raise FastAPIHTTPException(
-                    status_code=403, detail="Email not verified."
-                )
-
-        with patch("app.routers.v1.auth_router.verify_user_login", side_effect=raise_403):
-            resp = client.post(self.URL, data={
-                "username": cust.email,
-                "password": "Password1!",
-            })
-        assert resp.status_code in (401, 403)
+    def test_login_inactive_customer_403(self, client, db_session):
+        """[C03] Non-active customer → 403."""
+        cust = _make_customer(db_session, verified=True, status="SUSPENDED")
+        with patch.dict("os.environ", {"SKIP_EMAIL_VERIFICATION": "true"}):
+            resp = client.post(
+                self.URL,
+                json={"email": cust.email, "password": "Password1!"},
+            )
+        assert resp.status_code == 403
 
     def test_login_path_is_singular(self, client):
         """[C03] /auth/customers/login (plural) must not exist."""
         resp = client.post("/api/v1/auth/customers/login",
-                           data={"username": "x@x.com", "password": "x"})
+                           json={"email": "x@x.com", "password": "Password1!"})
         assert resp.status_code in (404, 405)
 
 

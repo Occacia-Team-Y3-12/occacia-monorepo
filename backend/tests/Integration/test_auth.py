@@ -97,17 +97,31 @@ def test_customer_verify_email_invalid_token(client):
 
 # ── Login ─────────────────────────────────────────────────────────────────────
 
+def _activate_customer(email: str) -> None:
+    db = SessionLocal()
+    try:
+        customer = db.query(Customer).filter(Customer.email == email).first()
+        assert customer is not None
+        customer.email_verified = True
+        customer.status = "ACTIVE"
+        db.commit()
+    finally:
+        db.close()
+
 def test_customer_login_success(client):
     email = f"user-{uuid4().hex[:8]}@test.com"
     client.post("/api/v1/auth/customer/register", json={
         "full_name": "Jane", "email": email, "password": "Pass123!"
     })
+    _activate_customer(email)
     import os
     os.environ["SKIP_EMAIL_VERIFICATION"] = "true"
     r = client.post("/api/v1/auth/customer/login",
-                    data={"username": email, "password": "Pass123!"})
+                    json={"email": email, "password": "Pass123!"})
     assert r.status_code == 200
-    assert "access_token" in r.json()
+    assert "accessToken" in r.json()
+    assert "refreshToken" in r.json()
+    assert r.json()["user"]["email"] == email
 
 
 def test_customer_login_wrong_password(client):
@@ -115,9 +129,34 @@ def test_customer_login_wrong_password(client):
     client.post("/api/v1/auth/customer/register", json={
         "full_name": "Jane", "email": email, "password": "Pass123!"
     })
+    _activate_customer(email)
     r = client.post("/api/v1/auth/customer/login",
-                    data={"username": email, "password": "WrongPass!"})
+                    json={"email": email, "password": "WrongPass!"})
     assert r.status_code == 401
+
+
+def test_customer_refresh_token_success(client):
+    email = f"user-{uuid4().hex[:8]}@test.com"
+    client.post("/api/v1/auth/customer/register", json={
+        "full_name": "Jane", "email": email, "password": "Pass123!"
+    })
+    _activate_customer(email)
+    import os
+    os.environ["SKIP_EMAIL_VERIFICATION"] = "true"
+    login = client.post(
+        "/api/v1/auth/customer/login",
+        json={"email": email, "password": "Pass123!"},
+    )
+    refresh_token = login.json()["refreshToken"]
+
+    r = client.post(
+        "/api/v1/auth/customer/token/refresh",
+        json={"refreshToken": refresh_token},
+    )
+
+    assert r.status_code == 200
+    assert "accessToken" in r.json()
+    assert "refreshToken" in r.json()
 
 
 def test_vendor_login_success(client):

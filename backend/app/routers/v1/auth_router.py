@@ -8,10 +8,25 @@ from jwt.exceptions import PyJWTError as JWTError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import ALGORITHM, SECRET_KEY, create_access_token, verify_password
+from app.core.security import (
+    ALGORITHM,
+    SECRET_KEY,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    verify_password,
+)
+from app.models.customer import Customer
 from app.schemas.auth_schema import (
-    CustomerRegister, RegisterResponse, VerifyEmailResponse,
-    ForgotPasswordRequest, ResetPasswordRequest, AuthMessageResponse
+    AuthMessageResponse,
+    AuthResponse,
+    CustomerRegister,
+    ForgotPasswordRequest,
+    LoginRequest,
+    RefreshTokenRequest,
+    RegisterResponse,
+    ResetPasswordRequest,
+    VerifyEmailResponse,
 )
 from app.schemas.vendor_schema import VendorRegisterRequest, VendorResponse
 from app.services.customer_service import customer_service
@@ -169,6 +184,46 @@ def verify_user_login(user, form_data: OAuth2PasswordRequestForm):
             raise HTTPException(status_code=403, detail="Email not verified.")
 
 
+def verify_customer_login(customer: Customer, password: str):
+    if not customer:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not customer.password_hash or not verify_password(password, customer.password_hash):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if os.getenv("SKIP_EMAIL_VERIFICATION") != "true" and not customer.email_verified:
+        raise HTTPException(status_code=403, detail="Email not verified.")
+    if customer.status != "ACTIVE":
+        raise HTTPException(status_code=403, detail="Customer account is not active.")
+
+
+def build_customer_auth_response(customer: Customer) -> AuthResponse:
+    access_token = create_access_token(
+        data={"sub": customer.email, "role": "CUSTOMER"},
+        expires_delta=timedelta(minutes=60),
+    )
+    refresh_token = create_refresh_token(
+        data={"sub": customer.email, "role": "CUSTOMER"},
+        expires_delta=timedelta(days=7),
+    )
+    return AuthResponse(
+        accessToken=access_token,
+        refreshToken=refresh_token,
+        user={
+            "userId": customer.customer_id,
+            "email": customer.email,
+            "role": "CUSTOMER",
+            "status": customer.status,
+        },
+    )
+
+
 @router.post("/vendor/register", response_model=VendorResponse, status_code=201)
 def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(get_db)):
     if vendor_service.get_vendor_by_email(db, email=vendor_data.email):
@@ -242,14 +297,40 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
     return auth_service.confirm_password_reset(db, request)
 
 
-@router.post("/customer/login", tags=["Authentication"])
-def login_customer(form_data: OAuth2PasswordRequestForm = Depends(),
-                   db: Session = Depends(get_db)):
-    customer = customer_service.get_customer_by_email(db, email=form_data.username)
-    verify_user_login(customer, form_data)
-    token = create_access_token(data={"sub": customer.email},
-                                expires_delta=timedelta(minutes=60))
-    return {"access_token": token, "token_type": "bearer"}
+@router.post("/customer/login", response_model=AuthResponse, response_model_by_alias=True, tags=["Authentication"])
+def login_customer(payload: LoginRequest, db: Session = Depends(get_db)):
+    customer = customer_service.get_customer_by_email(db, email=str(payload.email))
+    verify_customer_login(customer, payload.password)
+    return build_customer_auth_response(customer)
+
+
+@router.post(
+    "/customer/token/refresh",
+    response_model=AuthResponse,
+    response_model_by_alias=True,
+    tags=["Authentication"],
+)
+def refresh_customer_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
+    exc = HTTPException(status_code=401, detail="Invalid or expired refresh token.")
+    try:
+        claims = decode_token(payload.refresh_token)
+    except JWTError:
+        raise exc
+
+    if claims.get("type") != "refresh" or claims.get("role") != "CUSTOMER":
+        raise exc
+
+    email = claims.get("sub")
+    if not email:
+        raise exc
+
+    customer = customer_service.get_customer_by_email(db, email=email)
+    if not customer or customer.status != "ACTIVE":
+        raise exc
+    if os.getenv("SKIP_EMAIL_VERIFICATION") != "true" and not customer.email_verified:
+        raise exc
+
+    return build_customer_auth_response(customer)
 
 
 @router.post("/vendor/login", tags=["Authentication"])

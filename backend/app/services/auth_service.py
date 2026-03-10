@@ -65,7 +65,7 @@ def _send_email(to: str, subject: str, html: str) -> bool:
 
 
 def _build_customer_verification_email(email: str, token: str) -> tuple[str, str]:
-    link = f"https://api.occacia.com/api/v1/auth/customers/verify-email?token={token}"
+    link = f"https://api.occacia.com/api/v1/auth/customer/verify-email?token={token}"
     subject = "Verify your Occacia account"
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
@@ -123,7 +123,7 @@ def _build_vendor_verification_email(email: str, token: str) -> tuple[str, str]:
 
 
 def _build_password_reset_email(email: str, token: str) -> tuple[str, str]:
-    link = f"https://api.occacia.com/api/v1/auth/customers/reset-password?token={token}"
+    link = f"https://api.occacia.com/api/v1/auth/customer/password/reset?token={token}"
     subject = "Reset your Occacia password"
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
