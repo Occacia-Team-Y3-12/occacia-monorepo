@@ -1,13 +1,11 @@
-'use client';
-
 import Image from 'next/image';
 import Link from 'next/link';
 import { ROUTES } from '@/lib/routes';
 
 export default function Home() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
-      <Image src="/images/background.png" alt="Background" fill className="object-cover" priority />
+    <main className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+      <Image src="/images/background.png" alt="" aria-hidden={true} fill sizes="100vw" className="object-cover" priority />
 
       <div className="relative z-10 w-full max-w-6xl px-4 sm:px-6 md:px-8">
         <div className="flex justify-center mb-12 md:mb-16">
@@ -22,10 +20,10 @@ export default function Home() {
             <div className="flex flex-col items-start justify-between px-6 sm:px-8 md:px-12 py-6 md:py-8 h-full md:pr-16">
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#2c3e50] mb-6 md:mb-8 text-left w-full">For Customers</h2>
               <p className="flex-1 text-left text-[#5a6c7d] mb-8 md:mb-12 text-base md:text-lg">
-                Thousands of people find it easy to get personalized recommendation along with their budget while saving time
+                Thousands of people find it easy to get personalized recommendations that fit their budget while saving time
               </p>
               <Link
-                href="/login"
+                href={ROUTES.CUSTOMER.LOGIN}
                 className="bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium inline-flex items-center justify-center w-full max-w-[320px] h-12 rounded-lg transition-colors duration-200 text-base md:text-lg"
               >
                 Login as Customer
@@ -52,6 +50,7 @@ export default function Home() {
           <p className="text-gray-500">Copyright © 2025 Occacia</p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
+
