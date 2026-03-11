@@ -4,15 +4,8 @@ import { ROUTES } from '@/lib/routes';
 
 export default function Home() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
-      <Image
-        src="/images/background.png"
-        alt="Background"
-        fill
-        sizes="100vw"
-        className="object-cover"
-        priority
-      />
+    <main className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+      <Image src="/images/background.png" alt="" aria-hidden={true} fill sizes="100vw" className="object-cover" priority />
 
       <div className="relative z-10 w-full max-w-6xl px-4 sm:px-6 md:px-8">
         <div className="flex justify-center mb-12 md:mb-16">
@@ -30,7 +23,7 @@ export default function Home() {
                 Thousands of people find it easy to get personalized recommendations that fit their budget while saving time
               </p>
               <Link
-                href="/login"
+                href={ROUTES.CUSTOMER.LOGIN}
                 className="bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium inline-flex items-center justify-center w-full max-w-[320px] h-12 rounded-lg transition-colors duration-200 text-base md:text-lg"
               >
                 Login as Customer
@@ -57,7 +50,7 @@ export default function Home() {
           <p className="text-gray-500">Copyright © 2025 Occacia</p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
