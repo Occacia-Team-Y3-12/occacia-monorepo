@@ -5,7 +5,14 @@ import { ROUTES } from '@/lib/routes';
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
-      <Image src="/images/background.png" alt="Background" fill className="object-cover" priority />
+      <Image
+        src="/images/background.png"
+        alt="Background"
+        fill
+        sizes="100vw"
+        className="object-cover"
+        priority
+      />
 
       <div className="relative z-10 w-full max-w-6xl px-4 sm:px-6 md:px-8">
         <div className="flex justify-center mb-12 md:mb-16">
