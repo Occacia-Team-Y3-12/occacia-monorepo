@@ -10,12 +10,12 @@ export default function AdminUsersPage() {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 py-6 px-4 sm:px-8">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">Users Management</h1>
             <p className="text-gray-600 mt-2">Manage customers and vendor accounts</p>
           </div>
-          <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors">
+          <button className="w-full rounded-lg bg-indigo-600 px-6 py-2 font-semibold text-white transition-colors hover:bg-indigo-700 sm:w-auto">
             Add User
           </button>
         </div>
