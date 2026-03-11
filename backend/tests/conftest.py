@@ -33,15 +33,18 @@ from app.main import app  # noqa: E402
 from app.models.chat_model import ChatMessage
 from app.models.customer import Customer
 from app.models.event import Event
+from app.models.event_chat_message import EventChatMessage
 from app.models.event_persona import EventPersona
 from app.models.package import Package
 from app.models.persona import Persona
+from app.models.task import Task
 from app.models.vendor import Vendor
 
 
 # ── Create all tables once ───────────────────────────────────────────
 @pytest.fixture(scope="session", autouse=True)
 def create_tables():
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
@@ -53,7 +56,7 @@ def clean_tables():
     yield
     db = SessionLocal()
     try:
-        for model in (ChatMessage, EventPersona, Event, Persona, Package, Vendor, Customer):
+        for model in (ChatMessage, EventChatMessage, Task, EventPersona, Event, Persona, Package, Vendor, Customer):
             try:
                 db.query(model).delete()
             except OperationalError:

@@ -19,6 +19,7 @@ class Task(Base):
     budget_min = Column(Float, nullable=True)
     budget_max = Column(Float, nullable=True)
     currency = Column(String, nullable=False)
+    needs_vendor = Column(String, nullable=True)
     status = Column(String, nullable=False, default="DRAFT")
 
     selected_offering_id = Column(String, nullable=True)
@@ -34,4 +35,3 @@ class Task(Base):
 
     created_at = Column(DateTime(timezone=True), default=now_utc, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False)
-
