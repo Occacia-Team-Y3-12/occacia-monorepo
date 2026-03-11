@@ -1,9 +1,8 @@
 # ==========================================
-# STAGE 1: The Builder (The Workshop)
+# STAGE 1: Builder
 # ==========================================
 FROM python:3.11-slim AS builder
 
-# 1. Install system build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
@@ -11,48 +10,42 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# 2. Configure Poetry via Environment Variables (Bulletproof method)
 ENV POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_IN_PROJECT=true \
-    POETRY_VIRTUALENVS_CREATE=true \
-    POETRY_CACHE_DIR='/tmp/poetry_cache'
+    POETRY_VIRTUALENVS_CREATE=true
 
 RUN pip install --no-cache-dir poetry==2.3.2
 
-# 3. Copy only the blueprint
 COPY pyproject.toml poetry.lock ./
-
-# 4. Install into /app/.venv (no need to lock during image build)
 RUN poetry install --only main --no-root --no-ansi && \
-    rm -rf $POETRY_CACHE_DIR
+    find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # ==========================================
-# STAGE 2: The Runtime (The Vault)
+# STAGE 2: Runtime
 # ==========================================
 FROM python:3.11-slim
 
-# Systems Optimization
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
-# Install runtime database drivers
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --upgrade pip setuptools wheel --no-cache-dir
 
-# 5. Teleport the FINISHED environment and code
-# This will now find /app/.venv because of the config above
 COPY --from=builder /app/.venv /app/.venv
 COPY . .
 
-# 6. Security: Run as a non-privileged user
 RUN useradd -m appuser && chown -R appuser /app
 USER appuser
 
 EXPOSE 8000
 
-# Execute directly from the teleported virtualenv
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

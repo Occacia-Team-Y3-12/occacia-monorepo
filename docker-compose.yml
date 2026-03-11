@@ -23,17 +23,32 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - internal
     logging: *default-logging
 
   # ===========================
-  # ⚙️ BACKEND API (The Engine)
+  # 🗄️ CACHE (The Memory)
   # ===========================
   redis:
     image: redis:7-alpine
     container_name: occacia-redis
     restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
     logging: *default-logging
 
+  # ===========================
+  # ⚙️ BACKEND API (The Engine)
+  # ===========================
   backend:
     build:
       context: ./backend
@@ -43,21 +58,31 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env
     environment:
       DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD}@db:5432/${DB_NAME:-occacia_db}
       DB_PASSWORD: ${DB_PASSWORD}
-      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (required)}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
       ALGORITHM: ${ALGORITHM:-HS256}
       LANGFLOW_URL: ${LANGFLOW_URL}
       LANGFLOW_TOKEN: ${LANGFLOW_TOKEN}
       LANGFLOW_ORG_ID: ${LANGFLOW_ORG_ID}
-      DOCKER_SOCKET: ${DOCKER_SOCKET:-/var/run/docker.sock}
-      REDIS_URL: redis://redis:6379
-      #SKIP_EMAIL_VERIFICATION: "true" ##Remove this after testing
-    ports:
-      - "8000:8000"
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      DISABLE_ADMIN_REGISTER: ${DISABLE_ADMIN_REGISTER:-true}
+    # NO public port — nginx is the only entry point
+    expose:
+      - "8000"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/health" ]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    networks:
+      - internal
     logging: *default-logging
 
   # ===========================
@@ -70,9 +95,21 @@ services:
     container_name: occacia-frontend
     restart: always
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000 # ✅ Next.js rewrite target inside Docker
+      - NEXT_PUBLIC_API_URL=http://backend:8000
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    # NO public port — nginx only
+    expose:
+      - "3000"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3000" ]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - internal
     logging: *default-logging
 
   # ===========================
@@ -90,8 +127,39 @@ services:
       - ./certbot/www:/var/www/certbot:ro
       - ./certbot/conf:/etc/letsencrypt/:ro
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+    logging: *default-logging
+
+  # ===========================
+  # 💾 DB BACKUP (The Vault)
+  # ===========================
+  db-backup:
+    image: postgres:15-alpine
+    container_name: occacia-backup
+    restart: always
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_backups:/backups
+    entrypoint: >
+      sh -c "while true; do
+        FILENAME=/backups/backup_$$(date +%Y%m%d_%H%M%S).sql.gz;
+        pg_dump -h db -U ${DB_USER:-admin} ${DB_NAME:-occacia_db} | gzip > $$FILENAME;
+        echo \"Backup saved: $$FILENAME\";
+        find /backups -name '*.sql.gz' -mtime +7 -delete;
+        echo \"Old backups cleaned\";
+        sleep 86400;
+      done"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
     logging: *default-logging
 
   # ===========================
@@ -106,8 +174,15 @@ services:
     volumes:
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
       - portainer_data:/data
+    networks:
+      - internal
     logging: *default-logging
+
+networks:
+  internal:
+    driver: bridge
 
 volumes:
   postgres_data:
   portainer_data:
+  db_backups:
