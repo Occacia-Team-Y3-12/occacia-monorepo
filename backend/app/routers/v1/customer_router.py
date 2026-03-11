@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -17,9 +17,12 @@ from app.models.customer import Customer
 from app.routers.v1.auth_router import get_current_customer
 from app.schemas.customer_schema import (
     CustomerProfileResponse,
+    EventCreateRequest,
+    EventCreateResponse,
     CustomerProfileUpdateRequest,
     EventResponse,
     PaginatedEventsResponse,
+    SetEventPersonasRequest,
     StringListResponse,
 )
 from app.services.customer_service import customer_service
@@ -114,6 +117,86 @@ def list_customer_events(
         ],
         nextCursor=next_cursor,
     )
+
+
+@router.post(
+    "/customers/events",
+    response_model=EventCreateResponse,
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_customer_event(
+    body: EventCreateRequest,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    event = customer_service.create_customer_event(
+        db,
+        customer_id=current_customer.customer_id,
+        event_type=body.event_type,
+        title=body.title,
+        persona_ids=body.persona_ids,
+    )
+    return EventCreateResponse(eventId=event.event_id, status=event.status)
+
+
+@router.get(
+    "/customers/events/{event_id}",
+    response_model=EventResponse,
+    response_model_by_alias=True,
+)
+def get_customer_event(
+    event_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    event = customer_service.get_customer_event(
+        db,
+        event_id=event_id,
+        customer_id=current_customer.customer_id,
+    )
+    persona_ids = customer_service.get_event_persona_ids(db, event_ids=[event.event_id]).get(event.event_id, [])
+    return _event_response(event, persona_ids)
+
+
+@router.put(
+    "/customers/events/{event_id}/personas",
+    response_model=EventResponse,
+    response_model_by_alias=True,
+)
+def set_event_personas(
+    event_id: str,
+    body: SetEventPersonasRequest,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    event = customer_service.replace_event_personas(
+        db,
+        event_id=event_id,
+        customer_id=current_customer.customer_id,
+        persona_ids=body.persona_ids,
+    )
+    persona_ids = customer_service.get_event_persona_ids(db, event_ids=[event.event_id]).get(event.event_id, [])
+    return _event_response(event, persona_ids)
+
+
+@router.delete("/customers/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_customer_event(
+    event_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    customer_service.delete_draft_event(
+        db,
+        event_id=event_id,
+        customer_id=current_customer.customer_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/event-types", response_model=StringListResponse)
+def list_event_types(_: Customer = Depends(get_current_customer)):
+    return StringListResponse(items=customer_service.list_event_types())
 
 
 @router.get("/event-templates", response_model=StringListResponse)
