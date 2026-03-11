@@ -25,4 +25,8 @@ class Customer(Base):
     status = Column(String, default="PENDING_VERIFICATION", nullable=False)
     verification_token = Column(String, nullable=True)
     verification_token_expires_at = Column(DateTime(timezone=True), nullable=True)
-
+    calendar_provider = Column(String, nullable=True)
+    calendar_default_id = Column(String, nullable=True)
+    calendar_connected_at = Column(DateTime(timezone=True), nullable=True)
+    calendar_last_sync_at = Column(DateTime(timezone=True), nullable=True)
+    calendar_oauth_state = Column(String, nullable=True)
