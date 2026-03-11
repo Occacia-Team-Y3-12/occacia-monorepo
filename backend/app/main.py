@@ -87,12 +87,18 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     application.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost",           # nginx in Docker
+        "http://localhost:80",
+        "http://localhost:3000",      # Next.js local dev (npm run dev)
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",      # direct backend access
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
     add_exception_handlers(application)
     application.include_router(api_router)
     return application
