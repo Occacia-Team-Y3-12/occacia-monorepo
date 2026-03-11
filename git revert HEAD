@@ -1,0 +1,10 @@
+[33me737192[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev/kashmika[m[33m, [m[1;31morigin/dev/kashmika[m[33m)[m Fixing localhost --> app.occacia.com
+[33mcd210ee[m FIXING NGINX CONFLICST WITH FRONTEND
+[33m046a07d[m OCA 250 - Validate Persona Editing & Update Behavior
+[33me0a685a[m fix: align all 25 routes to OpenAPI spec + full test suite
+[33m3a590cc[m OCA-249 Implement Persona Update Service | OCA-245 Implement Persona Confirmation Logic
+[33md93e049[m OCA-293 OCA-294 | Implement AI related functionality for Chat interaction
+[33m05f8b30[m fix: add normalize_tags and check_rate_limit exports for CI
+[33m9472e02[m fix: add normalize_tags and check_rate_limit exports for CI
+[33m9670bd2[m fix: add normalize_tags and check_rate_limit exports for CI
+[33m9c84212[m Fully functional AI, Vendor admin confimraiton mails and reset passwords, personas

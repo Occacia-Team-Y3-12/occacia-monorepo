@@ -89,11 +89,11 @@ def create_app() -> FastAPI:
     application.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost",
-        "http://localhost:3000",
+        "http://localhost",           # nginx in Docker
+        "http://localhost:80",
+        "http://localhost:3000",      # Next.js local dev (npm run dev)
         "http://127.0.0.1:3000",
-        "https://app.occacia.com",   # ✅ production
-        "http://app.occacia.com",    # ✅ just in case
+        "http://localhost:8000",      # direct backend access
     ],
     allow_credentials=True,
     allow_methods=["*"],
