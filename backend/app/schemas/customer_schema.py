@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from pydantic import BaseModel, Field
+from pydantic import field_validator
 
 
 class CustomerProfileResponse(BaseModel):
@@ -51,3 +52,49 @@ class PaginatedEventsResponse(BaseModel):
 
 class StringListResponse(BaseModel):
     items: list[str]
+
+
+class EventCreateRequest(BaseModel):
+    event_type: str = Field(alias="eventType")
+    title: str
+    persona_ids: list[str] = Field(default_factory=list, alias="personaIds")
+
+    @field_validator("event_type", "title")
+    @classmethod
+    def validate_trimmed_text(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("must not be empty")
+        return trimmed
+
+    @field_validator("title")
+    @classmethod
+    def validate_title_length(cls, value: str) -> str:
+        if len(value) < 3:
+            raise ValueError("title must be at least 3 characters long")
+        return value
+
+    @field_validator("persona_ids")
+    @classmethod
+    def dedupe_persona_ids(cls, value: list[str]) -> list[str]:
+        return list(dict.fromkeys(value))
+
+    model_config = {"populate_by_name": True}
+
+
+class EventCreateResponse(BaseModel):
+    event_id: str = Field(alias="eventId")
+    status: str
+
+    model_config = {"populate_by_name": True}
+
+
+class SetEventPersonasRequest(BaseModel):
+    persona_ids: list[str] = Field(alias="personaIds")
+
+    @field_validator("persona_ids")
+    @classmethod
+    def dedupe_persona_ids(cls, value: list[str]) -> list[str]:
+        return list(dict.fromkeys(value))
+
+    model_config = {"populate_by_name": True}
