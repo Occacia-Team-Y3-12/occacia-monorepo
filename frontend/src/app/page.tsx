@@ -22,7 +22,7 @@ export default function Home() {
             <div className="flex flex-col items-start justify-between px-6 sm:px-8 md:px-12 py-6 md:py-8 h-full md:pr-16">
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#2c3e50] mb-6 md:mb-8 text-left w-full">For Customers</h2>
               <p className="flex-1 text-left text-[#5a6c7d] mb-8 md:mb-12 text-base md:text-lg">
-                Thousands of people find it easy to get personalized recommendation along with their budget while saving time
+                Thousands of people find it easy to get personalized recommendations that fit their budget while saving time
               </p>
               <Link
                 href="/login"
