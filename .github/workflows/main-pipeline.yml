@@ -115,7 +115,7 @@ jobs:
           severity: CRITICAL,HIGH
 
   # -------------------------------------------------------
-  # JOB 4: Deploy to production — main branch only
+  # JOB 4: Deploy to production
   # -------------------------------------------------------
   deploy:
     name: Deploy to Production
@@ -123,6 +123,7 @@ jobs:
     timeout-minutes: 15
     needs: security
     environment: production
+    # Modify this if you want it to deploy from your dev branch instead of just main
     if: github.ref == 'refs/heads/main'
 
     steps:
@@ -140,34 +141,45 @@ jobs:
       - name: Deploy and migrate
         uses: appleboy/ssh-action@v1.0.3
         env:
+          LANGFLOW_URL: ${{ secrets.LANGFLOW_URL }}
+          LANGFLOW_ORG_ID: ${{ secrets.LANGFLOW_ORG_ID }}
+          LANGFLOW_TOKEN: ${{ secrets.LANGFLOW_TOKEN }}
+          DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ALGORITHM: ${{ secrets.ALGORITHM }}
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
-          LANGFLOW_URL: ${{ secrets.LANGFLOW_URL }}
-          LANGFLOW_TOKEN: ${{ secrets.LANGFLOW_TOKEN }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          DISABLE_ADMIN_REGISTER: ${{ secrets.DISABLE_ADMIN_REGISTER }}
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DB_PASSWORD,DATABASE_URL,SECRET_KEY,ALGORITHM,SENDGRID_API_KEY,FROM_EMAIL,LANGFLOW_URL,LANGFLOW_TOKEN
+          envs: LANGFLOW_URL,LANGFLOW_ORG_ID,LANGFLOW_TOKEN,DB_USER,DB_PASSWORD,DB_NAME,DATABASE_URL,SECRET_KEY,ALGORITHM,SENDGRID_API_KEY,FROM_EMAIL,REDIS_PASSWORD,DISABLE_ADMIN_REGISTER
           script: |
             set -e
             cd ~/occacia-app
 
             # Write full production .env
             cat <<EOF > .env
-            DATABASE_URL=${DATABASE_URL}
+            LANGFLOW_URL=${LANGFLOW_URL}
+            LANGFLOW_ORG_ID=${LANGFLOW_ORG_ID}
+            LANGFLOW_TOKEN=${LANGFLOW_TOKEN}
+            DB_USER=${DB_USER}
             DB_PASSWORD=${DB_PASSWORD}
+            DB_NAME=${DB_NAME}
+            DATABASE_URL=${DATABASE_URL}
             SECRET_KEY=${SECRET_KEY}
             ALGORITHM=${ALGORITHM:-HS256}
             SENDGRID_API_KEY=${SENDGRID_API_KEY}
             FROM_EMAIL=${FROM_EMAIL}
-            LANGFLOW_URL=${LANGFLOW_URL}
-            LANGFLOW_TOKEN=${LANGFLOW_TOKEN}
-            REDIS_URL=redis://redis:6379
+            REDIS_PASSWORD=${REDIS_PASSWORD}
+            REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+            DISABLE_ADMIN_REGISTER=${DISABLE_ADMIN_REGISTER}
+            DOCKER_SOCKET=/var/run/docker.sock
             EOF
 
             # Restart containers
