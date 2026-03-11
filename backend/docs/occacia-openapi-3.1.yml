@@ -1,14 +1,20 @@
 openapi: 3.1.0
 info:
   title: Occacia API
-  version: 1.1.0
+  version: 1.1.1
   description: 'Occacia API contract aligned with use cases, EERD, and class diagram.
     Core flow: Event -> Tasks -> Recommendations -> Packages -> Confirm Package ->
     Package Order -> Vendor Fulfillment Requests -> Task execution.
 
 
-    Updated on 2026-03-11: added optional endpoints to align with expanded API inventory
-    (~112 operations) and switched Admin task support update from PATCH to PUT.'
+    Update 1.1.0: Added event scheduling (recurrence), reminders, and external calendar
+    integration endpoints (UC-13).
+
+
+    Update 1.1.1: Added customer/vendor inquiry read endpoints, package deletion,
+    package order cancellation, and vendor fulfillment request detail endpoint.
+
+    '
 servers:
 - url: https://app.occacia.com/api/v1
   description: Production (example)
@@ -767,7 +773,7 @@ paths:
     get:
       tags:
       - Support & Inquiries
-      summary: List customer inquiries (optional)
+      summary: List customer inquiries (UC-30)
       parameters:
       - name: status
         in: query
@@ -804,7 +810,7 @@ paths:
     get:
       tags:
       - Support & Inquiries
-      summary: List vendor inquiries (optional)
+      summary: List vendor inquiries (UC-30)
       parameters:
       - name: status
         in: query
@@ -1066,27 +1072,6 @@ paths:
       responses:
         '204':
           description: Deleted
-        '404':
-          $ref: '#/components/responses/NotFound'
-    put:
-      tags:
-      - Customer
-      summary: Update event details (optional)
-      description: Update event metadata (title, description, location, time) while
-        the event is still editable.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EventUpdateRequest'
-      responses:
-        '200':
-          description: Updated event
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Event'
         '404':
           $ref: '#/components/responses/NotFound'
   /customers/events/{eventId}/personas:
@@ -1362,17 +1347,14 @@ paths:
     delete:
       tags:
       - Customer
-      summary: Delete a package (optional)
-      description: Delete a draft package before it is confirmed into a package order.
+      summary: Delete custom package (UC-16)
       responses:
-        '200':
+        '204':
           description: Deleted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MessageResponse'
         '404':
           $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /customers/events/{eventId}/packages/{packageId}/confirm:
     parameters:
     - $ref: '#/components/parameters/EventId'
@@ -1715,7 +1697,7 @@ paths:
                 $ref: '#/components/schemas/Task'
         '404':
           $ref: '#/components/responses/NotFound'
-    put:
+    patch:
       tags:
       - Admin
       summary: Admin support action on a task (UC-28)
@@ -1732,8 +1714,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Task'
-      description: 'NOTE: This endpoint was changed from PATCH to PUT to align with
-        API standards agreed in the project.'
   /admin/tasks/{taskId}/fulfillment-requests:
     parameters:
     - $ref: '#/components/parameters/TaskId'
@@ -1810,17 +1790,221 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionResponse'
+  /customers/events/{eventId}/schedule:
+    parameters:
+    - $ref: '#/components/parameters/EventId'
+    get:
+      tags:
+      - Customer
+      summary: Get event schedule (UC-13)
+      responses:
+        '200':
+          description: Schedule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventScheduleResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+      - Customer
+      summary: Upsert event schedule (recurrence/timezone/all-day) (UC-13)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventScheduleUpsertRequest'
+      responses:
+        '200':
+          description: Schedule updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventScheduleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /customers/events/{eventId}/reminders:
+    parameters:
+    - $ref: '#/components/parameters/EventId'
+    get:
+      tags:
+      - Customer
+      summary: Get event reminders configuration (UC-13)
+      responses:
+        '200':
+          description: Reminders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventRemindersResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+      - Customer
+      summary: Upsert event reminders (offsets + channels) (UC-13)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventRemindersUpsertRequest'
+      responses:
+        '200':
+          description: Reminders updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventRemindersResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /customers/events/{eventId}/occurrences:
+    parameters:
+    - $ref: '#/components/parameters/EventId'
+    get:
+      tags:
+      - Customer
+      summary: List upcoming occurrences for a recurring event (UC-13)
+      parameters:
+      - name: from
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/ISODateTime'
+        description: Return occurrences starting from this datetime (inclusive)
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Occurrences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEventOccurrences'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /customers/events/{eventId}/calendar-sync:
+    parameters:
+    - $ref: '#/components/parameters/EventId'
+    get:
+      tags:
+      - Customer
+      summary: Get per-event external calendar sync status (UC-13)
+      responses:
+        '200':
+          description: Calendar sync status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCalendarSyncStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+      - Customer
+      summary: Enable/disable per-event external calendar sync (UC-13)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCalendarSyncUpsertRequest'
+      responses:
+        '200':
+          description: Calendar sync updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCalendarSyncStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /customers/calendar/providers:
+    get:
+      tags:
+      - Customer
+      summary: List supported external calendar providers (UC-13)
+      responses:
+        '200':
+          description: Providers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarProviderListResponse'
+  /customers/calendar/connect:
+    post:
+      tags:
+      - Customer
+      summary: Start calendar OAuth connect (UC-13)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalendarConnectRequest'
+      responses:
+        '200':
+          description: OAuth connect started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarConnectResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /customers/calendar/exchange-code:
+    post:
+      tags:
+      - Customer
+      summary: Exchange OAuth code and link calendar provider (UC-13)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalendarExchangeCodeRequest'
+      responses:
+        '200':
+          description: Calendar connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarConnectionStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /customers/calendar/status:
+    get:
+      tags:
+      - Customer
+      summary: Get calendar connection status (UC-13)
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarConnectionStatus'
+  /customers/calendar/disconnect:
+    delete:
+      tags:
+      - Customer
+      summary: Disconnect external calendar provider (UC-13)
+      responses:
+        '204':
+          description: Disconnected
   /customers/inquiries/{inquiryId}:
     parameters:
-    - name: inquiryId
-      in: path
-      required: true
-      schema:
-        $ref: '#/components/schemas/UUID'
+    - $ref: '#/components/parameters/InquiryId'
     get:
       tags:
       - Support & Inquiries
-      summary: Get customer inquiry (optional)
+      summary: Get customer inquiry (UC-30)
       responses:
         '200':
           description: Inquiry
@@ -1832,15 +2016,11 @@ paths:
           $ref: '#/components/responses/NotFound'
   /vendors/inquiries/{inquiryId}:
     parameters:
-    - name: inquiryId
-      in: path
-      required: true
-      schema:
-        $ref: '#/components/schemas/UUID'
+    - $ref: '#/components/parameters/InquiryId'
     get:
       tags:
       - Support & Inquiries
-      summary: Get vendor inquiry (optional)
+      summary: Get vendor inquiry (UC-30)
       responses:
         '200':
           description: Inquiry
@@ -1852,43 +2032,33 @@ paths:
           $ref: '#/components/responses/NotFound'
   /customers/package-orders/{packageOrderId}/cancel:
     parameters:
-    - name: packageOrderId
-      in: path
-      required: true
-      schema:
-        $ref: '#/components/schemas/UUID'
+    - $ref: '#/components/parameters/PackageOrderId'
     put:
       tags:
       - Customer
       summary: Cancel package order (optional)
-      description: Attempt to cancel a package order before fulfillment starts. Actual
-        behavior depends on current order status.
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CancelPackageOrderRequest'
       responses:
         '200':
-          description: Updated package order
+          description: Package order cancelled
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PackageOrder'
+                $ref: '#/components/schemas/PackageOrderDetailsResponse'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot cancel in current status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /vendors/fulfillment-requests/{fulfillmentRequestId}:
     parameters:
-    - name: fulfillmentRequestId
-      in: path
-      required: true
-      schema:
-        $ref: '#/components/schemas/UUID'
+    - $ref: '#/components/parameters/FulfillmentRequestId'
     get:
       tags:
       - Vendor
-      summary: Get fulfillment request detail (optional)
+      summary: Get fulfillment request detail (UC-20)
       responses:
         '200':
           description: Fulfillment request
@@ -1896,214 +2066,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FulfillmentRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /vendors/fulfillment-requests/{fulfillmentRequestId}/accept:
-    parameters:
-    - name: fulfillmentRequestId
-      in: path
-      required: true
-      schema:
-        $ref: '#/components/schemas/UUID'
-    post:
-      tags:
-      - Vendor
-      summary: Accept fulfillment request (optional)
-      description: Convenience endpoint equivalent to POST /vendors/fulfillment-requests/{id}/response
-        with decision=ACCEPT.
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AcceptFulfillmentRequestRequest'
-      responses:
-        '200':
-          description: Updated fulfillment request + task
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RespondFulfillmentRequestResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /vendors/fulfillment-requests/{fulfillmentRequestId}/reject:
-    parameters:
-    - name: fulfillmentRequestId
-      in: path
-      required: true
-      schema:
-        $ref: '#/components/schemas/UUID'
-    post:
-      tags:
-      - Vendor
-      summary: Reject fulfillment request (optional)
-      description: Convenience endpoint equivalent to POST /vendors/fulfillment-requests/{id}/response
-        with decision=REJECT.
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RejectFulfillmentRequestRequest'
-      responses:
-        '200':
-          description: Updated fulfillment request + task
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RespondFulfillmentRequestResponse'
-  /admin/package-orders/{packageOrderId}/status:
-    parameters:
-    - name: packageOrderId
-      in: path
-      required: true
-      schema:
-        $ref: '#/components/schemas/UUID'
-    put:
-      tags:
-      - Admin
-      summary: Update package order status (support) (optional)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PackageOrderStatusUpdateRequest'
-      responses:
-        '200':
-          description: Updated package order
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PackageOrder'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /admin/tasks/{taskId}/reassign:
-    parameters:
-    - name: taskId
-      in: path
-      required: true
-      schema:
-        $ref: '#/components/schemas/UUID'
-    post:
-      tags:
-      - Admin
-      summary: Reassign vendor for a task (support) (optional)
-      description: Reassign the vendor (support action).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AdminTaskReassignVendorRequest'
-      responses:
-        '200':
-          description: Updated task
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Task'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /admin/tasks/{taskId}/extend-expiry:
-    parameters:
-    - name: taskId
-      in: path
-      required: true
-      schema:
-        $ref: '#/components/schemas/UUID'
-    post:
-      tags:
-      - Admin
-      summary: Extend task expiry (support) (optional)
-      description: Extend the response/lock expiry (support action).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AdminTaskExtendExpiryRequest'
-      responses:
-        '200':
-          description: Updated task
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Task'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /admin/tasks/{taskId}/unlock:
-    parameters:
-    - name: taskId
-      in: path
-      required: true
-      schema:
-        $ref: '#/components/schemas/UUID'
-    post:
-      tags:
-      - Admin
-      summary: Unlock task editing (support) (optional)
-      description: Unlock task editing (support action).
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AdminTaskUnlockEditingRequest'
-      responses:
-        '200':
-          description: Updated task
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Task'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /admin/tasks/{taskId}/override-status:
-    parameters:
-    - name: taskId
-      in: path
-      required: true
-      schema:
-        $ref: '#/components/schemas/UUID'
-    post:
-      tags:
-      - Admin
-      summary: Override task status (support) (optional)
-      description: Override task status (support action).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AdminTaskOverrideStatusRequest'
-      responses:
-        '200':
-          description: Updated task
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Task'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /admin/internal-notes/{noteId}:
-    parameters:
-    - name: noteId
-      in: path
-      required: true
-      schema:
-        $ref: '#/components/schemas/UUID'
-    delete:
-      tags:
-      - Admin
-      summary: Delete internal note (optional)
-      responses:
-        '200':
-          description: Deleted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MessageResponse'
         '404':
           $ref: '#/components/responses/NotFound'
 components:
@@ -3657,78 +3619,258 @@ components:
         newPassword:
           type: string
           minLength: 8
-    EventUpdateRequest:
+    ReminderChannel:
+      type: string
+      enum:
+      - PUSH
+      - EMAIL
+      - IN_APP
+    CalendarProviderType:
+      type: string
+      enum:
+      - GOOGLE
+      - MICROSOFT
+    CalendarSyncState:
+      type: string
+      enum:
+      - DISABLED
+      - ENABLED
+    CalendarSyncLastStatus:
+      type: string
+      enum:
+      - SUCCESS
+      - FAILED
+      - PENDING
+    EventSchedule:
       type: object
-      description: Update mutable event fields. Only DRAFT (or PLANNING) events may
-        be edited by customers.
+      required:
+      - startAt
+      - timezone
+      - isAllDay
       properties:
-        eventType:
+        startAt:
+          $ref: '#/components/schemas/ISODateTime'
+        endAt:
+          $ref: '#/components/schemas/ISODateTime'
+        timezone:
           type: string
-        title:
+          description: IANA time zone, e.g., Asia/Colombo
+        isAllDay:
+          type: boolean
+        recurrenceRule:
           type: string
-        description:
-          type: string
-        locationText:
+          description: 'RFC 5545 RRULE string (optional). Example: FREQ=YEARLY;INTERVAL=1'
+        recurrenceUntil:
+          $ref: '#/components/schemas/ISODateTime'
+        recurrenceCount:
+          type: integer
+          minimum: 1
+    EventOccurrence:
+      type: object
+      required:
+      - startAt
+      properties:
+        occurrenceId:
           type: string
         startAt:
           $ref: '#/components/schemas/ISODateTime'
         endAt:
           $ref: '#/components/schemas/ISODateTime'
-    CancelPackageOrderRequest:
-      type: object
-      properties:
-        reason:
-          type: string
-    AcceptFulfillmentRequestRequest:
-      type: object
-      properties:
-        responseNote:
-          type: string
-    RejectFulfillmentRequestRequest:
-      type: object
-      properties:
-        responseNote:
-          type: string
-        reason:
-          type: string
-    PackageOrderStatusUpdateRequest:
+    PaginatedEventOccurrences:
       type: object
       required:
-      - status
+      - items
       properties:
-        status:
-          $ref: '#/components/schemas/PackageOrderStatus'
-        note:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventOccurrence'
+        nextCursor:
           type: string
-    AdminTaskReassignVendorRequest:
+    EventScheduleUpsertRequest:
       type: object
       required:
-      - assignedVendorId
+      - startAt
+      - timezone
+      - isAllDay
       properties:
-        assignedVendorId:
-          $ref: '#/components/schemas/UUID'
-        note:
-          type: string
-    AdminTaskExtendExpiryRequest:
-      type: object
-      required:
-      - expiresAt
-      properties:
-        expiresAt:
+        startAt:
           $ref: '#/components/schemas/ISODateTime'
-        note:
+        endAt:
+          $ref: '#/components/schemas/ISODateTime'
+        timezone:
           type: string
-    AdminTaskUnlockEditingRequest:
-      type: object
-      properties:
-        note:
+        isAllDay:
+          type: boolean
+        recurrenceRule:
           type: string
-    AdminTaskOverrideStatusRequest:
+        recurrenceUntil:
+          $ref: '#/components/schemas/ISODateTime'
+        recurrenceCount:
+          type: integer
+          minimum: 1
+    EventScheduleResponse:
       type: object
       required:
-      - status
+      - schedule
       properties:
-        status:
-          $ref: '#/components/schemas/TaskStatus'
-        note:
+        schedule:
+          $ref: '#/components/schemas/EventSchedule'
+        nextOccurrence:
+          $ref: '#/components/schemas/EventOccurrence'
+    EventReminders:
+      type: object
+      required:
+      - enabled
+      - channels
+      - offsets
+      properties:
+        enabled:
+          type: boolean
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReminderChannel'
+        offsets:
+          type: array
+          items:
+            type: string
+            description: ISO-8601 duration, e.g., P7D, P1D, PT0M
+    EventRemindersUpsertRequest:
+      type: object
+      required:
+      - enabled
+      - channels
+      - offsets
+      properties:
+        enabled:
+          type: boolean
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReminderChannel'
+        offsets:
+          type: array
+          items:
+            type: string
+    EventRemindersResponse:
+      type: object
+      required:
+      - reminders
+      properties:
+        reminders:
+          $ref: '#/components/schemas/EventReminders'
+    CalendarProvider:
+      type: object
+      required:
+      - type
+      - displayName
+      properties:
+        type:
+          $ref: '#/components/schemas/CalendarProviderType'
+        displayName:
+          type: string
+        capabilities:
+          type: object
+          properties:
+            recurrence:
+              type: boolean
+            reminders:
+              type: boolean
+    CalendarProviderListResponse:
+      type: object
+      required:
+      - providers
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarProvider'
+    CalendarConnectRequest:
+      type: object
+      required:
+      - provider
+      - redirectUri
+      properties:
+        provider:
+          $ref: '#/components/schemas/CalendarProviderType'
+        redirectUri:
+          type: string
+          format: uri
+        scopes:
+          type: array
+          items:
+            type: string
+    CalendarConnectResponse:
+      type: object
+      required:
+      - provider
+      - authorizationUrl
+      - state
+      properties:
+        provider:
+          $ref: '#/components/schemas/CalendarProviderType'
+        authorizationUrl:
+          type: string
+          format: uri
+        state:
+          type: string
+    CalendarExchangeCodeRequest:
+      type: object
+      required:
+      - provider
+      - code
+      - redirectUri
+      properties:
+        provider:
+          $ref: '#/components/schemas/CalendarProviderType'
+        code:
+          type: string
+        state:
+          type: string
+        redirectUri:
+          type: string
+          format: uri
+    CalendarConnectionStatus:
+      type: object
+      required:
+      - connected
+      properties:
+        connected:
+          type: boolean
+        provider:
+          $ref: '#/components/schemas/CalendarProviderType'
+        defaultCalendarId:
+          type: string
+        connectedAt:
+          $ref: '#/components/schemas/ISODateTime'
+        lastSyncAt:
+          $ref: '#/components/schemas/ISODateTime'
+    EventCalendarSyncStatus:
+      type: object
+      required:
+      - state
+      properties:
+        state:
+          $ref: '#/components/schemas/CalendarSyncState'
+        provider:
+          $ref: '#/components/schemas/CalendarProviderType'
+        calendarId:
+          type: string
+        externalEventId:
+          type: string
+        lastSyncAt:
+          $ref: '#/components/schemas/ISODateTime'
+        lastSyncStatus:
+          $ref: '#/components/schemas/CalendarSyncLastStatus'
+    EventCalendarSyncUpsertRequest:
+      type: object
+      required:
+      - state
+      properties:
+        state:
+          $ref: '#/components/schemas/CalendarSyncState'
+        provider:
+          $ref: '#/components/schemas/CalendarProviderType'
+        calendarId:
           type: string
