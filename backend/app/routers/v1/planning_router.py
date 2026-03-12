@@ -1,4 +1,8 @@
-"""planning_router.py — all 5 AI fixes wired in."""
+"""
+app/routers/v1/planning_router.py
+
+Core AI planning logic with multi-intent detection and persona flow.
+"""
 
 import logging
 import re
@@ -6,7 +10,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -23,15 +27,12 @@ router = APIRouter(prefix="/planning", tags=["Planning"])
 _SESSION_RE = re.compile(r'^[a-zA-Z0-9_\-]{1,64}$')
 
 
-# ── persona_service ──────────────────────────────────────────────────────────
-# Tests patch BOTH:
-#   app.services.persona_service.persona_service.get_personas   (source)
-#   app.routers.v1.planning_router.persona_service.get_personas (router ref)
+# --- Persona Service Shim ---
+# Tests patch BOTH the source and the router reference.
 # We import the real singleton so patches on the services module propagate here.
 try:
     from app.services.persona_service import persona_service
 except ImportError:
-    # Fallback shim if module doesn't exist yet
     class _PersonaService:
         def get_personas(self, db: Session, customer_id):
             return (
@@ -42,7 +43,7 @@ except ImportError:
     persona_service = _PersonaService()
 
 
-# ── Redis / rate-limit ────────────────────────────────────────────────────────
+# --- Redis / Rate Limiting ---
 
 def get_redis():
     """Return Redis client or None if unavailable."""
@@ -55,14 +56,11 @@ def get_redis():
     except Exception:
         return None
 
-
 _RATE_LIMIT = 10
-
 
 def check_rate_limit(customer_id, session_id=None):
     """
     Raise HTTPException(429) if over limit.
-    session_id is optional — tests call with only customer_id=.
     Fails open when Redis is unavailable.
     """
     r = get_redis()
@@ -84,7 +82,7 @@ def check_rate_limit(customer_id, session_id=None):
         return True
 
 
-# ── Request / Response schemas ────────────────────────────────────────────────
+# --- Request / Response Schemas ---
 
 class PlanRequest(BaseModel):
     session_id: str
@@ -103,13 +101,14 @@ class PlanResponse(BaseModel):
     budget_per_head: Optional[float] = None
     guest_count: Optional[int] = None
     venue_tags: list = []
+    
     # Persona flow signals for the frontend
-    ask_save_persona: bool = False    # True = AI is asking user to save a persona
-    persona_saved: bool = False       # True = a new persona was just saved this turn
-    persona_confirmed: bool = False   # True = an existing persona was just confirmed
+    ask_save_persona: bool = False
+    persona_saved: bool = False
+    persona_confirmed: bool = False
 
 
-# ── Extraction helpers ────────────────────────────────────────────────────────
+# --- Extraction Helpers ---
 
 _BUDGET_RE = re.compile(
     r'(?:budget|spend|spending|cost|costs|afford|price)[^\d]{0,10}(\d[\d,]*)',
@@ -128,7 +127,6 @@ def _extract_budget(text: str) -> Optional[float]:
             pass
     return None
 
-
 def _extract_guests(text: str) -> Optional[int]:
     m = _GUEST_RE.search(text)
     if m:
@@ -137,7 +135,6 @@ def _extract_guests(text: str) -> Optional[int]:
         except ValueError:
             pass
     return None
-
 
 def _extract_date(text: str) -> Optional[date]:
     m = _DATE_RE.search(text)
@@ -148,17 +145,11 @@ def _extract_date(text: str) -> Optional[date]:
             pass
     return None
 
-
 def _package_to_dict(pkg, requested_tags: list = None) -> dict:
     """
-    Serialise a Package (or MagicMock) to a plain dict for the API response.
-
-    requested_tags — the venue_tags the customer asked for.  When provided,
-    we compute a human-readable match_score so the UI can show e.g.
-    "3 of 4 tags matched" instead of leaving every result looking identical.
+    Serializes a Package (or MagicMock) to a plain dict for the API response.
+    Computes a human-readable match_score if requested_tags are provided.
     """
-    # Use __dict__ to read already-loaded SQLAlchemy state without triggering lazy loads.
-    # Falls back to direct attribute access for MagicMock objects (tests).
     state = getattr(pkg, "__dict__", None) or {}
     vendor_name = None
     try:
@@ -180,7 +171,6 @@ def _package_to_dict(pkg, requested_tags: list = None) -> dict:
     except Exception:
         vendor_name = None
 
-    # ── Confidence / match score ──────────────────────────────────────────────
     pkg_tags = pkg.tags or []
     if isinstance(pkg_tags, str):
         import json as _json
@@ -192,8 +182,8 @@ def _package_to_dict(pkg, requested_tags: list = None) -> dict:
     if requested_tags:
         matched   = len(set(requested_tags) & set(pkg_tags))
         total     = len(set(requested_tags))
-        match_score       = matched          # int: how many tags matched
-        match_score_max   = total            # int: how many were requested
+        match_score       = matched
+        match_score_max   = total
         match_score_label = f"{matched} of {total} tags matched"
     else:
         match_score       = None
@@ -201,21 +191,21 @@ def _package_to_dict(pkg, requested_tags: list = None) -> dict:
         match_score_label = None
 
     return {
-        "id":               pkg.id,
-        "name":             pkg.name,
-        "description":      pkg.description,
-        "price":            getattr(pkg, "price", None),
-        "price_per_head":   getattr(pkg, "price_per_head", None),
-        "tags":             pkg_tags,
-        "location":         getattr(pkg, "location_coverage", None),
-        "vendor_name":      vendor_name,
-        "match_score":      match_score,        # e.g. 3
-        "match_score_max":  match_score_max,    # e.g. 4
-        "match_score_label": match_score_label, # e.g. "3 of 4 tags matched"
+        "id":                pkg.id,
+        "name":              pkg.name,
+        "description":       pkg.description,
+        "price":             getattr(pkg, "price", None),
+        "price_per_head":    getattr(pkg, "price_per_head", None),
+        "tags":              pkg_tags,
+        "location":          getattr(pkg, "location_coverage", None),
+        "vendor_name":       vendor_name,
+        "match_score":       match_score,
+        "match_score_max":   match_score_max,
+        "match_score_label": match_score_label,
     }
 
 
-# ── Main endpoint ─────────────────────────────────────────────────────────────
+# --- Main Endpoint ---
 
 @router.post("/generate", response_model=PlanResponse)
 async def generate_plan(
@@ -227,11 +217,9 @@ async def generate_plan(
     session_id = plan_req.session_id
     user_query = plan_req.user_query
 
-    # Validate session_id manually → 400 (Pydantic would give 422)
     if not _SESSION_RE.match(session_id):
         raise HTTPException(status_code=400, detail="Invalid session_id format.")
 
-    # Rate limiting
     check_rate_limit(str(current_customer.customer_id), session_id)
 
     # 1. Conversation history
@@ -250,20 +238,19 @@ async def generate_plan(
     extracted_date     = _extract_date(all_text)
 
     resolved = set()
-    if extracted_budget   is not None:
+    if extracted_budget is not None:
         resolved.add("budget")
-    if extracted_guests   is not None:
+    if extracted_guests is not None:
         resolved.add("guest_count")
     if extracted_location is not None:
         resolved.add("location")
-    if extracted_date     is not None:
+    if extracted_date is not None:
         resolved.add("event_date")
 
-    # Pass ALL prev_missing to AI so it knows what was previously asked
     active_missing = list(prev_missing or [])
 
     logger.info(
-        f"🔍 EXTRACTED: budget={extracted_budget}, guests={extracted_guests}, "
+        f"EXTRACTED: budget={extracted_budget}, guests={extracted_guests}, "
         f"location={extracted_location}, date={extracted_date} | "
         f"resolved={resolved} | still_missing={active_missing}"
     )
@@ -305,7 +292,7 @@ async def generate_plan(
             missing_info   = active_missing if active_missing else None,
         )
     except Exception as exc:
-        logger.error(f"🔥 AI call failed: {exc}")
+        logger.error(f"AI call failed: {exc}")
         ai_result = {
             "intent":        "chat",
             "chat_response": (
@@ -323,9 +310,8 @@ async def generate_plan(
     gift_suggestion = ai_result.get("gift_suggestion")
     event_type      = ai_result.get("event_type")
 
-    # ── PERSONA FLOW ──────────────────────────────────────────────────────────
-    # Step A: AI detected a person in chat and wants to save them as a persona.
-    #         Only save if user explicitly said yes ("yes", "save", "sure" etc.)
+    # --- Persona Flow ---
+    
     save_persona_data = ai_result.get("save_persona")
     ask_save_persona  = ai_result.get("ask_save_persona", False)
     _query_lower_pers = user_query.lower().strip()
@@ -336,23 +322,21 @@ async def generate_plan(
         try:
             name = save_persona_data.get("name", "").strip()
             if name:
-                # Check if persona with this name already exists for the customer
                 existing = persona_service.get_personas(db, str(current_customer.customer_id))
                 already_exists = any(
                     p.name.lower() == name.lower() for p in existing
                 )
                 if not already_exists:
-                    # Build persona data from AI extraction
                     pdata = {
-                        "name":             name,
-                        "relationship":     save_persona_data.get("relationship"),
-                        "personality":      save_persona_data.get("personality"),
-                        "food_preferences": save_persona_data.get("food_preferences") or [],
-                        "music_preferences":save_persona_data.get("music_preferences") or [],
-                        "personality_tags": save_persona_data.get("personality_tags") or [],
-                        "color_preferences":save_persona_data.get("color_preferences") or [],
+                        "name":              name,
+                        "relationship":      save_persona_data.get("relationship"),
+                        "personality":       save_persona_data.get("personality"),
+                        "food_preferences":  save_persona_data.get("food_preferences") or [],
+                        "music_preferences": save_persona_data.get("music_preferences") or [],
+                        "personality_tags":  save_persona_data.get("personality_tags") or [],
+                        "color_preferences": save_persona_data.get("color_preferences") or [],
                     }
-                    # Add age to personality text if provided
+                    
                     age = save_persona_data.get("age")
                     if age:
                         pdata["personality"] = (
@@ -364,21 +348,18 @@ async def generate_plan(
                         customer_id=str(current_customer.customer_id),
                         data=pdata,
                     )
-                    # Auto-confirm since user said yes
+                    
                     persona_service.confirm_persona(
                         db, new_persona.persona_id, str(current_customer.customer_id)
                     )
                     logger.info(
-                        f"💾 PERSONA AUTO-SAVED & CONFIRMED from chat: "
+                        f"PERSONA AUTO-SAVED & CONFIRMED from chat: "
                         f"{new_persona.persona_id} name='{name}'"
                     )
-                    # Refresh personas list so this session uses the new persona
                     personas = persona_service.get_personas(db, str(current_customer.customer_id))
         except Exception as e:
-            logger.warning(f"⚠️ Persona auto-save failed: {e}")
+            logger.warning(f"Persona auto-save failed: {e}")
 
-    # Step B: AI detected a name that matches an existing persona and wants to
-    #         suggest using it. Ask user once per session.
     use_persona_name = ai_result.get("use_persona_name", "").strip() if ai_result.get("use_persona_name") else ""
     if use_persona_name and personas:
         matched_persona = next(
@@ -386,8 +367,6 @@ async def generate_plan(
             None,
         )
         if matched_persona and not matched_persona.is_confirmed:
-            # AI is suggesting a saved profile — confirm it automatically
-            # (the AI already asked the user, and planning continues)
             try:
                 persona_service.confirm_persona(
                     db,
@@ -395,35 +374,26 @@ async def generate_plan(
                     str(current_customer.customer_id),
                 )
                 personas = persona_service.get_personas(db, str(current_customer.customer_id))
-                logger.info(
-                    f"✅ PERSONA CONFIRMED via AI suggestion: '{use_persona_name}'"
-                )
+                logger.info(f"PERSONA CONFIRMED via AI suggestion: '{use_persona_name}'")
             except Exception as e:
-                logger.warning(f"⚠️ Persona auto-confirm failed: {e}")
+                logger.warning(f"Persona auto-confirm failed: {e}")
 
-    # Step C: If no personas exist at all and this is a planning request,
-    #         proactively ask the user if they want to use a saved profile.
-    #         (The AI handles this via ask_save_persona flag — no extra code needed.)
-    # ── END PERSONA FLOW ──────────────────────────────────────────────────────
-
-    # ── Fix #6: Multi-intent detection ───────────────────────────────────────
-    # If the user's message contains BOTH a venue/planning signal AND a gift
-    # signal in the same turn (e.g. "I want a romantic dinner AND a gift for
-    # my wife"), upgrade intent to "multi" so both matchers run below.
+    # --- Multi-Intent Detection ---
+    
     _query_lower = (user_query or "").lower()
-    _GIFT_SIGNALS = ["gift", "present", "buy", "surprise", "something for",
-                     "get her", "get him"]
-    _PLAN_SIGNALS = ["venue", "dinner", "restaurant", "party", "book", "plan",
+    _GIFT_SIGNALS = ["gift", "present", "buy", "surprise", "something for", "get her", "get him"]
+    _PLAN_SIGNALS = ["venue", "dinner", "restaurant", "party", "book", "plan", 
                      "celebrate", "event", "wedding", "birthday", "anniversary",
                      "arrange", "find a place"]
+                     
     _has_gift_signal = any(s in _query_lower for s in _GIFT_SIGNALS)
     _has_plan_signal = any(s in _query_lower for s in _PLAN_SIGNALS)
 
     if _has_gift_signal and _has_plan_signal:
         intent = "multi"
-        logger.info("\U0001f500 MULTI-INTENT DETECTED: running both venue + gift matchers.")
+        logger.info("MULTI-INTENT DETECTED: running both venue + gift matchers.")
 
-    # 7. Venue / gift matching
+    # 7. Venue / Gift Matching
     matched_venues   = []
     venue_match_tier = None
 
@@ -431,7 +401,7 @@ async def generate_plan(
     location_for_filter = ai_result.get("location") or extracted_location
 
     if intent == "multi" and venue_tags:
-        # ── Run venue matching ────────────────────────────────────────────────
+        # Venue matching
         pkgs = vendor_service.find_perfect_matches(
             db,
             criteria={
@@ -443,7 +413,7 @@ async def generate_plan(
         )
         matched_venues = [_package_to_dict(p, requested_tags=venue_tags) for p in pkgs]
 
-        # ── Run gift matching ─────────────────────────────────────────────────
+        # Gift matching
         gift_tags = list(venue_tags)
         response_lower = (chat_response or "").lower()
         for persona in personas:
@@ -454,27 +424,26 @@ async def generate_plan(
                 p_tags       = list(persona.personality_tags  or [])
                 merged       = list(set(hobbies + food_tags + music_tags + p_tags))
                 gift_tags    = list(set(gift_tags + merged))
-                logger.info(
-                    f"\U0001f464 PERSONA '{persona.name}' merged all preference tags into gift tags: {merged}"
-                )
+                logger.info(f"PERSONA '{persona.name}' merged all preference tags into gift tags: {merged}")
+                
         gift_pkgs = vendor_service.find_gift_matches(
             db,
             gift_tags=gift_tags,
             budget=budget_for_filter,
         )
+        
         if gift_pkgs and not gift_suggestion:
             first_gift = gift_pkgs[0]
             gift_suggestion = (
-                f"{first_gift.name} \u2014 {getattr(first_gift, 'description', '') or ''}"
-            ).strip(" \u2014")
+                f"{first_gift.name} - {getattr(first_gift, 'description', '') or ''}"
+            ).strip(" -")
 
         logger.info(
-            f"\U0001f3e0 MULTI VENUES: {len(matched_venues)} | "
-            f"\U0001f381 GIFT: {'yes' if gift_suggestion else 'no'}"
+            f"MULTI VENUES: {len(matched_venues)} | "
+            f"GIFT: {'yes' if gift_suggestion else 'no'}"
         )
 
     elif intent in ("planning", "date", "gift") and venue_tags:
-
         if intent == "gift":
             gift_tags = list(venue_tags)
             response_lower = (chat_response or "").lower()
@@ -486,18 +455,14 @@ async def generate_plan(
                     p_tags       = list(persona.personality_tags  or [])
                     merged       = list(set(hobbies + food_tags + music_tags + p_tags))
                     gift_tags    = list(set(gift_tags + merged))
-                    logger.info(
-                        f"\U0001f464 PERSONA '{persona.name}' merged all preference tags: {merged}"
-                    )
-            # NOTE: tests mock find_gift_matches as capture_gift(db, gift_tags, budget=None)
-            # with NO location kwarg \u2014 do NOT add location= here
+                    logger.info(f"PERSONA '{persona.name}' merged all preference tags: {merged}")
+                    
             pkgs = vendor_service.find_gift_matches(
                 db,
                 gift_tags=gift_tags,
                 budget=budget_for_filter,
             )
         else:
-            # Tests expect find_perfect_matches for planning/date intent
             pkgs = vendor_service.find_perfect_matches(
                 db,
                 criteria={
@@ -522,10 +487,12 @@ async def generate_plan(
                     pkg_tags = _json.loads(pkg_tags)
                 except Exception:
                     pkg_tags = []
+            
             all_tags_match = set(venue_tags).issubset(set(pkg_tags))
             loc_match = canonical_loc and canonical_loc in (
                 getattr(first, "location_coverage", "") or ""
             ).lower()
+            
             if all_tags_match and loc_match:
                 venue_match_tier = 1
             elif all_tags_match:
@@ -534,7 +501,7 @@ async def generate_plan(
                 venue_match_tier = 3
 
         logger.info(
-            f"\U0001f3e0 VENUES: {len(matched_venues)} matched "
+            f"VENUES: {len(matched_venues)} matched "
             f"(tier={venue_match_tier}, intent={intent}, tags={venue_tags}, "
             f"location={location_for_filter})"
         )
@@ -549,8 +516,7 @@ async def generate_plan(
         missing_info = new_missing,
     )
 
-    # Determine persona flow flags for response
-    _persona_saved     = (
+    _persona_saved = (
         bool(save_persona_data) and _user_said_yes
         and isinstance(save_persona_data, dict)
         and bool(save_persona_data.get("name", "").strip())
