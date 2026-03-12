@@ -1,4 +1,4 @@
-import VendorForgotPasswordForm from '@/components/features/vendor/VendorForgotPasswordForm';
+import VendorForgotPasswordForm from '@/components/vendor/auth/VendorForgotPasswordForm';
 
 export default function ForgotPasswordPage() {
   return <VendorForgotPasswordForm />;
