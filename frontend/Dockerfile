@@ -25,7 +25,15 @@ ENV NODE_ENV=production
 ENV HOSTNAME="0.0.0.0"
 ENV PORT=3000
 
-# Non-root user
+# 🛠️ THE FIX IS HERE 🛠️
+# Do the heavy lifting while you are still ROOT.
+# Added clean up commands so your image doesn't get bloated.
+RUN apt-get update && \
+    apt-get install -y curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Now that curl is installed, we lock down the permissions
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
@@ -34,7 +42,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Put on the restricted suit
 USER nextjs
 EXPOSE 3000
 
+# Go to sleep and wait for traffic
 CMD ["node", "server.js"]
