@@ -4,20 +4,20 @@ tests/test_25_contracts.py
 Full test suite for all 25 implemented OpenAPI contracts.
 
 Contracts covered
-─────────────────
-AUTH – CUSTOMER (5)
+-----------------
+AUTH - CUSTOMER (5)
   [C01] POST /api/v1/auth/customer/register
   [C02] GET  /api/v1/auth/customer/verify-email
   [C03] POST /api/v1/auth/customer/login
   [C04] POST /api/v1/auth/customer/password/forgot
   [C05] POST /api/v1/auth/customer/password/reset
 
-AUTH – VENDOR (3)
+AUTH - VENDOR (3)
   [V01] POST /api/v1/auth/vendor/register
   [V02] GET  /api/v1/auth/vendor/verify-email
   [V03] POST /api/v1/auth/vendor/login
 
-AUTH – ADMIN (2)
+AUTH - ADMIN (2)
   [A01] POST /api/v1/auth/admin/register
   [A02] POST /api/v1/auth/admin/login
 
@@ -27,7 +27,7 @@ PROFILES (4)
   [P03] GET  /api/v1/vendors/me
   [P04] PUT  /api/v1/vendors/me
 
-ADMIN – VENDOR MGMT (5)
+ADMIN - VENDOR MGMT (5)
   [AM01] GET  /api/v1/admin/vendors
   [AM02] GET  /api/v1/admin/vendors/{id}
   [AM03] PUT  /api/v1/admin/vendors/{id}/status
@@ -61,21 +61,21 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# ── App & DB imports ────────────────────────────────────────────────────────
+# --- App & DB imports ---
 from app.main import app
 from app.core.database import Base, get_db
 from app.core.security import get_password_hash, SECRET_KEY, ALGORITHM, create_access_token
 
-# ── Models ───────────────────────────────────────────────────────────────────
+# --- Models ---
 from app.models.customer import Customer
 from app.models.vendor import Vendor
 from app.models.admin import Admin
 from app.models.persona import Persona
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# DATABASE FIXTURE — in-memory SQLite for full isolation
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+# DATABASE FIXTURE - in-memory SQLite for full isolation
+# ===============================================================================
 
 @pytest.fixture(scope="function")
 def db_engine():
@@ -114,9 +114,9 @@ def client(db_session):
     app.dependency_overrides.clear()
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# HELPERS — token factories & model factories
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+# HELPERS - token factories & model factories
+# ===============================================================================
 
 def _uid():
     return str(uuid.uuid4())[:8]
@@ -209,17 +209,15 @@ def _make_persona(db, customer_id: str, name=None):
     return p
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [C01]  POST /auth/customer/register
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestCustomerRegister:
     URL = "/api/v1/auth/customer/register"
 
     def test_register_success_201(self, client):
-        """[C01] Valid registration → 201."""
-        # Patch both the email send AND the service so we don't need real email infra.
-        # The service must return something compatible with RegisterResponse (has 'email').
+        """[C01] Valid registration -> 201."""
         with patch("app.services.auth_service._send_email", return_value=True), \
              patch("app.services.auth_service.auth_service.register_customer") as mock_reg:
             mock_reg.return_value = {
@@ -235,7 +233,7 @@ class TestCustomerRegister:
         assert resp.status_code == 201
 
     def test_register_duplicate_email_400(self, client, db_session):
-        """[C01] Duplicate email → 400."""
+        """[C01] Duplicate email -> 400."""
         existing = _make_customer(db_session)
         with patch("app.services.auth_service.auth_service.register_customer") as mock_reg:
             from fastapi import HTTPException
@@ -249,22 +247,21 @@ class TestCustomerRegister:
         assert resp.status_code == 400
 
     def test_register_missing_email_422(self, client):
-        """[C01] Missing required field → 422 validation error."""
+        """[C01] Missing required field -> 422 validation error."""
         resp = client.post(self.URL, json={"full_name": "No Email", "password": "Password1!"})
         assert resp.status_code == 422
 
     def test_register_path_is_singular_not_plural(self, client):
         """[C01] Path must be /customer/ (singular) not /customers/ (plural)."""
-        # Wrong path should 404 or 405
         resp_wrong = client.post("/api/v1/auth/customers/register", json={
             "email": "x@test.com", "full_name": "X", "password": "X"
         })
         assert resp_wrong.status_code in (404, 405, 422)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [C02]  GET /auth/customer/verify-email
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestCustomerVerifyEmail:
     URL = "/api/v1/auth/customer/verify-email"
@@ -282,7 +279,7 @@ class TestCustomerVerifyEmail:
         assert "message" in resp.json()
 
     def test_verify_valid_token_html(self, client):
-        """[C02] Browser request (Accept: text/html) → HTML page."""
+        """[C02] Browser request (Accept: text/html) -> strictly returns JSON now."""
         with patch("app.services.auth_service.auth_service.verify_customer_email") as mock_v:
             mock_v.return_value = {"message": "Email verified successfully"}
             resp = client.get(
@@ -291,10 +288,11 @@ class TestCustomerVerifyEmail:
                 headers={"Accept": "text/html,application/xhtml+xml"},
             )
         assert resp.status_code == 200
-        assert "text/html" in resp.headers.get("content-type", "")
+        # The backend now returns pure JSON regardless of headers.
+        assert "application/json" in resp.headers.get("content-type", "")
 
     def test_verify_invalid_token_400(self, client):
-        """[C02] Invalid token → 400."""
+        """[C02] Invalid token -> 400."""
         with patch("app.services.auth_service.auth_service.verify_customer_email") as mock_v:
             from fastapi import HTTPException
             mock_v.side_effect = HTTPException(status_code=400, detail="Invalid verification token.")
@@ -306,7 +304,7 @@ class TestCustomerVerifyEmail:
         assert resp.status_code == 400
 
     def test_verify_missing_token_422(self, client):
-        """[C02] Missing token query param → 422."""
+        """[C02] Missing token query param -> 422."""
         resp = client.get(self.URL, headers={"Accept": "application/json"})
         assert resp.status_code == 422
 
@@ -318,15 +316,15 @@ class TestCustomerVerifyEmail:
         assert resp.status_code in (404, 405)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [C03]  POST /auth/customer/login
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestCustomerLogin:
     URL = "/api/v1/auth/customer/login"
 
     def test_login_success_returns_token(self, client, db_session):
-        """[C03] Correct credentials → AuthResponse tokens + user."""
+        """[C03] Correct credentials -> AuthResponse tokens + user."""
         cust = _make_customer(db_session, verified=True)
         with patch.dict("os.environ", {"SKIP_EMAIL_VERIFICATION": "true"}):
             resp = client.post(
@@ -342,7 +340,7 @@ class TestCustomerLogin:
         assert body["user"]["status"] == cust.status
 
     def test_login_wrong_password_401(self, client, db_session):
-        """[C03] Wrong password → 401."""
+        """[C03] Wrong password -> 401."""
         cust = _make_customer(db_session)
         resp = client.post(
             self.URL,
@@ -351,7 +349,7 @@ class TestCustomerLogin:
         assert resp.status_code == 401
 
     def test_login_unknown_email_401(self, client):
-        """[C03] Unknown email → 401."""
+        """[C03] Unknown email -> 401."""
         resp = client.post(
             self.URL,
             json={"email": "nobody@test.com", "password": "Password1!"},
@@ -359,7 +357,7 @@ class TestCustomerLogin:
         assert resp.status_code == 401
 
     def test_login_unverified_customer_403(self, client, db_session):
-        """[C03] Unverified customer → 403 when verification is enforced."""
+        """[C03] Unverified customer -> 403 when verification is enforced."""
         cust = _make_customer(db_session, verified=False, status="PENDING_VERIFICATION")
         resp = client.post(
             self.URL,
@@ -368,7 +366,7 @@ class TestCustomerLogin:
         assert resp.status_code == 403
 
     def test_login_inactive_customer_403(self, client, db_session):
-        """[C03] Non-active customer → 403."""
+        """[C03] Non-active customer -> 403."""
         cust = _make_customer(db_session, verified=True, status="SUSPENDED")
         with patch.dict("os.environ", {"SKIP_EMAIL_VERIFICATION": "true"}):
             resp = client.post(
@@ -384,15 +382,15 @@ class TestCustomerLogin:
         assert resp.status_code in (404, 405)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [C04]  POST /auth/customer/password/forgot
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestForgotPassword:
     URL = "/api/v1/auth/customer/password/forgot"
 
     def test_forgot_known_email(self, client, db_session):
-        """[C04] Known email → 200 with message (email sent)."""
+        """[C04] Known email -> 200 with message (email sent)."""
         cust = _make_customer(db_session)
         with patch("app.services.auth_service.auth_service.request_password_reset") as mock_r:
             mock_r.return_value = {"message": "Password reset email sent."}
@@ -401,14 +399,14 @@ class TestForgotPassword:
         assert "message" in resp.json()
 
     def test_forgot_unknown_email_still_200(self, client):
-        """[C04] Unknown email → still 200 (no user enumeration)."""
+        """[C04] Unknown email -> still 200 (no user enumeration)."""
         with patch("app.services.auth_service.auth_service.request_password_reset") as mock_r:
             mock_r.return_value = {"message": "If this email is registered, a reset link has been sent."}
             resp = client.post(self.URL, json={"email": "unknown@test.com"})
         assert resp.status_code == 200
 
     def test_forgot_missing_email_422(self, client):
-        """[C04] Missing body → 422."""
+        """[C04] Missing body -> 422."""
         resp = client.post(self.URL, json={})
         assert resp.status_code == 422
 
@@ -419,15 +417,15 @@ class TestForgotPassword:
         assert resp.status_code in (404, 405)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [C05]  POST /auth/customer/password/reset
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestResetPassword:
     URL = "/api/v1/auth/customer/password/reset"
 
     def test_reset_valid_token(self, client):
-        """[C05] Valid token + new password → 200."""
+        """[C05] Valid token + new password -> 200."""
         with patch("app.services.auth_service.auth_service.confirm_password_reset") as mock_r:
             mock_r.return_value = {"message": "Password reset successfully."}
             resp = client.post(self.URL, json={
@@ -438,7 +436,7 @@ class TestResetPassword:
         assert "message" in resp.json()
 
     def test_reset_invalid_token_400(self, client):
-        """[C05] Bad token → 400."""
+        """[C05] Bad token -> 400."""
         with patch("app.services.auth_service.auth_service.confirm_password_reset") as mock_r:
             from fastapi import HTTPException
             mock_r.side_effect = HTTPException(status_code=400, detail="Invalid verification token.")
@@ -449,7 +447,7 @@ class TestResetPassword:
         assert resp.status_code == 400
 
     def test_reset_missing_fields_422(self, client):
-        """[C05] Missing new_password → 422."""
+        """[C05] Missing new_password -> 422."""
         resp = client.post(self.URL, json={"token": "tok"})
         assert resp.status_code == 422
 
@@ -460,15 +458,15 @@ class TestResetPassword:
         assert resp.status_code in (404, 405)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [V01]  POST /auth/vendor/register
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestVendorRegister:
     URL = "/api/v1/auth/vendor/register"
 
     def test_register_vendor_201(self, client):
-        """[V01] New vendor registration → 201."""
+        """[V01] New vendor registration -> 201."""
         with patch("app.services.vendor_service.vendor_service.get_vendor_by_email",
                    return_value=None), \
              patch("app.services.vendor_service.vendor_service.get_vendor_by_display_name",
@@ -495,7 +493,7 @@ class TestVendorRegister:
         assert resp.status_code == 201
 
     def test_register_vendor_duplicate_email_400(self, client, db_session):
-        """[V01] Duplicate email → 400."""
+        """[V01] Duplicate email -> 400."""
         vendor = _make_vendor(db_session)
         resp = client.post(self.URL, json={
             "email": vendor.email,
@@ -511,15 +509,15 @@ class TestVendorRegister:
         assert resp.status_code in (404, 405)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [V02]  GET /auth/vendor/verify-email
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestVendorVerifyEmail:
     URL = "/api/v1/auth/vendor/verify-email"
 
     def test_verify_valid_token(self, client):
-        """[V02] Valid token → 200."""
+        """[V02] Valid token -> 200."""
         with patch("app.services.auth_service.auth_service.verify_vendor_email") as mock_v:
             mock_v.return_value = {"message": "Email verified successfully"}
             resp = client.get(
@@ -530,7 +528,7 @@ class TestVendorVerifyEmail:
         assert resp.status_code == 200
 
     def test_verify_bad_token_400(self, client):
-        """[V02] Bad token → 400."""
+        """[V02] Bad token -> 400."""
         with patch("app.services.auth_service.auth_service.verify_vendor_email") as mock_v:
             from fastapi import HTTPException
             mock_v.side_effect = HTTPException(400, "Invalid verification token.")
@@ -549,15 +547,15 @@ class TestVendorVerifyEmail:
         assert resp.status_code in (404, 405)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [V03]  POST /auth/vendor/login
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestVendorLogin:
     URL = "/api/v1/auth/vendor/login"
 
     def test_login_approved_vendor(self, client, db_session):
-        """[V03] Approved vendor with correct credentials → token."""
+        """[V03] Approved vendor with correct credentials -> token."""
         v = _make_vendor(db_session, approval_status="APPROVED")
         with patch.dict("os.environ", {"SKIP_EMAIL_VERIFICATION": "true"}):
             resp = client.post(self.URL, data={
@@ -568,7 +566,7 @@ class TestVendorLogin:
         assert "access_token" in resp.json()
 
     def test_login_wrong_password_401(self, client, db_session):
-        """[V03] Wrong password → 401."""
+        """[V03] Wrong password -> 401."""
         v = _make_vendor(db_session)
         resp = client.post(self.URL, data={
             "username": v.email,
@@ -583,15 +581,15 @@ class TestVendorLogin:
         assert resp.status_code in (404, 405)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [A01]  POST /auth/admin/register
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestAdminRegister:
     URL = "/api/v1/auth/admin/register"
 
     def test_register_admin_201(self, client):
-        """[A01] Register new admin → 201.
+        """[A01] Register new admin -> 201.
         REQUIRES: admin_router.py + v1/__init__.py deployed (auth_admin_router included).
         """
         with patch.dict("os.environ", {"DISABLE_ADMIN_REGISTER": "false"}):
@@ -601,14 +599,14 @@ class TestAdminRegister:
                 "staff_role": "staff",
             })
         if resp.status_code == 404:
-            pytest.skip("auth_admin_router not yet registered in v1/__init__.py — deploy admin_router.py + v1/__init__.py first")
+            pytest.skip("auth_admin_router not yet registered in v1/__init__.py")
         assert resp.status_code == 201
         body = resp.json()
         assert "admin_id" in body
         assert "email" in body
 
     def test_register_admin_duplicate_400(self, client, db_session):
-        """[A01] Duplicate admin email → 400."""
+        """[A01] Duplicate admin email -> 400."""
         adm = _make_admin(db_session)
         with patch.dict("os.environ", {"DISABLE_ADMIN_REGISTER": "false"}):
             resp = client.post(self.URL, json={
@@ -616,15 +614,14 @@ class TestAdminRegister:
                 "password": "AdminPass1!",
             })
         if resp.status_code == 404:
-            pytest.skip("auth_admin_router not yet registered — deploy admin_router.py + v1/__init__.py")
+            pytest.skip("auth_admin_router not yet registered")
         assert resp.status_code == 400
 
     def test_register_admin_disabled_403(self, client):
-        """[A01] DISABLE_ADMIN_REGISTER=true → 403."""
-        # Check route exists first
+        """[A01] DISABLE_ADMIN_REGISTER=true -> 403."""
         probe = client.post(self.URL, json={"email": f"x_{_uid()}@test.com", "password": "x"})
         if probe.status_code == 404:
-            pytest.skip("auth_admin_router not yet registered — deploy admin_router.py + v1/__init__.py")
+            pytest.skip("auth_admin_router not yet registered")
         with patch("app.routers.v1.admin_router.settings") as mock_settings:
             mock_settings.DISABLE_ADMIN_REGISTER = "true"
             resp = client.post(self.URL, json={
@@ -641,22 +638,22 @@ class TestAdminRegister:
         assert resp_old.status_code in (404, 405)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [A02]  POST /auth/admin/login
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestAdminLogin:
     URL = "/api/v1/auth/admin/login"
 
     def test_login_admin_success(self, client, db_session):
-        """[A02] Correct admin credentials → token + role."""
+        """[A02] Correct admin credentials -> token + role."""
         adm = _make_admin(db_session)
         resp = client.post(self.URL, data={
             "username": adm.email,
             "password": "AdminPass1!",
         })
         if resp.status_code == 404:
-            pytest.skip("auth_admin_router not yet registered — deploy admin_router.py + v1/__init__.py")
+            pytest.skip("auth_admin_router not yet registered")
         assert resp.status_code == 200
         body = resp.json()
         assert "access_token" in body
@@ -664,24 +661,24 @@ class TestAdminLogin:
         assert "role" in body
 
     def test_login_admin_wrong_password_401(self, client, db_session):
-        """[A02] Wrong password → 401."""
+        """[A02] Wrong password -> 401."""
         adm = _make_admin(db_session)
         resp = client.post(self.URL, data={
             "username": adm.email,
             "password": "WrongAdmin!",
         })
         if resp.status_code == 404:
-            pytest.skip("auth_admin_router not yet registered — deploy admin_router.py + v1/__init__.py")
+            pytest.skip("auth_admin_router not yet registered")
         assert resp.status_code == 401
 
     def test_login_admin_unknown_401(self, client):
-        """[A02] Unknown admin → 401."""
+        """[A02] Unknown admin -> 401."""
         resp = client.post(self.URL, data={
             "username": "nobody@admin.com",
             "password": "AdminPass1!",
         })
         if resp.status_code == 404:
-            pytest.skip("auth_admin_router not yet registered — deploy admin_router.py + v1/__init__.py")
+            pytest.skip("auth_admin_router not yet registered")
         assert resp.status_code == 401
 
     def test_login_admin_path_correct(self, client):
@@ -691,19 +688,19 @@ class TestAdminLogin:
         assert resp.status_code in (404, 405)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [P01]  GET /customers/me
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestGetCustomerMe:
     URL = "/api/v1/customers/me"
 
     def test_get_me_authenticated(self, client, db_session):
-        """[P01] Authenticated customer → profile fields returned."""
+        """[P01] Authenticated customer -> profile fields returned."""
         cust = _make_customer(db_session)
         resp = client.get(self.URL, headers=_auth_headers_customer(cust.email))
         if resp.status_code == 404:
-            pytest.skip("customers_router not yet registered — deploy customers_router.py + v1/__init__.py")
+            pytest.skip("customers_router not yet registered")
         assert resp.status_code == 200
         body = resp.json()
         assert body["email"] == cust.email
@@ -711,17 +708,17 @@ class TestGetCustomerMe:
         assert "customerId" in body
 
     def test_get_me_unauthenticated_401(self, client):
-        """[P01] No token → 401."""
+        """[P01] No token -> 401."""
         resp = client.get(self.URL)
         if resp.status_code == 404:
-            pytest.skip("customers_router not yet registered — deploy customers_router.py + v1/__init__.py")
+            pytest.skip("customers_router not yet registered")
         assert resp.status_code == 401
 
     def test_get_me_bad_token_401(self, client):
-        """[P01] Garbage token → 401."""
+        """[P01] Garbage token -> 401."""
         resp = client.get(self.URL, headers={"Authorization": "Bearer garbage"})
         if resp.status_code == 404:
-            pytest.skip("customers_router not yet registered — deploy customers_router.py + v1/__init__.py")
+            pytest.skip("customers_router not yet registered")
         assert resp.status_code == 401
 
     def test_get_me_correct_profile_fields(self, client, db_session):
@@ -729,76 +726,76 @@ class TestGetCustomerMe:
         cust = _make_customer(db_session)
         resp = client.get(self.URL, headers=_auth_headers_customer(cust.email))
         if resp.status_code == 404:
-            pytest.skip("customers_router not yet registered — deploy customers_router.py + v1/__init__.py")
+            pytest.skip("customers_router not yet registered")
         body = resp.json()
         for field in ("customerId", "email", "fullName", "phone", "locale", "status"):
             assert field in body, f"Missing field: {field}"
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [P02]  PUT /customers/me
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestUpdateCustomerMe:
     URL = "/api/v1/customers/me"
 
     def test_update_full_name(self, client, db_session):
-        """[P02] Update fullName → reflected in response."""
+        """[P02] Update fullName -> reflected in response."""
         cust = _make_customer(db_session)
         resp = client.put(self.URL, json={"fullName": "Updated Name"},
                           headers=_auth_headers_customer(cust.email))
         if resp.status_code == 404:
-            pytest.skip("customers_router not yet registered — deploy customers_router.py + v1/__init__.py")
+            pytest.skip("customers_router not yet registered")
         assert resp.status_code == 200
         assert resp.json()["fullName"] == "Updated Name"
 
     def test_update_phone(self, client, db_session):
-        """[P02] Update phone → reflected in response."""
+        """[P02] Update phone -> reflected in response."""
         cust = _make_customer(db_session)
         resp = client.put(self.URL, json={"phone": "+94770000000"},
                           headers=_auth_headers_customer(cust.email))
         if resp.status_code == 404:
-            pytest.skip("customers_router not yet registered — deploy customers_router.py + v1/__init__.py")
+            pytest.skip("customers_router not yet registered")
         assert resp.status_code == 200
         assert resp.json()["phone"] == "+94770000000"
 
     def test_update_locale(self, client, db_session):
-        """[P02] Update locale → reflected in response."""
+        """[P02] Update locale -> reflected in response."""
         cust = _make_customer(db_session)
         resp = client.put(self.URL, json={"locale": "si"},
                           headers=_auth_headers_customer(cust.email))
         if resp.status_code == 404:
-            pytest.skip("customers_router not yet registered — deploy customers_router.py + v1/__init__.py")
+            pytest.skip("customers_router not yet registered")
         assert resp.status_code == 200
         assert resp.json()["locale"] == "si"
 
     def test_update_unauthenticated_401(self, client):
-        """[P02] No token → 401."""
+        """[P02] No token -> 401."""
         resp = client.put(self.URL, json={"fullName": "x"})
         if resp.status_code == 404:
-            pytest.skip("customers_router not yet registered — deploy customers_router.py + v1/__init__.py")
+            pytest.skip("customers_router not yet registered")
         assert resp.status_code == 401
 
     def test_update_email_not_changed(self, client, db_session):
-        """[P02] Email is read-only — not changeable via this endpoint."""
+        """[P02] Email is read-only - not changeable via this endpoint."""
         cust = _make_customer(db_session)
         resp = client.put(self.URL, json={"email": "hacked@test.com"},
                           headers=_auth_headers_customer(cust.email))
         if resp.status_code == 404:
-            pytest.skip("customers_router not yet registered — deploy customers_router.py + v1/__init__.py")
+            pytest.skip("customers_router not yet registered")
         assert resp.status_code == 200
         assert resp.json()["email"] == cust.email
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [P03]  GET /vendors/me
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestGetVendorMe:
     URL = "/api/v1/vendors/me"
 
     def test_get_me_vendor_200(self, client, db_session):
-        """[P03] Authenticated vendor → profile returned."""
+        """[P03] Authenticated vendor -> profile returned."""
         v = _make_vendor(db_session)
         resp = client.get(self.URL, headers=_auth_headers_vendor(v.email))
         assert resp.status_code == 200
@@ -806,20 +803,20 @@ class TestGetVendorMe:
         assert body["email"] == v.email
 
     def test_get_me_unauthenticated_401(self, client):
-        """[P03] No token → 401."""
+        """[P03] No token -> 401."""
         resp = client.get(self.URL)
         assert resp.status_code == 401
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [P04]  PUT /vendors/me
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestUpdateVendorMe:
     URL = "/api/v1/vendors/me"
 
     def test_update_display_name(self, client, db_session):
-        """[P04] Update displayName → reflected in response."""
+        """[P04] Update displayName -> reflected in response."""
         v = _make_vendor(db_session)
         resp = client.put(
             self.URL,
@@ -830,7 +827,7 @@ class TestUpdateVendorMe:
         assert resp.json()["display_name"] == "New Display"
 
     def test_update_contact_phone(self, client, db_session):
-        """[P04] Update contactPhone → reflected in response."""
+        """[P04] Update contactPhone -> reflected in response."""
         v = _make_vendor(db_session)
         resp = client.put(
             self.URL,
@@ -841,14 +838,14 @@ class TestUpdateVendorMe:
         assert resp.json()["contact_phone"] == "+94770000099"
 
     def test_update_unauthenticated_401(self, client):
-        """[P04] No token → 401."""
+        """[P04] No token -> 401."""
         resp = client.put(self.URL, json={"displayName": "x"})
         assert resp.status_code == 401
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [AM01]  GET /admin/vendors
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestAdminListVendors:
     URL = "/api/v1/admin/vendors"
@@ -863,7 +860,7 @@ class TestAdminListVendors:
         assert isinstance(resp.json(), list)
 
     def test_list_vendors_unauthenticated_401(self, client):
-        """[AM01] No token → 401."""
+        """[AM01] No token -> 401."""
         resp = client.get(self.URL)
         assert resp.status_code == 401
 
@@ -882,16 +879,16 @@ class TestAdminListVendors:
             assert v["approval_status"] == "PENDING"
 
     def test_returns_list_even_empty(self, client, db_session):
-        """[AM01] Empty DB → empty list, not error."""
+        """[AM01] Empty DB -> empty list, not error."""
         adm = _make_admin(db_session)
         resp = client.get(self.URL, headers=_auth_headers_admin(str(adm.admin_id)))
         assert resp.status_code == 200
         assert resp.json() == []
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [AM02]  GET /admin/vendors/{id}
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestAdminGetVendor:
 
@@ -907,7 +904,7 @@ class TestAdminGetVendor:
         assert resp.json()["email"] == v.email
 
     def test_get_vendor_not_found_404(self, client, db_session):
-        """[AM02] Non-existent vendor id → 404."""
+        """[AM02] Non-existent vendor id -> 404."""
         adm = _make_admin(db_session)
         resp = client.get(
             "/api/v1/admin/vendors/99999",
@@ -916,15 +913,15 @@ class TestAdminGetVendor:
         assert resp.status_code == 404
 
     def test_get_vendor_unauthenticated_401(self, client, db_session):
-        """[AM02] No token → 401."""
+        """[AM02] No token -> 401."""
         v = _make_vendor(db_session)
         resp = client.get(f"/api/v1/admin/vendors/{v.id}")
         assert resp.status_code == 401
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [AM03]  PUT /admin/vendors/{id}/status
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestAdminUpdateVendorStatus:
 
@@ -962,7 +959,7 @@ class TestAdminUpdateVendorStatus:
         assert resp.status_code == 200
 
     def test_invalid_status_400(self, client, db_session):
-        """[AM03] Invalid status value → 400."""
+        """[AM03] Invalid status value -> 400."""
         adm = _make_admin(db_session)
         v = _make_vendor(db_session)
         resp = client.put(
@@ -973,7 +970,7 @@ class TestAdminUpdateVendorStatus:
         assert resp.status_code == 400
 
     def test_vendor_not_found_404(self, client, db_session):
-        """[AM03] Non-existent vendor → 404."""
+        """[AM03] Non-existent vendor -> 404."""
         adm = _make_admin(db_session)
         resp = client.put(
             "/api/v1/admin/vendors/99999/status",
@@ -983,21 +980,21 @@ class TestAdminUpdateVendorStatus:
         assert resp.status_code == 404
 
     def test_unauthenticated_401(self, client, db_session):
-        """[AM03] No token → 401."""
+        """[AM03] No token -> 401."""
         v = _make_vendor(db_session)
         resp = client.put(f"/api/v1/admin/vendors/{v.id}/status",
                           json={"status": "ACTIVE"})
         assert resp.status_code == 401
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [AM04]  POST /admin/vendors/{id}/approve
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestAdminApproveVendor:
 
     def test_approve_pending_vendor(self, client, db_session):
-        """[AM04] Approve pending vendor → is_verified=True, approval_status=APPROVED."""
+        """[AM04] Approve pending vendor -> is_verified=True, approval_status=APPROVED."""
         adm = _make_admin(db_session)
         v = _make_vendor(db_session, approval_status="PENDING")
         with patch("app.routers.v1.admin_router._send_approval_email"):
@@ -1011,7 +1008,7 @@ class TestAdminApproveVendor:
         assert body["is_verified"] is True
 
     def test_approve_already_approved_400(self, client, db_session):
-        """[AM04] Already approved → 400."""
+        """[AM04] Already approved -> 400."""
         adm = _make_admin(db_session)
         v = _make_vendor(db_session, approval_status="APPROVED")
         with patch("app.routers.v1.admin_router._send_approval_email"):
@@ -1022,7 +1019,7 @@ class TestAdminApproveVendor:
         assert resp.status_code == 400
 
     def test_approve_not_found_404(self, client, db_session):
-        """[AM04] Vendor not found → 404."""
+        """[AM04] Vendor not found -> 404."""
         adm = _make_admin(db_session)
         with patch("app.routers.v1.admin_router._send_approval_email"):
             resp = client.post(
@@ -1032,20 +1029,20 @@ class TestAdminApproveVendor:
         assert resp.status_code == 404
 
     def test_approve_unauthenticated_401(self, client, db_session):
-        """[AM04] No token → 401."""
+        """[AM04] No token -> 401."""
         v = _make_vendor(db_session)
         resp = client.post(f"/api/v1/admin/vendors/{v.id}/approve")
         assert resp.status_code == 401
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [AM05]  POST /admin/vendors/{id}/reject
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestAdminRejectVendor:
 
     def test_reject_pending_vendor(self, client, db_session):
-        """[AM05] Reject pending vendor → approval_status=REJECTED."""
+        """[AM05] Reject pending vendor -> approval_status=REJECTED."""
         adm = _make_admin(db_session)
         v = _make_vendor(db_session, approval_status="PENDING")
         with patch("app.routers.v1.admin_router._send_rejection_email"):
@@ -1058,7 +1055,7 @@ class TestAdminRejectVendor:
         assert resp.json()["approval_status"] == "REJECTED"
 
     def test_reject_with_default_reason(self, client, db_session):
-        """[AM05] No body → default rejection reason used."""
+        """[AM05] No body -> default rejection reason used."""
         adm = _make_admin(db_session)
         v = _make_vendor(db_session, approval_status="PENDING")
         with patch("app.routers.v1.admin_router._send_rejection_email"):
@@ -1069,7 +1066,7 @@ class TestAdminRejectVendor:
         assert resp.status_code == 200
 
     def test_reject_already_rejected_400(self, client, db_session):
-        """[AM05] Already rejected → 400."""
+        """[AM05] Already rejected -> 400."""
         adm = _make_admin(db_session)
         v = _make_vendor(db_session, approval_status="REJECTED")
         with patch("app.routers.v1.admin_router._send_rejection_email"):
@@ -1080,7 +1077,7 @@ class TestAdminRejectVendor:
         assert resp.status_code == 400
 
     def test_reject_not_found_404(self, client, db_session):
-        """[AM05] Vendor not found → 404."""
+        """[AM05] Vendor not found -> 404."""
         adm = _make_admin(db_session)
         with patch("app.routers.v1.admin_router._send_rejection_email"):
             resp = client.post(
@@ -1090,9 +1087,9 @@ class TestAdminRejectVendor:
         assert resp.status_code == 404
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # DEPLOY-GUARD FIXTURES
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @pytest.fixture
 def require_personas_router(client):
@@ -1100,7 +1097,7 @@ def require_personas_router(client):
     probe = client.get("/api/v1/customers/personas",
                        headers={"Authorization": "Bearer fake"})
     if probe.status_code == 404:
-        pytest.skip("persona_router not registered at /customers/personas — deploy persona_router.py + v1/__init__.py")
+        pytest.skip("persona_router not registered at /customers/personas")
 
 
 @pytest.fixture
@@ -1108,7 +1105,7 @@ def require_customers_router(client):
     """Skip customers/me tests if customers_router not yet deployed."""
     probe = client.get("/api/v1/customers/me")
     if probe.status_code == 404:
-        pytest.skip("customers_router not registered — deploy customers_router.py + v1/__init__.py")
+        pytest.skip("customers_router not registered")
 
 
 @pytest.fixture
@@ -1117,18 +1114,18 @@ def require_admin_auth_router(client):
     probe = client.post("/api/v1/auth/admin/login",
                         data={"username": "x", "password": "x"})
     if probe.status_code == 404:
-        pytest.skip("auth_admin_router not registered — deploy admin_router.py + v1/__init__.py")
+        pytest.skip("auth_admin_router not registered")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [PE01]  GET /customers/personas
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestListPersonas:
     URL = "/api/v1/customers/personas"
 
     def test_list_personas_empty(self, client, db_session, require_personas_router):
-        """[PE01] No personas → empty list."""
+        """[PE01] No personas -> empty list."""
         cust = _make_customer(db_session)
         resp = client.get(self.URL, headers=_auth_headers_customer(cust.email))
         assert resp.status_code == 200
@@ -1150,7 +1147,7 @@ class TestListPersonas:
             assert p["customer_id"] == str(cust1.customer_id)
 
     def test_list_unauthenticated_401(self, client, require_personas_router):
-        """[PE01] No token → 401."""
+        """[PE01] No token -> 401."""
         resp = client.get(self.URL)
         assert resp.status_code == 401
 
@@ -1160,15 +1157,15 @@ class TestListPersonas:
         assert resp.status_code in (401, 404)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [PE02]  POST /customers/personas
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestCreatePersona:
     URL = "/api/v1/customers/personas"
 
     def test_create_minimal_persona(self, client, db_session, require_personas_router):
-        """[PE02] Minimal valid payload → 201."""
+        """[PE02] Minimal valid payload -> 201."""
         cust = _make_customer(db_session)
         resp = client.post(
             self.URL,
@@ -1182,7 +1179,7 @@ class TestCreatePersona:
         assert body["customer_id"] == str(cust.customer_id)
 
     def test_create_full_payload(self, client, db_session, require_personas_router):
-        """[PE02] Full payload with all optional fields → 201."""
+        """[PE02] Full payload with all optional fields -> 201."""
         cust = _make_customer(db_session)
         resp = client.post(
             self.URL,
@@ -1201,7 +1198,7 @@ class TestCreatePersona:
         assert resp.status_code == 201
 
     def test_create_empty_name_422(self, client, db_session, require_personas_router):
-        """[PE02] Empty name → 422 validation error."""
+        """[PE02] Empty name -> 422 validation error."""
         cust = _make_customer(db_session)
         resp = client.post(
             self.URL,
@@ -1211,7 +1208,7 @@ class TestCreatePersona:
         assert resp.status_code == 422
 
     def test_create_missing_name_422(self, client, db_session, require_personas_router):
-        """[PE02] Missing name → 422."""
+        """[PE02] Missing name -> 422."""
         cust = _make_customer(db_session)
         resp = client.post(
             self.URL,
@@ -1221,7 +1218,7 @@ class TestCreatePersona:
         assert resp.status_code == 422
 
     def test_create_unauthenticated_401(self, client, require_personas_router):
-        """[PE02] No token → 401."""
+        """[PE02] No token -> 401."""
         resp = client.post(self.URL, json={"name": "x"})
         assert resp.status_code == 401
 
@@ -1237,9 +1234,9 @@ class TestCreatePersona:
         assert resp.json()["persona_id"].startswith("PER-")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [PE03]  GET /customers/personas/{personaId}
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestGetPersona:
 
@@ -1256,7 +1253,7 @@ class TestGetPersona:
         assert resp.json()["persona_id"] == p.persona_id
 
     def test_get_other_customer_persona_404(self, client, db_session, require_personas_router):
-        """[PE03] Cannot access another customer's persona → 404."""
+        """[PE03] Cannot access another customer's persona -> 404."""
         cust1 = _make_customer(db_session)
         cust2 = _make_customer(db_session)
         p = _make_persona(db_session, str(cust2.customer_id))
@@ -1267,7 +1264,7 @@ class TestGetPersona:
         assert resp.status_code == 404
 
     def test_get_nonexistent_persona_404(self, client, db_session, require_personas_router):
-        """[PE03] Non-existent persona_id → 404."""
+        """[PE03] Non-existent persona_id -> 404."""
         cust = _make_customer(db_session)
         resp = client.get(
             "/api/v1/customers/personas/PER-DOESNOTEXIST",
@@ -1276,19 +1273,19 @@ class TestGetPersona:
         assert resp.status_code == 404
 
     def test_get_unauthenticated_401(self, client, require_personas_router):
-        """[PE03] No token → 401."""
+        """[PE03] No token -> 401."""
         resp = client.get("/api/v1/customers/personas/PER-ANYTHING")
         assert resp.status_code == 401
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [PE04]  PUT /customers/personas/{personaId}
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestUpdatePersona:
 
     def test_update_name(self, client, db_session, require_personas_router):
-        """[PE04] Update name only → only name changes."""
+        """[PE04] Update name only -> only name changes."""
         cust = _make_customer(db_session)
         p = _make_persona(db_session, str(cust.customer_id), name="Original")
         resp = client.put(
@@ -1300,16 +1297,14 @@ class TestUpdatePersona:
         assert resp.json()["name"] == "Updated"
 
     def test_partial_update_preserves_other_fields(self, client, db_session, require_personas_router):
-        """[PE04] Partial update — unspecified fields unchanged."""
+        """[PE04] Partial update - unspecified fields unchanged."""
         cust = _make_customer(db_session)
         p = _make_persona(db_session, str(cust.customer_id), name="Original")
-        # Set relationship first
         client.put(
             f"/api/v1/customers/personas/{p.persona_id}",
             json={"relationship": "sister"},
             headers=_auth_headers_customer(cust.email),
         )
-        # Now update name only
         resp = client.put(
             f"/api/v1/customers/personas/{p.persona_id}",
             json={"name": "New Name"},
@@ -1332,7 +1327,7 @@ class TestUpdatePersona:
         assert resp.json()["food_preferences"] == ["vegan", "raw"]
 
     def test_update_other_persona_404(self, client, db_session, require_personas_router):
-        """[PE04] Can't update another customer's persona → 404."""
+        """[PE04] Can't update another customer's persona -> 404."""
         cust1 = _make_customer(db_session)
         cust2 = _make_customer(db_session)
         p = _make_persona(db_session, str(cust2.customer_id))
@@ -1344,20 +1339,20 @@ class TestUpdatePersona:
         assert resp.status_code == 404
 
     def test_update_unauthenticated_401(self, client, require_personas_router):
-        """[PE04] No token → 401."""
+        """[PE04] No token -> 401."""
         resp = client.put("/api/v1/customers/personas/PER-X",
                           json={"name": "x"})
         assert resp.status_code == 401
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [PE05]  DELETE /customers/personas/{personaId}
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestDeletePersona:
 
     def test_delete_own_persona_204(self, client, db_session, require_personas_router):
-        """[PE05] Delete own persona → 204 No Content."""
+        """[PE05] Delete own persona -> 204 No Content."""
         cust = _make_customer(db_session)
         p = _make_persona(db_session, str(cust.customer_id))
         resp = client.delete(
@@ -1392,7 +1387,7 @@ class TestDeletePersona:
         assert resp.status_code == 404
 
     def test_delete_nonexistent_persona_404(self, client, db_session, require_personas_router):
-        """[PE05] Non-existent persona → 404 (not 204/500)."""
+        """[PE05] Non-existent persona -> 404 (not 204/500)."""
         cust = _make_customer(db_session)
         resp = client.delete(
             "/api/v1/customers/personas/PER-GHOST",
@@ -1401,14 +1396,14 @@ class TestDeletePersona:
         assert resp.status_code == 404
 
     def test_delete_unauthenticated_401(self, client, require_personas_router):
-        """[PE05] No token → 401."""
+        """[PE05] No token -> 401."""
         resp = client.delete("/api/v1/customers/personas/PER-ANYTHING")
         assert resp.status_code == 401
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # [S01]  GET /health
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class TestHealth:
     URL = "/api/v1/health"
@@ -1430,20 +1425,19 @@ class TestHealth:
         assert "system" in resp.json()
 
     def test_health_no_auth_required(self, client):
-        """[S01] Health is a public endpoint — no token needed."""
+        """[S01] Health is a public endpoint - no token needed."""
         resp = client.get(self.URL)
         assert resp.status_code != 401
 
     def test_health_path_under_v1(self, client):
         """[S01] Path is /api/v1/health (not bare /health)."""
         resp_bare = client.get("/health")
-        # Bare /health should 404 since all routes are under /api/v1
         assert resp_bare.status_code in (404, 307, 308)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# PATH ALIGNMENT SMOKE TESTS — verify old wrong paths are gone
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+# PATH ALIGNMENT SMOKE TESTS - verify old wrong paths are gone
+# ===============================================================================
 
 class TestPathAlignment:
     """Regression tests: old wrong paths must be dead."""
@@ -1495,7 +1489,7 @@ class TestPathAlignment:
         assert resp.status_code in (404, 405)
 
     def test_old_personas_prefix_gone(self, client):
-        """Old /api/v1/personas/ must be dead — now at /customers/personas."""
+        """Old /api/v1/personas/ must be dead - now at /customers/personas."""
         resp = client.get("/api/v1/personas/",
                           headers={"Authorization": "Bearer garbage"})
         assert resp.status_code in (401, 404)
