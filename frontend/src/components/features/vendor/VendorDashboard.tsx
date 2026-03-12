@@ -131,8 +131,8 @@ export default function VendorDashboard() {
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="mb-2 flex items-center gap-3 px-2 py-1">
-          <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="h-[59px] w-[59px]" priority />
+          <div className="mb-2 flex items-center gap-2 py-1">
+          <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="ml-[-8px] h-[59px] w-[59px] shrink-0" priority />
           <span className="text-[22px] font-extrabold tracking-tight text-[#1562CC]">OCCACIA</span>
           </div>
 
@@ -270,8 +270,8 @@ export default function VendorDashboard() {
                     {card.note}
                   </span>
                 </div>
-                <p className="text-4xl font-semibold leading-none tracking-tight text-slate-900 sm:text-[44px]">{card.value}</p>
-                <p className="mt-2 text-base text-slate-500 sm:text-xl lg:text-2xl">{card.title}</p>
+                <p className="text-[28px] font-semibold leading-none tracking-tight text-slate-900">{card.value}</p>
+                <p className="mt-2 text-sm text-slate-500">{card.title}</p>
               </article>
             ))}
           </section>
@@ -280,10 +280,10 @@ export default function VendorDashboard() {
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Recent Orders</h2>
-                  <p className="text-sm text-slate-500 sm:text-base lg:text-2xl">Manage and fulfill customer orders</p>
+                  <h2 className="text-lg font-semibold tracking-tight text-slate-900">Recent Orders</h2>
+                  <p className="text-sm text-slate-500">Manage and fulfill customer orders</p>
                 </div>
-                <div className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-slate-100 p-1 text-sm sm:w-auto sm:text-base lg:text-[18px]">
+                <div className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-slate-100 p-1 text-sm sm:w-auto">
                   <button type="button" className="rounded-lg bg-white px-3 py-2 font-medium text-blue-700 shadow-sm inline-flex items-center gap-2 sm:px-4">
                     <Image src="/icons/vendor/dashboard/filter-all-orders.svg" alt="All orders" width={16} height={16} className="h-4 w-4" />
                     All Orders
@@ -320,7 +320,7 @@ export default function VendorDashboard() {
                       <div className="text-sm font-semibold text-slate-800 sm:text-base">{order.recipient}</div>
                       <div className="text-xs text-slate-500 sm:text-sm">{order.recipientMeta}</div>
                         </td>
-                    <td className="px-2 py-3 text-lg font-semibold text-slate-800 sm:text-[22px]">{order.budget}</td>
+                    <td className="px-2 py-3 text-sm font-semibold text-slate-800 sm:text-base">{order.budget}</td>
                         <td className="px-2 py-3">
                           <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusPillClass[order.status]}`}>{order.status}</span>
                         </td>
@@ -345,8 +345,8 @@ export default function VendorDashboard() {
 
             <div className="space-y-5">
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:p-5">
-              <h3 className="mb-4 text-xl font-semibold text-slate-900 sm:text-2xl">Quick Actions</h3>
-              <div className="space-y-3 text-base sm:text-[18px]">
+              <h3 className="mb-4 text-base font-semibold text-slate-900">Quick Actions</h3>
+              <div className="space-y-3 text-sm">
               <button className="w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white shadow-md hover:bg-blue-700 inline-flex items-center justify-center gap-2" type="button">
                     <Image src="/icons/vendor/dashboard/quick-package.svg" alt="" aria-hidden="true" width={18} height={18} className="h-[18px] w-[18px]" />
                     Create New Package
@@ -364,7 +364,7 @@ export default function VendorDashboard() {
 
               <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:p-5">
                 <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">Top Recipient Types</h3>
+                <h3 className="text-base font-semibold text-slate-900">Top Recipient Types</h3>
                   <button type="button" className="text-sm font-semibold text-blue-700 hover:text-blue-800 inline-flex items-center gap-1.5">
                     <Image src="/icons/vendor/dashboard/link-report.svg" alt="" aria-hidden="true" width={16} height={16} className="h-4 w-4" />
                     View Report
