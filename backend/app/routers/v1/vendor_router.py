@@ -2,11 +2,11 @@
 app/routers/v1/vendor_router.py
 
 Vendor self-service endpoints (requires vendor JWT):
-  GET    /vendors/me                    — own profile
-  GET    /vendors/me/packages           — own packages
-  POST   /vendors/me/packages           — create package (blocked if not APPROVED)
-  PUT    /vendors/me/packages/{id}      — update own package
-  DELETE /vendors/me/packages/{id}      — delete own package
+  GET    /vendors/me                 - own profile
+  GET    /vendors/me/packages        - own packages
+  POST   /vendors/me/packages        - create package (blocked if not APPROVED)
+  PUT    /vendors/me/packages/{id}   - update own package
+  DELETE /vendors/me/packages/{id}   - delete own package
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/vendors", tags=["Vendors"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/vendor/login")
 
 
-# ── Auth dependency ──────────────────────────────────────────────────
+# --- Auth Dependencies ---
 
 def get_current_vendor(
     token: str = Depends(oauth2_scheme),
@@ -66,11 +66,11 @@ def require_approved_vendor(vendor: Vendor = Depends(get_current_vendor)) -> Ven
     return vendor
 
 
-# ── Profile ───────────────────────────────────────────────────────────
+# --- Profile ---
 
 @router.get("/me", response_model=VendorResponse)
 def get_my_profile(vendor: Vendor = Depends(get_current_vendor)):
-    """Get current vendor profile. Spec: GET /vendors/me"""
+    """Get current vendor profile."""
     return vendor
 
 
@@ -80,7 +80,7 @@ def update_my_profile(
     vendor: Vendor = Depends(get_current_vendor),
     db: Session = Depends(get_db),
 ):
-    """Update current vendor profile. Spec: PUT /vendors/me"""
+    """Update current vendor profile."""
     if body.get("displayName"):
         vendor.display_name = body["displayName"]
     if "contactPhone" in body:
@@ -90,7 +90,7 @@ def update_my_profile(
     return vendor
 
 
-# ── Packages ──────────────────────────────────────────────────────────
+# --- Packages ---
 
 @router.get("/me/packages", response_model=List[PackageResponse])
 def list_my_packages(
@@ -123,7 +123,7 @@ def create_package(
     db.add(pkg)
     db.commit()
     db.refresh(pkg)
-    logger.info(f"📦 Vendor {vendor.vendor_id} created package '{pkg.name}'")
+    logger.info("Vendor %s created package '%s'", vendor.vendor_id, pkg.name)
     return pkg
 
 
@@ -145,7 +145,7 @@ def update_package(
 
     db.commit()
     db.refresh(pkg)
-    logger.info(f"✏️ Vendor {vendor.vendor_id} updated package {package_id}")
+    logger.info("Vendor %s updated package %s", vendor.vendor_id, package_id)
     return pkg
 
 
@@ -162,4 +162,4 @@ def delete_package(
         raise HTTPException(status_code=404, detail="Package not found.")
     db.delete(pkg)
     db.commit()
-    logger.info(f"🗑️ Vendor {vendor.vendor_id} deleted package {package_id}")
+    logger.info("Vendor %s deleted package %s", vendor.vendor_id, package_id)

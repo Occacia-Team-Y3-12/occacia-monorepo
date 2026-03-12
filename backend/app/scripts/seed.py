@@ -6,18 +6,15 @@ from app.models.vendor import Vendor
 def seed_data():
     db = SessionLocal()
     
-    # Check if data exists
+    # Check if database is already populated
     if db.query(Vendor).first():
-        print("⚡ Database already initialized. Skipping seed.")
+        print("Database already initialized. Skipping seed.")
         db.close()
         return
 
-    print("🌱 Database is empty. Planting seeds...")
+    print("Database is empty. Seeding initial data...")
 
-    # ==========================================
-    # 1. THE INTROVERT (Kandy)
-    # ==========================================
-    # ✅ FIXED: Using 'business_name', 'email', 'phone' to match your DB
+    # --- Vendor 1: Kandy (Introvert/Private) ---
     v1 = Vendor(
         business_name="The Colonial Bungalow", 
         display_name="The Colonial Bungalow",
@@ -43,9 +40,7 @@ def seed_data():
         tags=["private-dining", "quiet", "secluded"]
     ))
 
-    # ==========================================
-    # 2. THE CORPORATE (Colombo)
-    # ==========================================
+    # --- Vendor 2: Colombo (Corporate) ---
     v2 = Vendor(
         business_name="TechHub Business Center", 
         display_name="TechHub Business Center",
@@ -71,9 +66,7 @@ def seed_data():
         tags=["projector", "wifi", "business"]
     ))
 
-    # ==========================================
-    # 3. THE ROMANTIC (Galle)
-    # ==========================================
+    # --- Vendor 3: Galle (Romantic) ---
     v3 = Vendor(
         business_name="Cloud9 Rooftop", 
         display_name="Cloud9 Rooftop",
@@ -99,9 +92,7 @@ def seed_data():
         tags=["romantic", "proposal", "luxury"]
     ))
 
-    # ==========================================
-    # 4. THE BUDGET PARTY (Colombo)
-    # ==========================================
+    # --- Vendor 4: Colombo (Budget/Party) ---
     v4 = Vendor(
         business_name="Burger Shack", 
         display_name="Burger Shack",
@@ -127,9 +118,7 @@ def seed_data():
         tags=["budget", "party", "loud"]
     ))
 
-    # ==========================================
-    # 5. THE FAMILY (Bentota)
-    # ==========================================
+    # --- Vendor 5: Bentota (Family) ---
     v5 = Vendor(
         business_name="Palm Grove Resort", 
         display_name="Palm Grove Resort",
@@ -155,9 +144,7 @@ def seed_data():
         tags=["family", "pool", "kids"]
     ))
 
-    # ==========================================
-    # 6. THE ADVENTURE (Ella)
-    # ==========================================
+    # --- Vendor 6: Ella (Adventure) ---
     v6 = Vendor(
         business_name="Wild Trails Camp", 
         display_name="Wild Trails Camp",
@@ -184,5 +171,5 @@ def seed_data():
     ))
 
     db.commit()
-    print("✅ Database Seeded Successfully!")
+    print("Database seeded successfully.")
     db.close()

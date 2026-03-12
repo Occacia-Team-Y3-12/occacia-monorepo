@@ -8,7 +8,7 @@ class PersonaCreate(BaseModel):
     relationship: Optional[str] = None
     birthday: Optional[datetime] = None
     personality: Optional[str] = None
-    preferences_json: Optional[Any] = None  # list of hobbies/interests
+    preferences_json: Optional[Any] = None 
 
 class PersonaResponse(BaseModel):
     persona_id: str

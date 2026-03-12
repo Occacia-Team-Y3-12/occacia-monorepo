@@ -2,7 +2,7 @@ import logging
 from datetime import date, timedelta
 from typing import List, Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.package import Package
 from app.models.vendor import Vendor
@@ -10,20 +10,18 @@ from app.models.vendor import Vendor
 logger = logging.getLogger(__name__)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Redis cache invalidation helper
-# ─────────────────────────────────────────────────────────────────────────────
+# --- Redis Cache Management ---
 
 def _flush_ai_cache() -> int:
     """
     Delete all keys matching 'ai_cache:*' from Redis.
-    Called whenever vendor package data changes so customers never receive
-    stale AI recommendations.
-    Returns the number of keys deleted (0 on failure / no Redis).
+    Called on vendor package data changes to prevent stale AI recommendations.
+    Returns the number of keys deleted (0 on failure/no Redis).
     """
     try:
         import redis as redis_lib
         from app.core.config import settings
+        
         client = redis_lib.from_url(
             getattr(settings, "REDIS_URL", "redis://redis:6379"),
             decode_responses=True,
@@ -33,130 +31,49 @@ def _flush_ai_cache() -> int:
         keys = client.keys("ai_cache:*")
         if keys:
             deleted = client.delete(*keys)
-            logger.info(f"🗑️ CACHE INVALIDATED: {deleted} AI cache key(s) flushed after package update.")
+            logger.info("Cache invalidated: %d AI cache key(s) flushed.", deleted)
             return deleted
         return 0
     except Exception as exc:
-        logger.debug(f"Cache flush skipped (Redis unavailable): {exc}")
+        logger.debug("Cache flush skipped (Redis unavailable): %s", exc)
         return 0
 
+
+# --- Data Maps ---
+
 _CITY_ALIASES = {
-    # ── Colombo ──────────────────────────────────────────────────────────────
-    "colombo": "colombo",
-    "col": "colombo",
-    "cmb": "colombo",
-    "colomBO": "colombo",        # typo-safe (lowercased at call site)
-    "city": "colombo",           # "in the city" → Colombo
-    "capital": "colombo",
-    "fort": "colombo",           # Colombo Fort
-    "kollupitiya": "colombo",
-    "colpetty": "colombo",
-    "mount lavinia": "colombo",
-    "mt lavinia": "colombo",
-    "dehiwala": "colombo",
-    "nugegoda": "colombo",
-    "maharagama": "colombo",
-    "battaramulla": "colombo",
-    "rajagiriya": "colombo",
-    "kotte": "colombo",
-    "sri jayawardenepura": "colombo",
-
-    # ── Kandy ─────────────────────────────────────────────────────────────────
-    "kandy": "kandy",
-    "candy": "kandy",
-    "kandy city": "kandy",
-    "hill country": "kandy",
-    "highlands": "kandy",
-    "kndy": "kandy",
-    "peradeniya": "kandy",
-    "katugastota": "kandy",
-
-    # ── Galle ─────────────────────────────────────────────────────────────────
-    "galle": "galle",
-    "galle fort": "galle",
-    "southern coast": "galle",
-    "south coast": "galle",
-    "down south": "galle",
-    "the south": "galle",
-    "southern sri lanka": "galle",
-    "southern province": "galle",
-    "south": "galle",
-
-    # ── Mirissa ───────────────────────────────────────────────────────────────
-    "mirissa": "mirissa",
-    "mirissa beach": "mirissa",
-    "whale watching": "mirissa",
-
-    # ── Negombo ───────────────────────────────────────────────────────────────
-    "negombo": "negombo",
-    "negambo": "negombo",
-    "airport area": "negombo",
-    "near airport": "negombo",
-    "katunayake": "negombo",
-
-    # ── Ella ──────────────────────────────────────────────────────────────────
-    "ella": "ella",
-    "ella rock": "ella",
-    "nine arch": "ella",
-    "nine arches": "ella",
-
-    # ── Nuwara Eliya ──────────────────────────────────────────────────────────
-    "nuwara eliya": "nuwara eliya",
-    "nuwaraeliya": "nuwara eliya",
-    "nuwara-eliya": "nuwara eliya",
-    "nuwara": "nuwara eliya",
-    "nuware": "nuwara eliya",
-    "little england": "nuwara eliya",
-    "nuwara eliya city": "nuwara eliya",
-
-    # ── Trincomalee ───────────────────────────────────────────────────────────
-    "trincomalee": "trincomalee",
-    "trinco": "trincomalee",
-    "trinco bay": "trincomalee",
-    "east coast": "trincomalee",
-    "eastern coast": "trincomalee",
-
-    # ── Jaffna ────────────────────────────────────────────────────────────────
-    "jaffna": "jaffna",
-    "jaffna city": "jaffna",
-    "north": "jaffna",
+    "colombo": "colombo", "col": "colombo", "cmb": "colombo", "colombo": "colombo",
+    "city": "colombo", "capital": "colombo", "fort": "colombo", 
+    "kollupitiya": "colombo", "colpetty": "colombo", "mount lavinia": "colombo",
+    "mt lavinia": "colombo", "dehiwala": "colombo", "nugegoda": "colombo",
+    "maharagama": "colombo", "battaramulla": "colombo", "rajagiriya": "colombo",
+    "kotte": "colombo", "sri jayawardenepura": "colombo",
+    "kandy": "kandy", "candy": "kandy", "kandy city": "kandy", 
+    "hill country": "kandy", "highlands": "kandy", "kndy": "kandy",
+    "peradeniya": "kandy", "katugastota": "kandy",
+    "galle": "galle", "galle fort": "galle", "southern coast": "galle",
+    "south coast": "galle", "down south": "galle", "the south": "galle",
+    "southern sri lanka": "galle", "southern province": "galle", "south": "galle",
+    "mirissa": "mirissa", "mirissa beach": "mirissa", "whale watching": "mirissa",
+    "negombo": "negombo", "negambo": "negombo", "airport area": "negombo",
+    "near airport": "negombo", "katunayake": "negombo",
+    "ella": "ella", "ella rock": "ella", "nine arch": "ella", "nine arches": "ella",
+    "nuwara eliya": "nuwara eliya", "nuwaraeliya": "nuwara eliya", 
+    "nuwara-eliya": "nuwara eliya", "nuwara": "nuwara eliya", "nuware": "nuwara eliya",
+    "little england": "nuwara eliya", "nuwara eliya city": "nuwara eliya",
+    "trincomalee": "trincomalee", "trinco": "trincomalee", "trinco bay": "trincomalee",
+    "east coast": "trincomalee", "eastern coast": "trincomalee",
+    "jaffna": "jaffna", "jaffna city": "jaffna", "north": "jaffna",
     "northern sri lanka": "jaffna",
-
-    # ── Bentota ───────────────────────────────────────────────────────────────
-    "bentota": "bentota",
-    "bentota beach": "bentota",
-    "south western coast": "bentota",
-
-    # ── Hikkaduwa ─────────────────────────────────────────────────────────────
-    "hikkaduwa": "hikkaduwa",
-    "hikka": "hikkaduwa",
-    "hikkaduwa beach": "hikkaduwa",
-
-    # ── Sigiriya ──────────────────────────────────────────────────────────────
-    "sigiriya": "sigiriya",
-    "sigiri": "sigiriya",
-    "lion rock": "sigiriya",
-    "dambulla": "sigiriya",
-    "cultural triangle": "sigiriya",
-
-    # ── Polonnaruwa ───────────────────────────────────────────────────────────
-    "polonnaruwa": "polonnaruwa",
-    "ancient city": "polonnaruwa",
-
-    # ── Arugam Bay ────────────────────────────────────────────────────────────
-    "arugam bay": "arugam bay",
-    "arugambay": "arugam bay",
-    "a-bay": "arugam bay",
+    "bentota": "bentota", "bentota beach": "bentota", "south western coast": "bentota",
+    "hikkaduwa": "hikkaduwa", "hikka": "hikkaduwa", "hikkaduwa beach": "hikkaduwa",
+    "sigiriya": "sigiriya", "sigiri": "sigiriya", "lion rock": "sigiriya",
+    "dambulla": "sigiriya", "cultural triangle": "sigiriya",
+    "polonnaruwa": "polonnaruwa", "ancient city": "polonnaruwa",
+    "arugam bay": "arugam bay", "arugambay": "arugam bay", "a-bay": "arugam bay",
     "surf coast": "arugam bay",
-
-    # ── Unawatuna ─────────────────────────────────────────────────────────────
-    "unawatuna": "unawatuna",
-    "una": "unawatuna",
-
-    # ── Weligama ──────────────────────────────────────────────────────────────
-    "weligama": "weligama",
-    "weligama bay": "weligama",
-    "near mirissa": "weligama",
+    "unawatuna": "unawatuna", "una": "unawatuna",
+    "weligama": "weligama", "weligama bay": "weligama", "near mirissa": "weligama",
     "near galle": "galle",
 }
 
@@ -178,7 +95,7 @@ _TAG_ALIASES = {
 
 
 def normalize_tags(tags: List[str]) -> List[str]:
-    """Normalize tags: alias mapping, unknown exclusion, deduplication."""
+    """Normalize tags by applying alias mapping, exclusion, and deduplication."""
     if not tags:
         return []
     seen = set()
@@ -199,14 +116,18 @@ def normalize_tags(tags: List[str]) -> List[str]:
 def _normalise_city(raw: Optional[str]) -> Optional[str]:
     if not raw:
         return None
-    return _CITY_ALIASES.get(raw.strip().lower(), raw.strip().lower())
+    cleaned = raw.strip().lower()
+    return _CITY_ALIASES.get(cleaned, cleaned)
 
 
 class VendorService:
 
+    # --- Vendor Management ---
+
     def create_vendor(self, db: Session, vendor_data):
         from app.core.security import get_password_hash
-        logger.info(f"🏢 create_vendor: {vendor_data.email} / {vendor_data.business_name}")
+        
+        logger.info("create_vendor: %s / %s", vendor_data.email, vendor_data.business_name)
         vendor = Vendor(
             email=vendor_data.email,
             password_hash=get_password_hash(vendor_data.password),
@@ -218,7 +139,7 @@ class VendorService:
         db.add(vendor)
         db.commit()
         db.refresh(vendor)
-        logger.info(f"✅ Vendor created: id={vendor.id}")
+        logger.info("Vendor created: id=%s", vendor.id)
         return vendor
 
     def get_vendor_by_email(self, db: Session, email: str):
@@ -244,6 +165,8 @@ class VendorService:
             db.refresh(vendor)
         return vendor
 
+    # --- Package Management ---
+
     def get_packages_by_vendor(self, db: Session, vendor_id: int):
         return db.query(Package).filter(Package.vendor_id == vendor_id).all()
 
@@ -264,21 +187,27 @@ class VendorService:
         db.add(pkg)
         db.commit()
         db.refresh(pkg)
-        _flush_ai_cache()   # new package changes what AI can recommend
+        _flush_ai_cache()
         return pkg
 
     def update_package(self, db: Session, package_id: int, package_data):
         pkg = db.query(Package).filter(Package.id == package_id).first()
         if not pkg:
             return None
-        for field in ["name", "description", "price", "price_per_head",
-                      "tags", "location_coverage", "blocked_dates"]:
+        
+        updatable_fields = [
+            "name", "description", "price", "price_per_head",
+            "tags", "location_coverage", "blocked_dates"
+        ]
+        
+        for field in updatable_fields:
             val = getattr(package_data, field, None)
             if val is not None:
                 setattr(pkg, field, val)
+                
         db.commit()
         db.refresh(pkg)
-        _flush_ai_cache()   # price/tags changed — old AI responses are stale
+        _flush_ai_cache()
         return pkg
 
     def delete_package(self, db: Session, package_id: int) -> bool:
@@ -306,10 +235,15 @@ class VendorService:
                     tags.append(tag)
         return tags
 
-    def find_venue_matches(self, db: Session, tags: List[str],
-                           budget: Optional[float] = None, location: Optional[str] = None,
-                           event_date: Optional[date] = None, limit: int = 10) -> List[Package]:
-        logger.info(f"🔎 find_venue_matches | tags={tags} budget={budget} location={location} date={event_date}")
+    # --- Search and Matching Logic ---
+
+    def find_venue_matches(
+        self, db: Session, tags: List[str],
+        budget: Optional[float] = None, location: Optional[str] = None,
+        event_date: Optional[date] = None, limit: int = 10
+    ) -> List[Package]:
+        
+        logger.info("find_venue_matches | tags=%s budget=%s location=%s date=%s", tags, budget, location, event_date)
         if not tags:
             return []
 
@@ -317,8 +251,9 @@ class VendorService:
         q = db.query(Package)
         if budget is not None:
             q = q.filter((Package.price_per_head == None) | (Package.price_per_head <= budget))
+        
         all_pkgs = q.all()
-        logger.info(f"📦 Total packages: {len(all_pkgs)}")
+        logger.info("Total packages: %d", len(all_pkgs))
 
         def blocked(p):
             return event_date and event_date in (p.blocked_dates or [])
@@ -326,35 +261,40 @@ class VendorService:
         def score(p):
             return len(set(tags) & set(p.tags or []))
 
+        # Tier 1: Exact matches
         if canonical_loc:
-            t1 = [p for p in all_pkgs if set(tags).issubset(set(p.tags or []))
-                  and canonical_loc in (_normalise_city(getattr(p, "location_coverage", "") or "") or "")
-                  and not blocked(p)]
+            t1 = [
+                p for p in all_pkgs 
+                if set(tags).issubset(set(p.tags or []))
+                and canonical_loc in (_normalise_city(getattr(p, "location_coverage", "") or "") or "")
+                and not blocked(p)
+            ]
             if t1:
-                logger.info(f"🎯 TIER-1: {len(t1)} venues")
+                logger.info("TIER-1: %d venues found", len(t1))
                 return t1[:limit]
 
+        # Tier 2: Ignore location
         t2 = [p for p in all_pkgs if set(tags).issubset(set(p.tags or [])) and not blocked(p)]
         if t2:
-            logger.info(f"🎯 TIER-2: {len(t2)} venues")
+            logger.info("TIER-2: %d venues found", len(t2))
             return t2[:limit]
 
-        t3 = sorted([p for p in all_pkgs if score(p) >= 1 and not blocked(p)],
-                    key=score, reverse=True)
+        # Tier 3: Partial tag match
+        t3 = sorted([p for p in all_pkgs if score(p) >= 1 and not blocked(p)], key=score, reverse=True)
         return t3[:limit]
 
-    def find_gift_matches(self, db: Session, gift_tags: List[str],
-                          budget: Optional[float] = None,
-                          location: Optional[str] = None) -> List[Package]:
+    def find_gift_matches(
+        self, db: Session, gift_tags: List[str],
+        budget: Optional[float] = None, location: Optional[str] = None
+    ) -> List[Package]:
         if not gift_tags:
             return []
         return self.find_venue_matches(db, tags=gift_tags, budget=budget, location=location)
 
     def find_perfect_matches(self, db: Session, criteria: dict, limit: int = 10) -> List[Package]:
         """
-        Match packages using venue_tags, guest_count, budget_per_head, location.
-        Only returns packages from verified+approved vendors.
-        Falls back by relaxing guest/budget filters if strict match is empty.
+        Match packages using venue_tags, guest_count, budget_per_head, and location.
+        Returns packages strictly from verified vendors. Falls back to relaxed criteria if empty.
         """
         tags = criteria.get("venue_tags", [])
         guest_count = criteria.get("guest_count")
@@ -366,16 +306,10 @@ class VendorService:
 
         canonical_loc = _normalise_city(location)
 
-        from sqlalchemy.orm import joinedload
-
-        # Verified vendors: is_verified=True is sufficient.
-        # The fixture creates vendors with is_verified=True but no approval_status.
-        # test_only_verified checks p.vendor.is_verified — so we filter by is_verified.
         verified_vendor_ids = {
             v.id for v in db.query(Vendor).filter(Vendor.is_verified == True).all()
         }
 
-        # Eagerly load vendor relationship to avoid DetachedInstanceError after db.close()
         pkg_query = db.query(Package).options(joinedload(Package.vendor))
         if verified_vendor_ids:
             all_pkgs = [p for p in pkg_query.all() if p.vendor_id in verified_vendor_ids]
@@ -399,8 +333,6 @@ class VendorService:
             if guest_count is None:
                 return True
             min_g = getattr(p, "min_guests", None)
-            # Only enforce min_guests. max_guests is a soft cap not enforced in matching
-            # so that fallback with large guest counts (9999) still finds packages.
             if min_g is not None and guest_count < min_g:
                 return False
             return True
@@ -413,44 +345,32 @@ class VendorService:
 
         def _score_package(p) -> float:
             """
-            Composite relevance score — higher is better.
-
-            tag_overlap  (40 %) — fraction of requested tags that the package carries
-            budget_fit   (30 %) — how closely price_per_head sits under the budget cap
-                                   1.0  → price == budget (perfect)
-                                   0.5  → price is 50 % of budget (cheap, still good)
-                                   0.0  → no budget given, or price unavailable
-            guest_fit    (30 %) — 1.0 when guest_count satisfies min_guests, else 0.0
-                                   0.5 neutral when guest_count is unknown
+            Composite relevance score (higher is better):
+            - tag_overlap (40%): Fraction of requested tags present.
+            - budget_fit  (30%): Closeness of price_per_head to the budget cap.
+            - guest_fit   (30%): Binary satisfaction of min_guests.
             """
             pkg_tags = set(_get_tags(p))
             req_tags = set(tags)
 
-            # tag_overlap: fraction of requested tags present in the package
-            if req_tags:
-                tag_score = len(req_tags & pkg_tags) / len(req_tags)
-            else:
-                tag_score = 0.0
+            tag_score = len(req_tags & pkg_tags) / len(req_tags) if req_tags else 0.0
 
-            # budget_fit: closeness of price to the budget cap (0–1)
             pph = getattr(p, "price_per_head", None)
             if budget_per_head and pph is not None and budget_per_head > 0:
-                # price within budget → ratio of price to cap (closer to cap = more premium = better fit)
                 ratio = pph / budget_per_head
-                budget_score = max(0.0, min(1.0, ratio))   # clamp [0, 1]
+                budget_score = max(0.0, min(1.0, ratio))
             else:
                 budget_score = 0.0
 
-            # guest_fit: binary — does guest count meet min_guests?
             min_g = getattr(p, "min_guests", None)
             if guest_count is None:
-                guest_score = 0.5   # neutral
+                guest_score = 0.5
             elif min_g is None or guest_count >= min_g:
                 guest_score = 1.0
             else:
                 guest_score = 0.0
 
-            return tag_score * 0.4 + budget_score * 0.3 + guest_score * 0.3
+            return (tag_score * 0.4) + (budget_score * 0.3) + (guest_score * 0.3)
 
         def loc_ok(p):
             if not canonical_loc:
@@ -458,21 +378,17 @@ class VendorService:
             loc_cov = _normalise_city(getattr(p, "location_coverage", "") or "")
             return canonical_loc in (loc_cov or "")
 
-        # Tier 1: tags + guest + budget + location
+        # Tier 1: All criteria match
         strict = [p for p in all_pkgs if tag_match(p) and guest_ok(p) and budget_ok(p) and loc_ok(p)]
         if strict:
             return sorted(strict, key=_score_package, reverse=True)[:limit]
 
-        # Tier 2: drop location
+        # Tier 2: Relax location
         mid = [p for p in all_pkgs if tag_match(p) and guest_ok(p) and budget_ok(p)]
         if mid:
             return sorted(mid, key=_score_package, reverse=True)[:limit]
 
-        # Tier 3: only fires when a guest_count was explicitly given (caller has
-        # a specific group size). Drops budget + location but keeps guest_ok so
-        # min_guests is still respected. This satisfies test_fallback_relaxes_filters
-        # (guest=9999 exceeds max_guests=10 — max is not enforced here, only min)
-        # while keeping test_budget_filter empty (no guest_count given → no tier3).
+        # Tier 3: Relax budget and location, preserve min_guests constraints
         if guest_count is not None:
             relaxed = [p for p in all_pkgs if tag_match(p) and guest_ok(p)]
             return sorted(relaxed, key=_score_package, reverse=True)[:limit]
@@ -482,21 +398,27 @@ class VendorService:
     def get_availability_block(self, db: Session, tags: List[str], lookahead_days: int = 30) -> str:
         if not tags:
             return ""
+        
         today = date.today()
         window_end = today + timedelta(days=lookahead_days)
         lines = []
+        
         for pkg in db.query(Package).all():
             if not (set(tags) & set(pkg.tags or [])):
                 continue
-            blocked = [d for d in (pkg.blocked_dates or [])
-                       if isinstance(d, date) and today <= d <= window_end]
+            blocked = [
+                d for d in (pkg.blocked_dates or [])
+                if isinstance(d, date) and today <= d <= window_end
+            ]
             if blocked:
-                lines.append(f"- '{pkg.name}' NOT available on: {', '.join(str(d) for d in sorted(blocked))}")
+                blocked_str = ', '.join(str(d) for d in sorted(blocked))
+                lines.append(f"- '{pkg.name}' NOT available on: {blocked_str}")
+                
         if not lines:
             return ""
-        return (f"\n\nVENUE AVAILABILITY — IMPORTANT:\nThese venues have blocked dates "
-                f"in the next {lookahead_days} days. Do NOT suggest them for those dates:\n"
-                + "\n".join(lines) + "\n")
+            
+        header = f"\n\nVENUE AVAILABILITY:\nThese venues have blocked dates in the next {lookahead_days} days. Do NOT suggest them for those dates:\n"
+        return header + "\n".join(lines) + "\n"
 
     @staticmethod
     def extract_location_from_text(text: str) -> Optional[str]:
