@@ -13,7 +13,7 @@ from app.schemas.auth_schema import (
     CustomerRegister, RegisterResponse, VerifyEmailResponse,
     ForgotPasswordRequest, ResetPasswordRequest, AuthMessageResponse
 )
-from app.schemas.vendor_schema import VendorRegisterRequest, VendorResponse
+from app.schemas.vendor_schema import VendorCreate, VendorResponse
 from app.services.customer_service import customer_service
 from app.services.auth_service import auth_service
 from app.services.vendor_service import vendor_service
@@ -170,7 +170,7 @@ def verify_user_login(user, form_data: OAuth2PasswordRequestForm):
 
 
 @router.post("/vendors/register", response_model=VendorResponse, status_code=201)
-def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(get_db)):
+def register_vendor(vendor_data: VendorCreate, db: Session = Depends(get_db)):
     if vendor_service.get_vendor_by_email(db, email=vendor_data.email):
         raise HTTPException(status_code=400, detail="Email already taken!")
     if vendor_service.get_vendor_by_display_name(db, name=vendor_data.business_name):

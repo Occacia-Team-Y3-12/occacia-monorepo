@@ -23,7 +23,7 @@ class VendorUpdate(BaseModel):
 
 # VendorResponse defines the structure of data sent back to the client
 class VendorResponse(VendorBase):
-    id: str
+    id: int
     user_id: str
     # status: The current approval state (PENDING, APPROVED, etc.)
     status: VendorStatus
