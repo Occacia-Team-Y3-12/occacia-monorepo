@@ -12,10 +12,16 @@ type CustomerHeaderProps = {
 const CustomerHeader = ({ isSidebarOpen, onToggleSidebar }: CustomerHeaderProps) => {
   const pathname = usePathname();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [savedEventTitle, setSavedEventTitle] = useState("Sister's Birthday");
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
-  const isEventsPage = pathname === '/customer/events';
-  const breadcrumbText = isEventsPage ? 'Events > Create New Event' : 'Customer Portal';
+  const isEventsRootPage = pathname === '/customer/events';
+  const isEventDetailPage = pathname.startsWith('/customer/events/');
+  const isEventFlow = isEventsRootPage || isEventDetailPage;
+
+  const breadcrumbText = isEventFlow
+    ? `Events > ${isEventsRootPage ? 'Create New Event' : savedEventTitle}`
+    : 'Customer Portal';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -28,10 +34,21 @@ const CustomerHeader = ({ isSidebarOpen, onToggleSidebar }: CustomerHeaderProps)
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!isEventDetailPage) {
+      return;
+    }
+
+    const title = window.sessionStorage.getItem('customer:lastEventTitle');
+    if (title && title.trim()) {
+      setSavedEventTitle(title.trim());
+    }
+  }, [isEventDetailPage]);
+
   return (
     <header
       className={`flex border-b border-[#ECECF0] bg-[#FFFFFF] px-4 transition-all duration-300 sm:px-6 lg:ml-[240px] ${
-        isEventsPage
+        isEventFlow
           ? 'min-h-[92px] items-center justify-between py-0'
           : 'min-h-[88px] flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:py-0'
       }`}
@@ -55,11 +72,11 @@ const CustomerHeader = ({ isSidebarOpen, onToggleSidebar }: CustomerHeaderProps)
         )}
 
         <div className="flex min-h-11 w-full items-center rounded-xl border border-transparent px-1 sm:w-auto">
-          {isEventsPage ? (
+          {isEventFlow ? (
             <p className="text-[16px] font-medium leading-none text-[#6B7C99]">
               <span>Events</span>
               <span className="px-2 text-[#8B97AD]">&gt;</span>
-              <span className="font-semibold text-[#1D2638]">Create New Event</span>
+              <span className="font-semibold text-[#1D2638]">{isEventsRootPage ? 'Create New Event' : savedEventTitle}</span>
             </p>
           ) : (
             <p className="text-sm font-medium text-[#8A90A1]">{breadcrumbText}</p>
@@ -67,34 +84,38 @@ const CustomerHeader = ({ isSidebarOpen, onToggleSidebar }: CustomerHeaderProps)
         </div>
       </div>
 
-      <div className={`flex items-center justify-end ${isEventsPage ? 'w-auto gap-5' : 'w-full gap-3 sm:w-auto sm:gap-5'}`}>
+      <div className={`flex items-center justify-end ${isEventFlow ? 'w-auto gap-5' : 'w-full gap-3 sm:w-auto sm:gap-5'}`}>
         <button
           aria-label="Notifications"
-          className={`relative flex items-center justify-center ${isEventsPage ? 'h-10 w-10 rounded-none bg-transparent' : 'h-14 w-14 rounded-3xl bg-[#EEF1F6]'}`}
+          className="relative flex h-14 w-14 items-center justify-center rounded-3xl bg-[#EEF1F6]"
         >
-          <svg viewBox="0 0 24 24" className={`${isEventsPage ? 'h-7 w-7 text-[#6E7C95]' : 'h-7 w-7 text-[#5B6478]'}`} fill="none" stroke="currentColor" strokeWidth={isEventsPage ? 2 : 1.8}>
+          <svg viewBox="0 0 24 24" className="h-7 w-7 text-[#5B6478]" fill="none" stroke="currentColor" strokeWidth={1.8}>
             <path d="M14.857 17.082a2.857 2.857 0 0 1-5.714 0" />
             <path d="M6.286 8.51a5.714 5.714 0 1 1 11.428 0v4.248l1.143 2.286v1.143H5.143V15.04l1.143-2.286V8.51Z" />
           </svg>
-          <span
-            className={`absolute rounded-full ${
-              isEventsPage ? 'right-[7px] top-[6px] h-[6px] w-[6px] bg-[#FF4D4F]' : 'right-4 top-3.5 h-2.5 w-2.5 bg-[#2443F4]'
-            }`}
-          />
+          <span className="absolute right-4 top-3.5 h-2.5 w-2.5 rounded-full bg-[#2443F4]" />
         </button>
 
-        {isEventsPage && (
-          <button aria-label="Search" className="flex h-11 w-11 items-center justify-center">
-            <svg viewBox="0 0 24 24" className="h-7 w-7 text-[#6E7C95]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M20 20l-3.5-3.5" />
-            </svg>
-          </button>
+        {isEventFlow && <span className="h-10 w-px bg-[#D9DEE8]" aria-hidden="true" />}
+
+        {isEventFlow && (
+          <div className="flex items-center gap-4 pl-1">
+            <span className="text-[17px] font-semibold text-[#182039]">Alex Rivers</span>
+            <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-[#F4CE95] shadow-[0_6px_18px_rgba(25,35,72,0.18)]">
+              <Image
+                src="/icons/customer/dashboard/profile.svg"
+                alt="Alex Rivers"
+                width={48}
+                height={48}
+                className="h-full w-full object-contain"
+              />
+            </span>
+          </div>
         )}
 
-        {!isEventsPage && <span className="h-14 w-px bg-[#D9DEE8]" aria-hidden="true" />}
+        {!isEventFlow && <span className="h-14 w-px bg-[#D9DEE8]" aria-hidden="true" />}
 
-        {!isEventsPage && (
+        {!isEventFlow && (
           <div className="relative" ref={profileMenuRef}>
             <button
               onClick={() => setIsProfileMenuOpen((prev) => !prev)}
