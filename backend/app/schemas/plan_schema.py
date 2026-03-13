@@ -31,8 +31,8 @@ class PlanResponse(BaseModel):
     event_type: Optional[str] = None
     event_date: Optional[str] = None
     location: Optional[str] = None
-    budget_per_head: Optional[float] = None  # null = unknown, never 0
-    guest_count: Optional[int] = None        # null = unknown, never 0
+    budget_per_head: Optional[float] = None 
+    guest_count: Optional[int] = None        
     venue_tags: List[str] = []
     missing_info: List[str] = []
     matched_venues: List[VenueDisplay] = []

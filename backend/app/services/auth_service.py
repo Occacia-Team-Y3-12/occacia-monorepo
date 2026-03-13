@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 
+import httpx
 import jwt
 from fastapi import HTTPException
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
@@ -24,24 +26,22 @@ EMAIL_VERIFICATION_TTL_HOURS = 24
 PASSWORD_RESET_TTL_MINUTES = 15
 
 
-# ── Email sending (Resend) ───────────────────────────────────────────────────
+# --- Email Utility (Resend) ---
 
-def _send_email(to: str, subject: str, html: str) -> bool:
+def _send_email(to: str, subject: str, text_body: str) -> bool:
     """
-    Sends email via Resend API using SENDGRID_API_KEY env var (which holds the Resend key).
-    Falls back to logger.info() if key is not set (dev/test safe).
+    Sends plain-text email via Resend API.
+    Falls back to logger.info() if the SENDGRID_API_KEY environment variable is not set.
     """
-    import os
     api_key = os.environ.get("SENDGRID_API_KEY", "")
     from_email = os.environ.get("FROM_EMAIL", "onboarding@resend.dev")
 
     if not api_key:
-        logger.warning("📧 No API key set — email not sent. Set SENDGRID_API_KEY in .env")
-        logger.info("📧 [DEV MOCK] To: %s | Subject: %s", to, subject)
+        logger.warning("No API key set - email not sent. Set SENDGRID_API_KEY in .env")
+        logger.info("DEV MOCK | To: %s | Subject: %s", to, subject)
         return False
 
     try:
-        import httpx
         response = httpx.post(
             "https://api.resend.com/emails",
             headers={
@@ -52,113 +52,66 @@ def _send_email(to: str, subject: str, html: str) -> bool:
                 "from": f"Occacia <{from_email}>",
                 "to": [to],
                 "subject": subject,
-                "html": html,
+                "text": text_body,
             },
             timeout=10,
         )
         response.raise_for_status()
-        logger.info("📧 Email sent to %s via Resend | Status: %s", to, response.status_code)
+        logger.info("Email sent to %s via Resend | Status: %s", to, response.status_code)
         return True
     except Exception as e:
-        logger.error("📧 Failed to send email to %s: %s", to, str(e))
+        logger.error("Failed to send email to %s: %s", to, str(e))
         return False
 
 
 def _build_customer_verification_email(email: str, token: str) -> tuple[str, str]:
-    link = f"https://api.occacia.com/api/v1/auth/customer/verify-email?token={token}"
+    link = f"https://app.occacia.com/verify?token={token}"
     subject = "Verify your Occacia account"
-    html = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
-        <h2 style="color: #2d3748;">Welcome to Occacia! 🎉</h2>
-        <p style="color: #4a5568;">
-            Thank you for registering. Please verify your email address to activate your account.
-        </p>
-        <a href="{link}"
-           style="display: inline-block; background: #6366f1; color: white;
-                  padding: 12px 28px; border-radius: 6px; text-decoration: none;
-                  font-weight: bold; margin: 20px 0; font-size: 16px;">
-            Verify My Email
-        </a>
-        <p style="color: #718096; font-size: 14px; margin-top: 24px;">
-            This link expires in 24 hours.<br>
-            If you didn't create an account, you can safely ignore this email.
-        </p>
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
-        <p style="color: #a0aec0; font-size: 12px;">
-            Can't click the button? Copy this link:<br>
-            <a href="{link}" style="color: #6366f1;">{link}</a>
-        </p>
-    </div>
-    """
-    return subject, html
+    body = (
+        "Welcome to Occacia!\n\n"
+        "Thank you for registering. Please verify your email address to activate your account "
+        "by clicking the link below:\n\n"
+        f"{link}\n\n"
+        "This link expires in 24 hours.\n"
+        "If you didn't create an account, you can safely ignore this email."
+    )
+    return subject, body
 
 
 def _build_vendor_verification_email(email: str, token: str) -> tuple[str, str]:
-    link = f"https://api.occacia.com/api/v1/auth/vendors/verify-email?token={token}"
+    link = f"https://app.occacia.com/vendor-verify?token={token}"
     subject = "Verify your Occacia vendor account"
-    html = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
-        <h2 style="color: #2d3748;">Welcome to Occacia Vendors! 🏢</h2>
-        <p style="color: #4a5568;">
-            Please verify your email address to complete your vendor registration.
-            Your account will be reviewed by our team after verification.
-        </p>
-        <a href="{link}"
-           style="display: inline-block; background: #6366f1; color: white;
-                  padding: 12px 28px; border-radius: 6px; text-decoration: none;
-                  font-weight: bold; margin: 20px 0; font-size: 16px;">
-            Verify Vendor Email
-        </a>
-        <p style="color: #718096; font-size: 14px; margin-top: 24px;">
-            This link expires in 24 hours.
-        </p>
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
-        <p style="color: #a0aec0; font-size: 12px;">
-            Can't click the button? Copy this link:<br>
-            <a href="{link}" style="color: #6366f1;">{link}</a>
-        </p>
-    </div>
-    """
-    return subject, html
+    body = (
+        "Welcome to Occacia Vendors!\n\n"
+        "Please verify your email address to complete your vendor registration "
+        "by clicking the link below:\n\n"
+        f"{link}\n\n"
+        "Your account will be reviewed by our team after verification.\n"
+        "This link expires in 24 hours."
+    )
+    return subject, body
 
 
 def _build_password_reset_email(email: str, token: str) -> tuple[str, str]:
-    link = f"https://api.occacia.com/api/v1/auth/customer/password/reset?token={token}"
+    link = f"https://app.occacia.com/reset-password?token={token}"
     subject = "Reset your Occacia password"
-    html = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
-        <h2 style="color: #2d3748;">Password Reset Request 🔐</h2>
-        <p style="color: #4a5568;">
-            We received a request to reset the password for your Occacia account.
-        </p>
-        <a href="{link}"
-           style="display: inline-block; background: #e53e3e; color: white;
-                  padding: 12px 28px; border-radius: 6px; text-decoration: none;
-                  font-weight: bold; margin: 20px 0; font-size: 16px;">
-            Reset My Password
-        </a>
-        <p style="color: #718096; font-size: 14px; margin-top: 24px;">
-            This link expires in 15 minutes.<br>
-            If you didn't request a password reset, you can safely ignore this email —
-            your password will not be changed.
-        </p>
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
-        <p style="color: #a0aec0; font-size: 12px;">
-            Can't click the button? Copy this link:<br>
-            <a href="{link}" style="color: #e53e3e;">{link}</a>
-        </p>
-    </div>
-    """
-    return subject, html
+    body = (
+        "Password Reset Request\n\n"
+        "We received a request to reset the password for your Occacia account. "
+        "Click the link below to reset it:\n\n"
+        f"{link}\n\n"
+        "This link expires in 15 minutes.\n"
+        "If you didn't request a password reset, you can safely ignore this email — "
+        "your password will not be changed."
+    )
+    return subject, body
 
 
-# ── AuthService ──────────────────────────────────────────────────────────────
+# --- AuthService ---
 
 class AuthService:
 
-    # ==========================================
-    # 🔐 REGISTRATION & VERIFICATION
-    # ==========================================
+    # --- Registration & Verification ---
 
     def register_customer(self, db: Session, payload: CustomerRegister) -> dict[str, str]:
         existing = db.query(Customer).filter(Customer.email == str(payload.email)).first()
@@ -186,8 +139,8 @@ class AuthService:
         db.add(customer)
         db.commit()
 
-        subject, html = _build_customer_verification_email(str(payload.email), verification_token)
-        _send_email(str(payload.email), subject, html)
+        subject, body = _build_customer_verification_email(str(payload.email), verification_token)
+        _send_email(str(payload.email), subject, body)
 
         return {"message": "Verification email sent", "email": str(payload.email)}
 
@@ -198,8 +151,8 @@ class AuthService:
             token_type="verify_vendor_email",
             hours=EMAIL_VERIFICATION_TTL_HOURS,
         )
-        subject, html = _build_vendor_verification_email(email, verification_token)
-        _send_email(email, subject, html)
+        subject, body = _build_vendor_verification_email(email, verification_token)
+        _send_email(email, subject, body)
 
     def verify_customer_email(self, db: Session, token: str) -> dict[str, str]:
         claims = self._decode_verification_token(token, expected_type="verify_customer_email")
@@ -240,15 +193,13 @@ class AuthService:
         db.commit()
         return {"message": "Email verified successfully"}
 
-    # ==========================================
-    # 🔑 PASSWORD RESET
-    # ==========================================
+    # --- Password Reset ---
 
     def request_password_reset(self, db: Session, payload: ForgotPasswordRequest) -> dict[str, str]:
         customer = db.query(Customer).filter(Customer.email == str(payload.email)).first()
 
         if not customer:
-            logger.info("UC-07: Reset requested for non-existent email: %s", payload.email)
+            logger.info("Reset requested for non-existent email: %s", payload.email)
             return {"message": "If this email is registered, a reset link has been sent."}
 
         token, _ = self._create_verification_token_internal(
@@ -257,8 +208,8 @@ class AuthService:
             minutes=PASSWORD_RESET_TTL_MINUTES,
         )
 
-        subject, html = _build_password_reset_email(str(payload.email), token)
-        _send_email(str(payload.email), subject, html)
+        subject, body = _build_password_reset_email(str(payload.email), token)
+        _send_email(str(payload.email), subject, body)
 
         return {"message": "If this email is registered, a reset link has been sent."}
 
@@ -274,12 +225,10 @@ class AuthService:
         db.add(customer)
         db.commit()
 
-        logger.info("UC-07: Password successfully reset for: %s", email)
+        logger.info("Password successfully reset for: %s", email)
         return {"message": "Password updated successfully"}
 
-    # ==========================================
-    # 🛠️ INTERNAL TOKEN HELPERS
-    # ==========================================
+    # --- Internal Token Helpers ---
 
     @staticmethod
     def _create_verification_token_internal(
