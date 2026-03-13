@@ -1,11 +1,15 @@
 import logging
 from datetime import date, timedelta
-from typing import List, Optional
-
+from typing import Any, List, Optional
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models.package import Package
+from app.models.user import User
 from app.models.vendor import Vendor
+from app.common.enums import UserRole, VendorStatus
+from app.schemas.vendor_schema import VendorCreate
+from app.core.security import get_password_hash
+from app.common.utils import generate_prefixed_id
 
 logger = logging.getLogger(__name__)
 
