@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.customer import Customer
-from app.routers.v1.auth_router import get_current_customer
+from app.core.dependencies import get_current_customer
 from app.services.persona_service import persona_service
 
 logger = logging.getLogger(__name__)

@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.routers.v1.auth_router import get_current_customer
+from app.core.dependencies import get_current_customer
 from app.models.customer import Customer
 from app.models.persona import Persona
 from app.services.ai_service import ai_service
