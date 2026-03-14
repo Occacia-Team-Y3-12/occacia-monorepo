@@ -19,10 +19,6 @@ const CustomerHeader = ({ isSidebarOpen, onToggleSidebar }: CustomerHeaderProps)
   const isEventDetailPage = pathname.startsWith('/customer/events/');
   const isEventFlow = isEventsRootPage || isEventDetailPage;
 
-  const breadcrumbText = isEventFlow
-    ? `Events > ${isEventsRootPage ? 'Create New Event' : savedEventTitle}`
-    : 'Customer Portal';
-
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
@@ -79,7 +75,7 @@ const CustomerHeader = ({ isSidebarOpen, onToggleSidebar }: CustomerHeaderProps)
               <span className="font-semibold text-[#1D2638]">{isEventsRootPage ? 'Create New Event' : savedEventTitle}</span>
             </p>
           ) : (
-            <p className="text-sm font-medium text-[#8A90A1]">{breadcrumbText}</p>
+            <></>
           )}
         </div>
       </div>
