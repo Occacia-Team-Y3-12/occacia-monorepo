@@ -1,3 +1,6 @@
+"""
+app/schemas/planning_schema.py
+"""
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 
@@ -36,3 +39,9 @@ class PlanResponse(BaseModel):
     venue_tags: List[str] = []
     missing_info: List[str] = []
     matched_venues: List[VenueDisplay] = []
+    
+    # Frontend State Flags (Required to not break the UI flow)
+    ask_save_persona: bool = False
+    persona_saved: bool = False
+    persona_confirmed: bool = False
+    venue_match_tier: Optional[int] = None
