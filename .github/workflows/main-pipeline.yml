@@ -178,7 +178,7 @@ jobs:
             DOCKER_SOCKET=/var/run/docker.sock
             EOF
 
-            # 🛑 CRITICAL FIX: The Architect and Foreman are fixed. No --no-cache.
+            # 🛑 The Architect and Foreman are fixed. No --no-cache.
             sudo docker compose down --remove-orphans || true
             sudo docker compose up --build -d
 
