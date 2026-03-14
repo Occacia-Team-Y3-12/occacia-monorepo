@@ -9,7 +9,7 @@ from .auth_schema import (
     VendorRegister,
     VerifyEmailResponse,
 )
-from .plan_schema import PlanRequest, PlanResponse, VenueDisplay
+from .planning_schema import PlanRequest, PlanResponse, VenueDisplay
 from .vendor_schema import Token, VendorLoginRequest, VendorRegisterRequest, VendorResponse
 
 __all__ = [
