@@ -17,6 +17,7 @@ import {
 
 const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const DEFAULT_OFFSETS = [10080, 1440, 60];
+const GENERIC_ERROR_TEXT = 'Something went wrong. Please try again.';
 
 const toLocalDate = (iso?: string): string => {
   if (!iso) {
@@ -332,27 +333,46 @@ export const useEventChatPlanner = (eventId: string) => {
     setIsBusy(false);
   };
 
-  const connectCalendar = async () => {
+  const connectCalendar = async (): Promise<boolean> => {
     setIsBusy(true);
     setError(null);
+    setWarning(null);
+    setSuccess(null);
 
     const result = await customerEventChatService.connectCalendar({ provider: selectedProvider });
     if (!result.ok || !result.data?.data?.status) {
-      setError(result.error || result.data?.message || 'Failed to connect calendar provider.');
+      const message = result.error || result.data?.message || 'Failed to connect calendar provider.';
+      if (message === GENERIC_ERROR_TEXT) {
+        setWarning('Google Calendar service is temporarily unavailable. Continue with local reminders and try again later.');
+      } else {
+        setError(message);
+      }
       setIsBusy(false);
-      return;
+      return false;
     }
 
     setCalendarStatus(result.data.data.status);
     setSuccess('Calendar connected.');
     setIsBusy(false);
+    return true;
   };
 
   const setCalendarSync = async (enabled: boolean) => {
     setIsBusy(true);
     setError(null);
+    setWarning(null);
+    setSuccess(null);
 
-    if (enabled && !calendarStatus.connected) {
+    let latestStatus = calendarStatus;
+    if (enabled && !latestStatus.connected) {
+      const statusResult = await customerEventChatService.getCalendarStatus();
+      if (statusResult.ok && statusResult.data?.data?.status) {
+        latestStatus = statusResult.data.data.status;
+        setCalendarStatus(latestStatus);
+      }
+    }
+
+    if (enabled && !latestStatus.connected) {
       setWarning('Calendar not connected. Connect provider first or use local reminders only.');
       setIsBusy(false);
       return;
@@ -361,11 +381,16 @@ export const useEventChatPlanner = (eventId: string) => {
     const result = await customerEventChatService.setCalendarSync(eventId, {
       enabled,
       provider: selectedProvider,
-      calendarId: calendarStatus.calendarId,
+      calendarId: latestStatus.calendarId,
     });
 
     if (!result.ok) {
-      setError(result.error || result.data?.message || 'Failed to update calendar sync.');
+      const message = result.error || result.data?.message || 'Failed to update calendar sync.';
+      if (message === GENERIC_ERROR_TEXT) {
+        setWarning('Calendar sync service is temporarily unavailable. You can still use local reminders.');
+      } else {
+        setError(message);
+      }
       setIsBusy(false);
       return;
     }

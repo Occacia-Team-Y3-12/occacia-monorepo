@@ -1,13 +1,57 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useEventChatPlanner } from '@/hooks/customer/useEventChatPlanner';
+import { ROUTES } from '@/lib/routes';
+
+const toDisplayDate = (isoDate: string): string => {
+  if (!isoDate) {
+    return '';
+  }
+
+  const [year, month, day] = isoDate.split('-');
+  if (!year || !month || !day) {
+    return '';
+  }
+
+  return `${day}/${month}/${year}`;
+};
+
+const toIsoDate = (displayDate: string): string | null => {
+  const cleaned = displayDate.trim();
+  if (!cleaned) {
+    return '';
+  }
+
+  const matched = cleaned.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!matched) {
+    return null;
+  }
+
+  const [, dayStr, monthStr, yearStr] = matched;
+  const day = Number(dayStr);
+  const month = Number(monthStr);
+  const year = Number(yearStr);
+
+  const candidate = new Date(year, month - 1, day);
+  const isValidDate = candidate.getFullYear() === year && candidate.getMonth() === month - 1 && candidate.getDate() === day;
+
+  if (!isValidDate) {
+    return null;
+  }
+
+  return `${yearStr}-${monthStr}-${dayStr}`;
+};
 
 export default function CustomerEventChatPage() {
   const params = useParams<{ eventId: string }>();
+  const router = useRouter();
   const eventId = params?.eventId;
   const [activeTaskMenuId, setActiveTaskMenuId] = useState<string | null>(null);
+  const [dateInputValue, setDateInputValue] = useState('');
+  const [dateInputError, setDateInputError] = useState<string | null>(null);
+  const datePickerRef = useRef<HTMLInputElement>(null);
 
   const {
     isInitialLoading,
@@ -26,7 +70,6 @@ export default function CustomerEventChatPage() {
     setNewTaskTitle,
     addTask,
     removeTask,
-    dateTBD,
     startDate,
     setStartDate,
     setIsRecurring,
@@ -43,6 +86,11 @@ export default function CustomerEventChatPage() {
     setCalendarSync,
     confirmTasks,
   } = useEventChatPlanner(eventId || '');
+
+  useEffect(() => {
+    setDateInputValue(toDisplayDate(startDate));
+    setDateInputError(null);
+  }, [startDate]);
 
   if (!eventId) {
     return <section className="rounded-2xl border border-[#E4E8F2] bg-white p-6 text-sm text-[#D64545]">Invalid event id.</section>;
@@ -63,12 +111,47 @@ export default function CustomerEventChatPage() {
     await saveReminders();
 
     if (calendarSyncEnabled && !calendarStatus.connected) {
-      await connectCalendar();
+      const connected = await connectCalendar();
+      if (!connected) {
+        return;
+      }
     }
 
     if (calendarSyncEnabled) {
       await setCalendarSync(true);
     }
+  };
+
+  const handleCalendarSyncToggle = async (nextEnabled: boolean) => {
+    if (nextEnabled) {
+      if (!calendarStatus.connected) {
+        const connected = await connectCalendar();
+        if (!connected) {
+          return;
+        }
+      }
+
+      await setCalendarSync(true);
+      return;
+    }
+
+    await setCalendarSync(false);
+  };
+
+  const commitTypedDate = () => {
+    const isoDate = toIsoDate(dateInputValue);
+
+    if (isoDate === null) {
+      if (dateInputValue.trim()) {
+        setDateInputError('Use format DD/MM/YYYY');
+      } else {
+        setDateInputError(null);
+      }
+      return;
+    }
+
+    setDateInputError(null);
+    setStartDate(isoDate);
   };
 
   if (isInitialLoading) {
@@ -145,7 +228,15 @@ export default function CustomerEventChatPage() {
               <div className="w-full max-w-[650px] text-right">
                 <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA5BC]">Me</p>
                 <div className="ml-auto inline-block rounded-2xl bg-[#0D4FB4] px-4 py-3 text-sm text-white shadow-[0_8px_20px_rgba(13,79,180,0.25)]">
-                  It&apos;s on {startDate || '2025-10-11'}. Yes, repeat it every year.
+                  <p>It&apos;s on {startDate || '2025-10-11'}. Yes, repeat it every year.</p>
+                  <span className="mt-1 inline-flex items-center justify-end gap-0.5 text-[10px] text-[#D6E4FF]" aria-label="Sent">
+                    <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M2 6.4L4.3 8.6L10 3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <svg viewBox="0 0 12 12" className="-ml-1.5 h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M2 6.4L4.3 8.6L10 3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
                 </div>
               </div>
             </div>
@@ -163,13 +254,65 @@ export default function CustomerEventChatPage() {
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#98A4BC]">
                         Date
-                        <input
-                          type="date"
-                          value={startDate}
-                          onChange={(event) => setStartDate(event.target.value)}
-                          disabled={dateTBD}
-                          className="mt-2 h-10 w-full rounded-lg border border-[#D7DFEC] bg-white px-3 text-sm text-[#1C2940]"
-                        />
+                        <div className="relative mt-2">
+                          <input
+                            type="text"
+                            value={dateInputValue}
+                            onChange={(event) => {
+                              setDateInputValue(event.target.value);
+                              if (dateInputError) {
+                                setDateInputError(null);
+                              }
+                            }}
+                            onBlur={commitTypedDate}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') {
+                                event.preventDefault();
+                                commitTypedDate();
+                              }
+                            }}
+                            placeholder="DD/MM/YYYY"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            className="h-10 w-full rounded-lg border border-[#D7DFEC] bg-white px-3 pr-10 text-sm text-[#1C2940] placeholder:text-[#98A4BC]"
+                          />
+
+                          <input
+                            ref={datePickerRef}
+                            type="date"
+                            value={startDate}
+                            onChange={(event) => {
+                              setStartDate(event.target.value);
+                              setDateInputError(null);
+                            }}
+                            className="pointer-events-none absolute right-2 top-2 h-6 w-6 opacity-0"
+                            tabIndex={-1}
+                            aria-hidden="true"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const picker = datePickerRef.current;
+                              if (!picker) {
+                                return;
+                              }
+
+                              if (typeof picker.showPicker === 'function') {
+                                picker.showPicker();
+                                return;
+                              }
+
+                              picker.click();
+                            }}
+                            className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center"
+                            aria-label="Open calendar"
+                          >
+                            <img src="/icons/customer/events/calander_icon.svg" alt="calendar" className="h-5 w-5 object-contain" />
+                          </button>
+                        </div>
+
+                        {dateInputError && <p className="mt-1 text-[10px] font-medium normal-case tracking-normal text-[#C23D3D]">{dateInputError}</p>}
                       </label>
 
                       <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#98A4BC]">
@@ -198,10 +341,7 @@ export default function CustomerEventChatPage() {
                             checked={calendarSyncEnabled}
                             onChange={async (event) => {
                               const enabled = event.target.checked;
-                              if (enabled && !calendarStatus.connected) {
-                                await connectCalendar();
-                              }
-                              await setCalendarSync(enabled);
+                              await handleCalendarSyncToggle(enabled);
                             }}
                           />
                           Sync to Google Calendar
@@ -209,12 +349,20 @@ export default function CustomerEventChatPage() {
                         <button
                           type="button"
                           onClick={async () => {
-                            await connectCalendar();
-                            await setCalendarSync(true);
+                            const nextEnabled = !calendarSyncEnabled;
+                            await handleCalendarSyncToggle(nextEnabled);
                           }}
-                          className="h-7 rounded-md bg-[#0F4FB7] px-3 text-[11px] font-semibold text-white"
+                          className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 ${
+                            calendarSyncEnabled ? 'bg-[#0F5FD8]' : 'bg-[#C6D2E8]'
+                          }`}
+                          aria-label="Toggle Google Calendar sync"
+                          aria-pressed={calendarSyncEnabled}
                         >
-                          {calendarStatus.connected ? 'Connected' : 'Connect'}
+                          <span
+                            className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-[0_2px_4px_rgba(17,35,74,0.3)] transition-transform duration-200 ${
+                              calendarSyncEnabled ? 'translate-x-7' : 'translate-x-1'
+                            }`}
+                          />
                         </button>
                       </div>
                     </div>
@@ -429,6 +577,13 @@ export default function CustomerEventChatPage() {
           </div>
 
           <div className="mt-auto border-t border-[#DDE5F2] bg-[#F4F7FC] px-6 py-6">
+            <button
+              type="button"
+              onClick={() => router.push(ROUTES.CUSTOMER.EVENT_DRAFT_REVIEW(eventId || ''))}
+              className="mb-3 h-10 w-full rounded-[12px] border border-[#D3DEEF] bg-white text-[12px] font-semibold uppercase tracking-[0.08em] text-[#3C4C6D]"
+            >
+              Save As Draft
+            </button>
             <button
               type="button"
               onClick={() => void confirmTasks()}

@@ -6,6 +6,7 @@ export const ROUTES = {
     REGISTER: '/customer/register',
     EVENTS: '/customer/events',
     EVENT_CHAT: (eventId: string) => `/customer/events/${eventId}/chat`,
+    EVENT_DRAFT_REVIEW: (eventId: string) => `/customer/events/${eventId}/draft`,
     EVENT_RECOMMENDATIONS: (eventId: string) => `/customer/events/${eventId}/recommendations`,
     PRODUCTS: '/customer/products',
     CART: '/customer/cart',
