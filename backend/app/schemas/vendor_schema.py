@@ -1,6 +1,8 @@
+"""
+app/schemas/vendor_schema.py
+"""
 from datetime import datetime
 from typing import Optional
-
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 # --- Requests ---
@@ -17,6 +19,11 @@ class VendorRegisterRequest(BaseModel):
 class VendorLoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+# FIX: Added strict schema for profile updates
+class VendorUpdate(BaseModel):
+    displayName: Optional[str] = None
+    contactPhone: Optional[str] = None
 
 # --- Responses ---
 
