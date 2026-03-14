@@ -10,11 +10,17 @@ class PlanRequest(BaseModel):
 
 class VenueDisplay(BaseModel):
     # Package fields
+    id: Optional[int] = None
     name: str
     description: Optional[str] = None
     price_per_head: Optional[float] = None
     tags: List[str] = []
     total_estimated_price: Optional[float] = None
+
+    # Match Score fields (Required for CI/CD tests)
+    match_score: Optional[int] = None
+    match_score_max: Optional[int] = None
+    match_score_label: Optional[str] = None
 
     # Vendor fields
     vendor_name: Optional[str] = None
@@ -23,7 +29,7 @@ class VenueDisplay(BaseModel):
     vendor_email: Optional[str] = None
     is_verified: Optional[bool] = False
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
 
 class PlanResponse(BaseModel):
     intent: str
@@ -40,7 +46,7 @@ class PlanResponse(BaseModel):
     missing_info: List[str] = []
     matched_venues: List[VenueDisplay] = []
     
-    # Frontend State Flags (Required to not break the UI flow)
+    # Frontend State Flags
     ask_save_persona: bool = False
     persona_saved: bool = False
     persona_confirmed: bool = False

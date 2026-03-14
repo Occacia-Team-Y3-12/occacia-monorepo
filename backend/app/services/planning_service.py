@@ -9,7 +9,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models.customer import Customer
-from app.schemas.planning_schema import PlanResponse, VenueDisplay
+from app.schemas.planning_schema import PlanResponse
 
 logger = logging.getLogger(__name__)
 
@@ -38,38 +38,57 @@ def _extract_date(text: str) -> Optional[str]:
     m = _DATE_RE.search(text)
     if m:
         try:
-            # Validate ISO format but return string for PlanResponse
             date.fromisoformat(m.group(1))
             return m.group(1)
         except ValueError: pass
     return None
 
-def _package_to_venue(pkg, guest_count: Optional[int] = None) -> VenueDisplay:
-    """Transforms a raw SQLAlchemy Package/Vendor join into your strict VenueDisplay schema."""
-    v = getattr(pkg, "vendor", None)
-    
-    tags = pkg.tags or []
-    if isinstance(tags, str):
-        import json
-        try: tags = json.loads(tags)
-        except: tags = []
-        
-    est_price = None
-    if getattr(pkg, "price_per_head", None) and guest_count:
-        est_price = float(pkg.price_per_head) * guest_count
+def _package_to_dict(pkg, requested_tags: list = None) -> dict:
+    state = getattr(pkg, "__dict__", None) or {}
+    vendor_name = None
+    try:
+        vendor_loaded = "vendor" in state
+        if vendor_loaded:
+            v = state["vendor"]
+            if v is not None:
+                vendor_name = (getattr(v, "display_name", None) or getattr(v, "business_name", None))
+        elif hasattr(pkg, "vendor") and not hasattr(type(pkg), "__tablename__"):
+            v = pkg.vendor
+            if v is not None:
+                vendor_name = (getattr(v, "display_name", None) or getattr(v, "business_name", None))
+    except Exception:
+        vendor_name = None
 
-    return VenueDisplay(
-        name=pkg.name,
-        description=pkg.description,
-        price_per_head=getattr(pkg, "price_per_head", None),
-        tags=tags,
-        total_estimated_price=est_price,
-        vendor_name=(getattr(v, "display_name", None) or getattr(v, "business_name", None)) if v else None,
-        vendor_phone=getattr(v, "contact_phone", None) or getattr(v, "phone", None) if v else None,
-        vendor_location=getattr(v, "location_base", None) if v else None,
-        vendor_email=getattr(v, "email", None) if v else None,
-        is_verified=getattr(v, "is_verified", False) if v else False,
-    )
+    pkg_tags = pkg.tags or []
+    if isinstance(pkg_tags, str):
+        import json as _json
+        try: pkg_tags = _json.loads(pkg_tags)
+        except Exception: pkg_tags = []
+
+    if requested_tags:
+        matched   = len(set(requested_tags) & set(pkg_tags))
+        total     = len(set(requested_tags))
+        match_score       = matched
+        match_score_max   = total
+        match_score_label = f"{matched} of {total} tags matched"
+    else:
+        match_score       = None
+        match_score_max   = None
+        match_score_label = None
+
+    return {
+        "id":                pkg.id,
+        "name":              pkg.name,
+        "description":       pkg.description,
+        "price_per_head":    getattr(pkg, "price_per_head", None),
+        "tags":              pkg_tags,
+        "location":          getattr(pkg, "location_coverage", None),
+        "vendor_name":       vendor_name,
+        "match_score":       match_score,
+        "match_score_max":   match_score_max,
+        "match_score_label": match_score_label,
+    }
+
 
 class PlanningService:
     async def process_plan(
@@ -84,11 +103,9 @@ class PlanningService:
         vendor_svc
     ) -> PlanResponse:
         
-        # 1. History & Missing Info
         history = chat_svc.get_session_history(db, session_id)
         prev_missing = chat_svc.get_last_missing_info(db, session_id)
 
-        # 2. Hard Fact Extraction
         all_text = user_query + " " + " ".join((m.user_message or "") for m in history[-5:])
         extracted_budget   = _extract_budget(all_text)
         extracted_guests   = _extract_guests(all_text)
@@ -96,13 +113,10 @@ class PlanningService:
         extracted_date     = _extract_date(all_text)
 
         active_missing = list(prev_missing or [])
-
-        # 3. Load Personas & Vendor Availability
         personas = persona_svc.get_personas(db, str(customer.customer_id))
         available_tags = vendor_svc.get_all_tags(db)
         availability_block = vendor_svc.get_availability_block(db, tags=available_tags[:20]) if available_tags else ""
 
-        # 4. AI Orchestration
         try:
             fact_parts = []
             if extracted_budget: fact_parts.append(f"budget={extracted_budget}")
@@ -132,7 +146,6 @@ class PlanningService:
                 "missing_info": [],
             }
 
-        # 5. Intent & State Mapping
         intent          = ai_result.get("intent", "chat")
         venue_tags      = ai_result.get("venue_tags") or []
         new_missing     = ai_result.get("missing_info") or []
@@ -142,12 +155,12 @@ class PlanningService:
         budget_for_filter = ai_result.get("budget_per_head") or extracted_budget
         location_for_filter = ai_result.get("location") or extracted_location
 
-        # --- Persona Flow Management ---
         save_persona_data = ai_result.get("save_persona")
         ask_save_persona  = ai_result.get("ask_save_persona", False)
         _query_lower_pers = user_query.lower().strip()
         _user_said_yes    = any(s in _query_lower_pers for s in ["yes", "sure", "ok", "okay", "save", "please", "yep", "yeah", "do it"])
 
+        # FIX 1: Correctly parse the age and personality strings
         if save_persona_data and isinstance(save_persona_data, dict) and _user_said_yes:
             try:
                 name = save_persona_data.get("name", "").strip()
@@ -155,66 +168,111 @@ class PlanningService:
                     pdata = {
                         "name": name,
                         "relationship": save_persona_data.get("relationship"),
-                        "personality": save_persona_data.get("personality", ""),
+                        "personality": save_persona_data.get("personality") or "",
                         "food_preferences": save_persona_data.get("food_preferences") or [],
                         "music_preferences": save_persona_data.get("music_preferences") or [],
                         "personality_tags": save_persona_data.get("personality_tags") or [],
                         "color_preferences": save_persona_data.get("color_preferences") or [],
                     }
-                    if save_persona_data.get("age"):
-                        pdata["personality"] = f"{pdata['personality']} Age: {save_persona_data.get('age')}".strip()
+                    
+                    age = save_persona_data.get("age")
+                    if age:
+                        pdata["personality"] = (pdata["personality"] + f" Age: {age}").strip()
 
                     new_persona = persona_svc.create_persona(db, customer_id=str(customer.customer_id), data=pdata)
                     persona_svc.confirm_persona(db, new_persona.persona_id, str(customer.customer_id))
                     personas = persona_svc.get_personas(db, str(customer.customer_id))
-            except Exception as e:
+            except Exception as e: 
                 logger.warning(f"Persona auto-save failed: {e}")
 
         use_persona_name = ai_result.get("use_persona_name", "").strip() if ai_result.get("use_persona_name") else ""
         if use_persona_name and personas:
             matched_persona = next((p for p in personas if p.name.lower() == use_persona_name.lower()), None)
             if matched_persona and not matched_persona.is_confirmed:
-                try:
-                    persona_svc.confirm_persona(db, matched_persona.persona_id, str(customer.customer_id))
-                except Exception as e:
-                    logger.warning(f"Persona auto-confirm failed: {e}")
+                try: persona_svc.confirm_persona(db, matched_persona.persona_id, str(customer.customer_id))
+                except Exception: pass
 
-        # --- Multi-Intent Overrides ---
         _query_lower = (user_query or "").lower()
         _has_gift = any(s in _query_lower for s in ["gift", "present", "buy", "surprise", "get her", "get him"])
         _has_plan = any(s in _query_lower for s in ["venue", "dinner", "restaurant", "party", "book", "plan", "event"])
         if _has_gift and _has_plan:
             intent = "multi"
 
-        # 6. Database Matchmaking
         matched_venues   = []
         venue_match_tier = None
 
-        if intent in ("planning", "date", "multi") and venue_tags:
+        if intent == "multi" and venue_tags:
             pkgs = vendor_svc.find_perfect_matches(
                 db, criteria={"venue_tags": venue_tags, "budget_per_head": budget_for_filter, "location": location_for_filter, "guest_count": extracted_guests}
             )
-            matched_venues = [_package_to_venue(p, extracted_guests) for p in pkgs]
-            
-            # Simple tier matching
-            if pkgs: venue_match_tier = 1 if len(matched_venues) > 0 else 3
+            matched_venues = [_package_to_dict(p, requested_tags=venue_tags) for p in pkgs]
 
-        if intent in ("gift", "multi") and venue_tags:
             gift_tags = list(venue_tags)
-            for p in personas:
-                if p.name and p.name.lower() in (chat_response or "").lower():
-                    gift_tags.extend((p.preferences_json or []) + (p.food_preferences or []) + (p.personality_tags or []))
+            response_lower = (chat_response or "").lower()
+            for persona in personas:
+                if persona.name and persona.name.lower() in response_lower:
+                    def _parse_list(val):
+                        if isinstance(val, str):
+                            import json
+                            try: return json.loads(val)
+                            except: return [val]
+                        return list(val or [])
                     
-            gift_pkgs = vendor_svc.find_gift_matches(db, gift_tags=list(set(gift_tags)), budget=budget_for_filter)
+                    merged = list(set(_parse_list(persona.preferences_json) + _parse_list(persona.food_preferences) + _parse_list(persona.personality_tags)))
+                    gift_tags = list(set(gift_tags + merged))
+                    
+            gift_pkgs = vendor_svc.find_gift_matches(db, gift_tags=gift_tags, budget=budget_for_filter)
             if gift_pkgs and not gift_suggestion:
                 gift_suggestion = f"{gift_pkgs[0].name} - {getattr(gift_pkgs[0], 'description', '') or ''}".strip(" -")
 
-        # 7. State Persist
+        elif intent in ("planning", "date", "gift") and venue_tags:
+            if intent == "gift":
+                gift_tags = list(venue_tags)
+                response_lower = (chat_response or "").lower()
+                for persona in personas:
+                    if persona.name and persona.name.lower() in response_lower:
+                        def _parse_list(val):
+                            if isinstance(val, str):
+                                import json
+                                try: return json.loads(val)
+                                except: return [val]
+                            return list(val or [])
+                        merged = list(set(_parse_list(persona.preferences_json) + _parse_list(persona.food_preferences) + _parse_list(persona.personality_tags)))
+                        gift_tags = list(set(gift_tags + merged))
+                        
+                pkgs = vendor_svc.find_gift_matches(db, gift_tags=gift_tags, budget=budget_for_filter)
+            else:
+                pkgs = vendor_svc.find_perfect_matches(
+                    db, criteria={"venue_tags": venue_tags, "budget_per_head": budget_for_filter, "location": location_for_filter, "guest_count": extracted_guests}
+                )
+
+            matched_venues = [_package_to_dict(p, requested_tags=venue_tags) for p in pkgs]
+
+            if pkgs:
+                canonical_loc = vendor_svc.extract_location_from_text(location_for_filter or "")
+                first = pkgs[0]
+                pkg_tags = first.tags or []
+                if isinstance(pkg_tags, str):
+                    import json
+                    try: pkg_tags = json.loads(pkg_tags)
+                    except: pkg_tags = []
+                
+                all_tags_match = set(venue_tags).issubset(set(pkg_tags))
+                loc_match = canonical_loc and canonical_loc in (getattr(first, "location_coverage", "") or "").lower()
+                
+                if all_tags_match and loc_match: venue_match_tier = 1
+                elif all_tags_match: venue_match_tier = 2
+                else: venue_match_tier = 3
+
         chat_svc.save_message(
             db, session_id=session_id, user_msg=user_query, ai_msg=chat_response or "",
             customer_id=customer.customer_id, missing_info=new_missing,
         )
 
+        _persona_saved = (bool(save_persona_data) and _user_said_yes and isinstance(save_persona_data, dict) and bool(save_persona_data.get("name", "").strip()))
+        _persona_confirmed = bool(use_persona_name)
+
+        # FIX 2: Restored ai_result.get() fallbacks for parameters that regex failed to extract
         return PlanResponse(
             intent             = intent,
             reasoning          = ai_result.get("reasoning"),
@@ -225,14 +283,14 @@ class PlanningService:
             venue_match_tier   = venue_match_tier,
             event_type         = event_type,
             event_date         = extracted_date,
-            location           = location_for_filter,
-            budget_per_head    = budget_for_filter,
-            guest_count        = extracted_guests,
+            location           = ai_result.get("location") or extracted_location,
+            budget_per_head    = ai_result.get("budget_per_head") or extracted_budget,
+            guest_count        = ai_result.get("guest_count") or extracted_guests,
             venue_tags         = venue_tags,
             matched_venues     = matched_venues,
             ask_save_persona   = bool(ask_save_persona),
-            persona_saved      = bool(save_persona_data and _user_said_yes),
-            persona_confirmed  = bool(use_persona_name),
+            persona_saved      = _persona_saved,
+            persona_confirmed  = _persona_confirmed,
         )
 
 planning_service = PlanningService()

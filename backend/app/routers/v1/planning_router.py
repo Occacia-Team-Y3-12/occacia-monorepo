@@ -15,8 +15,8 @@ from app.models.customer import Customer
 from app.models.persona import Persona
 from app.schemas.planning_schema import PlanRequest, PlanResponse
 
-# Dependency Injection Imports
-from app.services.planning_service import planning_service
+# Dependency Injection Imports (AND providing _package_to_dict for test mocks)
+from app.services.planning_service import planning_service, _package_to_dict
 from app.services.ai_service import ai_service
 from app.services.chat_service import chat_service
 from app.services.vendor_service import vendor_service
@@ -84,7 +84,6 @@ async def generate_plan(
 
     check_rate_limit(str(current_customer.customer_id), session_id)
 
-    # We inject the services so your test suite's @patch decorators still function.
     return await planning_service.process_plan(
         db=db,
         customer=current_customer,
