@@ -1,9 +1,25 @@
-.venv
-.idea
-.pytest_cache
-.ruff_cache
-.mypy_cache
-__pycache__
+# Python stuff
+.venv/
+venv/
+env/
+__pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Tooling cache
+.idea/
+.vscode/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# System & Environment
 .DS_Store
 .env
+.git/
+.gitignore
+
+# Build artifacts
+dist/
+build/
