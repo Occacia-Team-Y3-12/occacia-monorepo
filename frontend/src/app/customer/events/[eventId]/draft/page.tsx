@@ -123,8 +123,8 @@ export default function CustomerEventDraftPage() {
       )}
 
       <div className="mx-auto max-w-[1060px]">
-        <h1 className="text-[34px] font-bold leading-[1.08] tracking-[-0.01em] text-[#1A2438] sm:text-[42px] lg:text-[50px]">Review Your Event Plan</h1>
-        <p className="mt-2 text-[14px] text-[#74839D] sm:text-[15px] lg:text-[20px]">Confirm the generated task list and details for your upcoming celebration.</p>
+        <h1 className="text-[32px] font-bold leading-[1.08] tracking-[-0.01em] text-[#1A2438] sm:text-[38px] lg:text-[44px]">Review Your Event Plan</h1>
+        <p className="mt-2 text-[13px] text-[#74839D] sm:text-[14px] lg:text-[18px]">Confirm the generated task list and details for your upcoming celebration.</p>
 
         <div className="mt-7 overflow-hidden rounded-[16px] border border-[#D5DEEC] bg-white shadow-[0_1px_0_rgba(24,39,75,0.06)]">
           <div className="grid grid-cols-1 md:grid-cols-[330px_minmax(0,1fr)]">
@@ -157,7 +157,7 @@ export default function CustomerEventDraftPage() {
                     <Image src="/icons/customer/event_draft/date.svg" alt="date" width={18} height={20} className="mt-0.5 h-5 w-[18px]" />
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#95A2B9]">Date</p>
-                      <p className="text-[16px] font-semibold leading-tight text-[#26334C] sm:text-[18px] lg:text-[20px]">{formatDateLabel(startDate)}</p>
+                      <p className="text-[13px] font-semibold leading-tight text-[#26334C] sm:text-[14px] lg:text-[15px]">{formatDateLabel(startDate)}</p>
                     </div>
                   </div>
 
@@ -165,7 +165,7 @@ export default function CustomerEventDraftPage() {
                     <Image src="/icons/customer/event_draft/remainder.svg" alt="reminders" width={20} height={21} className="mt-0.5 h-[21px] w-5" />
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#95A2B9]">Reminders</p>
-                      <p className="text-[16px] font-semibold leading-tight text-[#26334C] sm:text-[18px] lg:text-[20px]">{reminderText}</p>
+                      <p className="text-[13px] font-semibold leading-tight text-[#26334C] sm:text-[14px] lg:text-[15px]">{reminderText}</p>
                     </div>
                   </div>
                 </div>
@@ -174,7 +174,7 @@ export default function CustomerEventDraftPage() {
                   <Image src="/icons/customer/event_draft/recurrence.svg" alt="recurrence" width={18} height={18} className="mt-0.5 h-[18px] w-[18px]" />
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#95A2B9]">Recurrence</p>
-                    <p className="text-[16px] font-semibold leading-tight text-[#26334C] sm:text-[18px] lg:text-[20px]">{frequencyLabel(frequency)}</p>
+                    <p className="text-[13px] font-semibold leading-tight text-[#26334C] sm:text-[14px] lg:text-[15px]">{frequencyLabel(frequency)}</p>
                   </div>
                 </div>
               </div>

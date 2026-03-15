@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import calendar
 import re
+from urllib.parse import quote
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -21,7 +22,13 @@ _RRULE_PART_RE = re.compile(r"^(?P<key>[A-Z]+)=(?P<value>.+)$")
 _DURATION_RE = re.compile(r"^P(?:(?P<days>\d+)D)?(?:T(?:(?P<hours>\d+)H)?(?:(?P<minutes>\d+)M)?)?$")
 _SUPPORTED_FREQ = {"DAILY", "WEEKLY", "MONTHLY", "YEARLY"}
 _REMINDER_CHANNELS = {"PUSH", "EMAIL", "IN_APP"}
-_CALENDAR_PROVIDERS = {"GOOGLE", "MICROSOFT"}
+_CALENDAR_PROVIDERS = {"GOOGLE", "MICROSOFT", "APPLE"}
+_TIMEZONE_ALIASES = {
+    "utc": "UTC",
+    "gmt": "UTC",
+    "slst": "Asia/Colombo",
+    "ist": "Asia/Kolkata",
+}
 
 _TASK_TEMPLATES = {
     "birthday": [
@@ -105,9 +112,13 @@ class EventPlanningService:
     ) -> tuple[str, list[dict[str, object]]]:
         event = self.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
         self._save_event_message(db, event_id=event.event_id, sender="CUSTOMER", content=content)
+        self._apply_chat_updates(event, content)
         suggested_tasks = self._build_suggested_tasks(event)
         reply = self._build_chat_reply(db, event, content, suggested_tasks)
         self._save_event_message(db, event_id=event.event_id, sender="AI", content=reply)
+        db.add(event)
+        db.commit()
+        db.refresh(event)
         return reply, suggested_tasks
 
     def summarize_event_context(self, db: Session, *, customer_id: str, event_id: str) -> str:
@@ -140,6 +151,9 @@ class EventPlanningService:
             offsets = ", ".join(event.reminder_offsets or [])
             channels = ", ".join(event.reminder_channels or [])
             parts.append(f"Reminders enabled via {channels or 'no channels'} at {offsets or 'no offsets'}.")
+            reminder_times = self._build_reminder_preview(event)
+            if reminder_times:
+                parts.append("Upcoming reminder times: " + ", ".join(reminder_times[:3]) + ".")
         else:
             parts.append("Reminders disabled.")
         if tasks:
@@ -149,6 +163,9 @@ class EventPlanningService:
         if event.calendar_sync_state == "ENABLED":
             target = event.calendar_sync_calendar_id or "default calendar"
             parts.append(f"Calendar sync enabled to {event.calendar_sync_provider or 'provider'} ({target}).")
+            calendar_link = self.build_calendar_link(event)
+            if calendar_link:
+                parts.append(f"Calendar link: {calendar_link}.")
         return " ".join(parts)
 
     def list_tasks(self, db: Session, *, customer_id: str, event_id: str) -> list[Task]:
@@ -174,6 +191,10 @@ class EventPlanningService:
             name=payload["name"],
             description=payload.get("description"),
             quantity=payload.get("quantity", 1),
+            needs_vendor=self._normalize_vendor_category(
+                payload.get("needs_vendor"),
+                payload.get("vendor_category"),
+            ),
             budget_min=payload.get("budget_min"),
             budget_max=payload.get("budget_max"),
             currency=payload.get("currency", "LKR"),
@@ -199,6 +220,12 @@ class EventPlanningService:
         for field in ("name", "description", "quantity", "budget_min", "budget_max", "currency"):
             if field in payload and payload[field] is not None:
                 setattr(task, field, payload[field])
+        if "needs_vendor" in payload or "vendor_category" in payload:
+            task.needs_vendor = self._normalize_vendor_category(
+                payload.get("needs_vendor"),
+                payload.get("vendor_category"),
+                current_value=task.needs_vendor,
+            )
         db.add(task)
         db.commit()
         db.refresh(task)
@@ -419,12 +446,17 @@ class EventPlanningService:
             {
                 "type": "GOOGLE",
                 "displayName": "Google Calendar",
-                "capabilities": {"recurrence": True, "reminders": True},
+                "capabilities": {"recurrence": True, "reminders": True, "directLinkSync": True},
             },
             {
                 "type": "MICROSOFT",
                 "displayName": "Microsoft Outlook",
-                "capabilities": {"recurrence": True, "reminders": True},
+                "capabilities": {"recurrence": True, "reminders": True, "directLinkSync": True},
+            },
+            {
+                "type": "APPLE",
+                "displayName": "Apple Calendar",
+                "capabilities": {"recurrence": True, "reminders": True, "directLinkSync": True},
             },
         ]
 
@@ -488,6 +520,48 @@ class EventPlanningService:
         db.add(customer)
         db.commit()
 
+    def build_calendar_link(self, event: Event) -> str | None:
+        start_at = self._ensure_aware_datetime(event.start_at)
+        if not start_at or event.calendar_sync_state != "ENABLED":
+            return None
+
+        end_at = self._ensure_aware_datetime(event.end_at) or (
+            start_at + timedelta(days=1) if event.is_all_day else start_at + timedelta(hours=1)
+        )
+        title = quote(event.title)
+        details = quote(event.description or self.summarize_event_context_from_event(event))
+        location = quote(event.location_text or "")
+
+        if event.calendar_sync_provider == "GOOGLE":
+            dates = f"{self._calendar_timestamp(start_at)}/{self._calendar_timestamp(end_at)}"
+            return (
+                "https://calendar.google.com/calendar/render?action=TEMPLATE"
+                f"&text={title}&dates={dates}&details={details}&location={location}"
+            )
+
+        if event.calendar_sync_provider == "MICROSOFT":
+            return (
+                "https://outlook.office.com/calendar/0/deeplink/compose?path=/calendar/action/compose"
+                f"&rru=addevent&subject={title}"
+                f"&startdt={quote(start_at.isoformat())}&enddt={quote(end_at.isoformat())}"
+                f"&body={details}&location={location}"
+            )
+
+        if event.calendar_sync_provider == "APPLE":
+            return "data:text/calendar;charset=utf-8," + quote(self._build_ics_payload(event, start_at, end_at))
+
+        return None
+
+    def summarize_event_context_from_event(self, event: Event) -> str:
+        parts = [f"{event.title} ({event.event_type})"]
+        if event.location_text:
+            parts.append(f"at {event.location_text}")
+        if event.start_at:
+            parts.append(f"starting {event.start_at.isoformat()}")
+        if event.recurrence_rule:
+            parts.append(f"with recurrence {event.recurrence_rule}")
+        return " ".join(parts)
+
     def _build_suggested_tasks(self, event: Event) -> list[dict[str, object]]:
         template_key = self._resolve_template_key(event)
         return _TASK_TEMPLATES[template_key]
@@ -513,6 +587,8 @@ class EventPlanningService:
             prompts.append("Which time zone should I use?")
         if not event.location_text:
             prompts.append("Where is it happening?")
+        if event.calendar_sync_state != "ENABLED":
+            prompts.append("Do you want local reminders only or calendar sync?")
         if not event.reminders_enabled:
             prompts.append("What reminder offsets do you want?")
         else:
@@ -532,7 +608,198 @@ class EventPlanningService:
         if suggested_tasks:
             task_hint = " Suggested tasks: " + ", ".join(task["name"] for task in suggested_tasks[:3]) + "."
 
-        return f"{prompts[0]} {' '.join(prompts[1:])}{persona_text}{task_hint}".strip()
+        refined_bits = []
+        if event.start_at and event.timezone:
+            refined_bits.append(f"Saved schedule: {event.start_at.isoformat()} ({event.timezone})")
+        if event.recurrence_rule:
+            refined_bits.append(f"Recurrence: {event.recurrence_rule}")
+        if event.reminders_enabled:
+            refined_bits.append(
+                "Reminders: "
+                + ", ".join(event.reminder_offsets or [])
+                + " via "
+                + ", ".join(event.reminder_channels or [])
+            )
+        if event.calendar_sync_state == "ENABLED":
+            refined_bits.append(f"Calendar sync: {event.calendar_sync_provider or 'connected'}")
+        refinement_text = f" {' '.join(refined_bits)}." if refined_bits else ""
+
+        return f"{prompts[0]} {' '.join(prompts[1:])}{persona_text}{task_hint}{refinement_text}".strip()
+
+    def _apply_chat_updates(self, event: Event, content: str) -> None:
+        normalized = content.strip()
+        if not normalized:
+            return
+
+        lowered = normalized.lower()
+        if not event.location_text:
+            location_match = re.search(r"\b(?:at|in)\s+([A-Za-z][A-Za-z ,.-]{2,})", normalized)
+            if location_match:
+                event.location_text = location_match.group(1).strip().rstrip(".")
+
+        timezone_name = self._extract_timezone(lowered)
+        if timezone_name:
+            event.timezone = timezone_name
+
+        parsed_schedule = self._extract_schedule(normalized, event.timezone or "UTC")
+        if parsed_schedule:
+            event.start_at = parsed_schedule["start_at"]
+            event.end_at = parsed_schedule.get("end_at")
+            event.timezone = parsed_schedule["timezone"]
+            event.is_all_day = parsed_schedule["is_all_day"]
+
+        recurrence = self._extract_recurrence(lowered)
+        if recurrence:
+            event.recurrence_rule = recurrence
+            event.recurrence_count = None
+            event.recurrence_until = None
+
+        reminder_channels, reminder_offsets = self._extract_reminders(lowered)
+        if reminder_channels or reminder_offsets:
+            event.reminders_enabled = True
+            event.reminder_channels = reminder_channels or event.reminder_channels or ["IN_APP"]
+            event.reminder_offsets = reminder_offsets or event.reminder_offsets or ["P1D"]
+            event.reminder_schedule_status = "SCHEDULED" if event.start_at else "PENDING_DATE"
+
+        if "local reminder" in lowered or "local reminders" in lowered:
+            event.calendar_sync_state = "DISABLED"
+
+        if "calendar sync" in lowered or "sync to" in lowered or "google calendar" in lowered or "outlook" in lowered:
+            if "google" in lowered:
+                event.calendar_sync_provider = "GOOGLE"
+            elif "microsoft" in lowered or "outlook" in lowered:
+                event.calendar_sync_provider = "MICROSOFT"
+            elif "apple" in lowered or "icloud" in lowered:
+                event.calendar_sync_provider = "APPLE"
+            if event.calendar_sync_provider:
+                event.calendar_sync_state = "ENABLED"
+                event.calendar_last_sync_status = "SUCCESS" if event.start_at else "PENDING"
+                event.calendar_last_sync_at = now_utc() if event.start_at else None
+                event.calendar_sync_calendar_id = event.calendar_sync_calendar_id or "primary"
+
+        if event.calendar_sync_state == "ENABLED" and event.start_at:
+            event.external_calendar_event_id = event.external_calendar_event_id or generate_prefixed_id("CAL")
+            event.calendar_last_sync_status = "SUCCESS"
+            event.calendar_last_sync_at = now_utc()
+
+    def _normalize_vendor_category(
+        self,
+        needs_vendor: object | None,
+        vendor_category: object | None,
+        *,
+        current_value: str | None = None,
+    ) -> str | None:
+        if needs_vendor is None and vendor_category is None:
+            return current_value
+        if needs_vendor is False:
+            return None
+        if isinstance(vendor_category, str) and vendor_category.strip():
+            return vendor_category.strip()
+        if needs_vendor:
+            return current_value or "general"
+        return None
+
+    def _extract_timezone(self, lowered: str) -> str | None:
+        for alias, timezone_name in _TIMEZONE_ALIASES.items():
+            if re.search(rf"\b{re.escape(alias)}\b", lowered):
+                return timezone_name
+        zone_match = re.search(r"\b([A-Za-z]+/[A-Za-z_]+)\b", lowered)
+        if zone_match:
+            timezone_name = zone_match.group(1)
+            try:
+                ZoneInfo(timezone_name)
+                return timezone_name
+            except ZoneInfoNotFoundError:
+                return None
+        return None
+
+    def _extract_schedule(self, content: str, timezone_name: str) -> dict[str, object] | None:
+        date_match = re.search(r"\b(20\d{2}-\d{2}-\d{2})\b", content)
+        if not date_match:
+            return None
+
+        try:
+            local_zone = ZoneInfo(timezone_name)
+        except ZoneInfoNotFoundError:
+            local_zone = timezone.utc
+
+        date_value = datetime.fromisoformat(date_match.group(1))
+        time_match = re.search(r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b", content, flags=re.IGNORECASE)
+        is_all_day = "all day" in content.lower()
+        if time_match:
+            hours = int(time_match.group(1)) % 12
+            if time_match.group(3).lower() == "pm":
+                hours += 12
+            minutes = int(time_match.group(2) or "0")
+        else:
+            hours = 9
+            minutes = 0
+
+        local_dt = datetime(
+            date_value.year,
+            date_value.month,
+            date_value.day,
+            hours,
+            minutes,
+            tzinfo=local_zone,
+        )
+        start_at = local_dt.astimezone(timezone.utc)
+        end_at = None if is_all_day else start_at + timedelta(hours=3)
+        return {
+            "start_at": start_at,
+            "end_at": end_at,
+            "timezone": timezone_name,
+            "is_all_day": is_all_day,
+        }
+
+    def _extract_recurrence(self, lowered: str) -> str | None:
+        if "every year" in lowered or "yearly" in lowered or "birthday" in lowered:
+            return "FREQ=YEARLY;INTERVAL=1"
+        if "every month" in lowered or "monthly" in lowered:
+            return "FREQ=MONTHLY;INTERVAL=1"
+        if "every week" in lowered or "weekly" in lowered:
+            return "FREQ=WEEKLY;INTERVAL=1"
+        if "every day" in lowered or "daily" in lowered:
+            return "FREQ=DAILY;INTERVAL=1"
+        return None
+
+    def _extract_reminders(self, lowered: str) -> tuple[list[str], list[str]]:
+        if "reminder" not in lowered:
+            return [], []
+
+        channels = []
+        if "email" in lowered:
+            channels.append("EMAIL")
+        if "push" in lowered:
+            channels.append("PUSH")
+        if "in-app" in lowered or "in app" in lowered:
+            channels.append("IN_APP")
+        if not channels:
+            channels = ["IN_APP"]
+
+        offsets = []
+        if "7 day" in lowered or "week before" in lowered:
+            offsets.append("P7D")
+        if "1 day" in lowered or "day before" in lowered:
+            offsets.append("P1D")
+        if "same day" in lowered or "on the day" in lowered:
+            offsets.append("PT0M")
+        if "1 hour" in lowered:
+            offsets.append("PT1H")
+        if not offsets:
+            offsets = ["P1D"]
+
+        return list(dict.fromkeys(channels)), list(dict.fromkeys(offsets))
+
+    def _build_reminder_preview(self, event: Event) -> list[str]:
+        next_occurrence = self._next_occurrence(event)
+        if not next_occurrence:
+            return []
+        start_at = next_occurrence["startAt"]
+        previews = []
+        for offset in event.reminder_offsets or []:
+            previews.append((start_at - self._parse_duration(offset)).isoformat())
+        return previews
 
     def _resolve_template_key(self, event: Event) -> str:
         search_text = " ".join(filter(None, [event.event_type, event.title, event.description])).lower()
@@ -618,6 +885,30 @@ class EventPlanningService:
 
     def _duration_seconds(self, duration: str) -> int:
         return int(self._parse_duration(duration).total_seconds())
+
+    def _calendar_timestamp(self, value: datetime) -> str:
+        return value.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+    def _build_ics_payload(self, event: Event, start_at: datetime, end_at: datetime) -> str:
+        uid = event.external_calendar_event_id or generate_prefixed_id("CAL")
+        lines = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//Occacia//UC13//EN",
+            "BEGIN:VEVENT",
+            f"UID:{uid}",
+            f"DTSTAMP:{self._calendar_timestamp(now_utc())}",
+            f"DTSTART:{self._calendar_timestamp(start_at)}",
+            f"DTEND:{self._calendar_timestamp(end_at)}",
+            f"SUMMARY:{event.title}",
+            f"DESCRIPTION:{event.description or self.summarize_event_context_from_event(event)}",
+        ]
+        if event.location_text:
+            lines.append(f"LOCATION:{event.location_text}")
+        if event.recurrence_rule:
+            lines.append(f"RRULE:{event.recurrence_rule}")
+        lines.extend(["END:VEVENT", "END:VCALENDAR"])
+        return "\r\n".join(lines)
 
     def _generate_occurrences(
         self,

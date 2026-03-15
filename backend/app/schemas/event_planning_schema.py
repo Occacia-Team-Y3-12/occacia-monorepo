@@ -37,6 +37,8 @@ class SuggestedTaskDraftResponse(BaseModel):
     name: str
     description: str | None = None
     quantity: int = 1
+    needs_vendor: bool = Field(default=False, alias="needsVendor")
+    vendor_category: str | None = Field(default=None, alias="vendorCategory")
     budget_min: float | None = Field(default=None, alias="budgetMin")
     budget_max: float | None = Field(default=None, alias="budgetMax")
     currency: str = "LKR"
@@ -61,6 +63,8 @@ class TaskResponse(BaseModel):
     name: str
     description: str | None = None
     quantity: int = 1
+    needs_vendor: bool = Field(default=False, alias="needsVendor")
+    vendor_category: str | None = Field(default=None, alias="vendorCategory")
     budget_min: float | None = Field(default=None, alias="budgetMin")
     budget_max: float | None = Field(default=None, alias="budgetMax")
     currency: str
@@ -88,6 +92,8 @@ class TaskCreateRequest(BaseModel):
     name: str
     description: str | None = None
     quantity: int = 1
+    needs_vendor: bool = Field(default=False, alias="needsVendor")
+    vendor_category: str | None = Field(default=None, alias="vendorCategory")
     budget_min: float | None = Field(default=None, alias="budgetMin")
     budget_max: float | None = Field(default=None, alias="budgetMax")
     currency: str = "LKR"
@@ -107,6 +113,16 @@ class TaskCreateRequest(BaseModel):
             raise ValueError("quantity must be at least 1")
         return value
 
+    @field_validator("vendor_category")
+    @classmethod
+    def validate_vendor_category(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("vendorCategory must not be empty")
+        return trimmed
+
     model_config = {"populate_by_name": True}
 
 
@@ -114,6 +130,8 @@ class TaskUpdateRequest(BaseModel):
     name: str | None = None
     description: str | None = None
     quantity: int | None = None
+    needs_vendor: bool | None = Field(default=None, alias="needsVendor")
+    vendor_category: str | None = Field(default=None, alias="vendorCategory")
     budget_min: float | None = Field(default=None, alias="budgetMin")
     budget_max: float | None = Field(default=None, alias="budgetMax")
     currency: str | None = None
@@ -134,6 +152,16 @@ class TaskUpdateRequest(BaseModel):
         if value is not None and value < 1:
             raise ValueError("quantity must be at least 1")
         return value
+
+    @field_validator("vendor_category")
+    @classmethod
+    def validate_optional_vendor_category(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("vendorCategory must not be empty")
+        return trimmed
 
     model_config = {"populate_by_name": True}
 
@@ -204,6 +232,7 @@ class EventRemindersResponse(BaseModel):
 class CalendarProviderCapabilitiesResponse(BaseModel):
     recurrence: bool | None = None
     reminders: bool | None = None
+    direct_link_sync: bool | None = Field(default=None, alias="directLinkSync")
 
 
 class CalendarProviderResponse(BaseModel):
@@ -258,6 +287,7 @@ class EventCalendarSyncStatusResponse(BaseModel):
     provider: str | None = None
     calendar_id: str | None = Field(default=None, alias="calendarId")
     external_event_id: str | None = Field(default=None, alias="externalEventId")
+    calendar_link: str | None = Field(default=None, alias="calendarLink")
     last_sync_at: datetime | None = Field(default=None, alias="lastSyncAt")
     last_sync_status: str | None = Field(default=None, alias="lastSyncStatus")
 
