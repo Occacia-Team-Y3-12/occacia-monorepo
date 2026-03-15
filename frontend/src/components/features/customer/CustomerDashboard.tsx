@@ -27,6 +27,7 @@ export default function CustomerDashboard() {
         </p>
 
         <button
+          type="button"
           onClick={() => router.push(ROUTES.CUSTOMER.EVENTS)}
           className="mt-6 inline-flex items-center gap-2 rounded-lg border border-white/30 bg-white px-4 py-2.5 text-sm font-semibold text-[#2443F4] sm:mt-8 sm:px-5 sm:py-3"
         >
@@ -38,12 +39,16 @@ export default function CustomerDashboard() {
       <section>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-2xl font-bold text-[#151A26] sm:text-[32px]">Quick Start Templates</h3>
-          <button className="text-sm font-semibold text-[#6736FF]">View all templates</button>
+          <button type="button" className="text-sm font-semibold text-[#6736FF]">View all templates</button>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {templates.map((template) => (
-            <button key={template.title} className="group relative h-[108px] overflow-hidden rounded-2xl text-left sm:h-[120px]">
+            <button
+              type="button"
+              key={template.title}
+              className="group relative h-[108px] overflow-hidden rounded-2xl text-left sm:h-[120px]"
+            >
               <Image
                 src={template.image}
                 alt={template.title}
