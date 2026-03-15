@@ -127,9 +127,9 @@ export default function CustomerEventDraftPage() {
         <p className="mt-2 text-[13px] text-[#74839D] sm:text-[14px] lg:text-[18px]">Confirm the generated task list and details for your upcoming celebration.</p>
 
         <div className="mt-7 overflow-hidden rounded-[16px] border border-[#D5DEEC] bg-white shadow-[0_1px_0_rgba(24,39,75,0.06)]">
-          <div className="grid grid-cols-1 md:grid-cols-[330px_minmax(0,1fr)]">
-            <div className="relative h-[230px] bg-[#BFDDF3]">
-              <Image src="/images/customer/event_draft/cake_image.svg" alt="Event visual" fill className="object-cover" />
+          <div className="grid grid-cols-1 md:grid-cols-[330px_minmax(0,1fr)] md:items-stretch">
+            <div className="relative min-h-[230px] overflow-hidden bg-[#BFDDF3] md:h-auto md:min-h-full">
+              <Image src="/images/customer/event_draft/cake_image.svg" alt="Event visual" fill className="object-cover object-center" />
             </div>
 
             <div className="p-6 sm:p-7">
