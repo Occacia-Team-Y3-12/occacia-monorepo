@@ -704,6 +704,7 @@ def exchange_calendar_code(
         provider=body.provider,
         code=body.code,
         state=body.state,
+        redirect_uri=body.redirect_uri,
     )
     return _calendar_status_response(customer)
 

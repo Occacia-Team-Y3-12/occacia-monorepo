@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# nject the virtual environment directly into the system path.
+# Inject the virtual environment directly into the system path.
 # This tells Linux exactly where to find alembic and uvicorn without needing Poetry.
 export PATH="/app/.venv/bin:$PATH"
 
