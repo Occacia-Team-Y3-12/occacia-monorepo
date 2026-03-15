@@ -53,3 +53,4 @@ env/
 .coverage
 coverage.xml
 htmlcov/
+nginx.conf

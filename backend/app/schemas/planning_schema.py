@@ -1,3 +1,6 @@
+"""
+app/schemas/planning_schema.py
+"""
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 
@@ -7,11 +10,17 @@ class PlanRequest(BaseModel):
 
 class VenueDisplay(BaseModel):
     # Package fields
+    id: Optional[int] = None
     name: str
     description: Optional[str] = None
     price_per_head: Optional[float] = None
     tags: List[str] = []
     total_estimated_price: Optional[float] = None
+
+    # Match Score fields (Required for CI/CD tests)
+    match_score: Optional[int] = None
+    match_score_max: Optional[int] = None
+    match_score_label: Optional[str] = None
 
     # Vendor fields
     vendor_name: Optional[str] = None
@@ -20,7 +29,7 @@ class VenueDisplay(BaseModel):
     vendor_email: Optional[str] = None
     is_verified: Optional[bool] = False
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
 
 class PlanResponse(BaseModel):
     intent: str
@@ -31,8 +40,14 @@ class PlanResponse(BaseModel):
     event_type: Optional[str] = None
     event_date: Optional[str] = None
     location: Optional[str] = None
-    budget_per_head: Optional[float] = None  # null = unknown, never 0
-    guest_count: Optional[int] = None        # null = unknown, never 0
+    budget_per_head: Optional[float] = None 
+    guest_count: Optional[int] = None        
     venue_tags: List[str] = []
     missing_info: List[str] = []
     matched_venues: List[VenueDisplay] = []
+    
+    # Frontend State Flags
+    ask_save_persona: bool = False
+    persona_saved: bool = False
+    persona_confirmed: bool = False
+    venue_match_tier: Optional[int] = None

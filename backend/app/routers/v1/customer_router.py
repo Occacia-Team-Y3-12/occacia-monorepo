@@ -1,5 +1,7 @@
 """
-Customer profile, event, and UC-13 event planning routes.
+app/routers/v1/customer_router.py
+
+Customer profile management, event creation, and event planning (UC-13) routes.
 """
 from __future__ import annotations
 
@@ -12,12 +14,12 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.customer import Customer
 from app.models.task import Task
-from app.routers.v1.auth_router import get_current_customer
+from app.core.dependencies import get_current_customer
 from app.schemas.customer_schema import (
     CustomerProfileResponse,
-    EventCreateResponse,
     CustomerProfileUpdateRequest,
     EventCreateRequest,
+    EventCreateResponse,
     EventResponse,
     PaginatedEventsResponse,
     SetEventPersonasRequest,
@@ -27,6 +29,7 @@ from app.schemas.event_planning_schema import (
     CalendarConnectRequest,
     CalendarConnectResponse,
     CalendarConnectionStatusResponse,
+    CalendarExchangeCodeRequest,
     CalendarProviderListResponse,
     ChatMessageResponse,
     ChatSendRequest,
@@ -49,14 +52,17 @@ from app.schemas.event_planning_schema import (
     TaskListResponse,
     TaskResponse,
     TaskUpdateRequest,
-    CalendarExchangeCodeRequest,
 )
+from app.schemas.recommendation_schema import RecommendationPackageListResponse
 from app.services.customer_service import customer_service
 from app.services.event_planning_service import event_planning_service
+from app.services.recommendation_service import recommendation_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Customer"])
 
+
+# --- Response Builders ---
 
 def _customer_response(customer: Customer) -> CustomerProfileResponse:
     return CustomerProfileResponse(
@@ -68,7 +74,6 @@ def _customer_response(customer: Customer) -> CustomerProfileResponse:
         status=customer.status,
     )
 
-
 def _event_response(event, persona_ids: list[str]) -> EventResponse:
     return EventResponse(
         eventId=event.event_id,
@@ -79,13 +84,27 @@ def _event_response(event, persona_ids: list[str]) -> EventResponse:
         locationText=event.location_text,
         startAt=event.start_at,
         endAt=event.end_at,
+        timezone=event.timezone,
+        isAllDay=event.is_all_day,
+        recurrenceRule=event.recurrence_rule,
+        recurrenceUntil=event.recurrence_until,
+        recurrenceCount=event.recurrence_count,
+        remindersEnabled=event.reminders_enabled,
+        reminderChannels=event.reminder_channels or [],
+        reminderOffsets=event.reminder_offsets or [],
+        reminderScheduleStatus=event.reminder_schedule_status,
+        calendarSyncState=event.calendar_sync_state,
+        calendarSyncProvider=event.calendar_sync_provider,
+        calendarSyncCalendarId=event.calendar_sync_calendar_id,
+        externalCalendarEventId=event.external_calendar_event_id,
+        calendarLastSyncAt=event.calendar_last_sync_at,
+        calendarLastSyncStatus=event.calendar_last_sync_status,
         status=event.status,
         confirmedAt=event.confirmed_at,
         personaIds=persona_ids,
         createdAt=event.created_at,
         updatedAt=event.updated_at,
     )
-
 
 def _task_response(task: Task) -> TaskResponse:
     return TaskResponse(
@@ -94,6 +113,8 @@ def _task_response(task: Task) -> TaskResponse:
         name=task.name,
         description=task.description,
         quantity=task.quantity,
+        needsVendor=bool(task.needs_vendor),
+        vendorCategory=task.needs_vendor,
         budgetMin=task.budget_min,
         budgetMax=task.budget_max,
         currency=task.currency,
@@ -111,7 +132,6 @@ def _task_response(task: Task) -> TaskResponse:
         updatedAt=task.updated_at,
     )
 
-
 def _schedule_response(event) -> EventScheduleResponse:
     next_occurrence = event_planning_service._next_occurrence(event)
     return EventScheduleResponse(
@@ -127,7 +147,6 @@ def _schedule_response(event) -> EventScheduleResponse:
         nextOccurrence=EventOccurrenceResponse(**next_occurrence) if next_occurrence else None,
     )
 
-
 def _reminders_response(event) -> EventRemindersResponse:
     return EventRemindersResponse(
         reminders=EventRemindersModel(
@@ -136,7 +155,6 @@ def _reminders_response(event) -> EventRemindersResponse:
             offsets=event.reminder_offsets or [],
         )
     )
-
 
 def _calendar_status_response(customer: Customer) -> CalendarConnectionStatusResponse:
     return CalendarConnectionStatusResponse(
@@ -147,17 +165,16 @@ def _calendar_status_response(customer: Customer) -> CalendarConnectionStatusRes
         lastSyncAt=customer.calendar_last_sync_at,
     )
 
-
 def _event_calendar_sync_response(event) -> EventCalendarSyncStatusResponse:
     return EventCalendarSyncStatusResponse(
         state=event.calendar_sync_state,
         provider=event.calendar_sync_provider,
         calendarId=event.calendar_sync_calendar_id,
         externalEventId=event.external_calendar_event_id,
+        calendarLink=event_planning_service.build_calendar_link(event),
         lastSyncAt=event.calendar_last_sync_at,
         lastSyncStatus=event.calendar_last_sync_status,
     )
-
 
 def _message_response(message) -> ChatMessageResponse:
     return ChatMessageResponse(
@@ -168,15 +185,12 @@ def _message_response(message) -> ChatMessageResponse:
     )
 
 
-# ── GET /customers/me ─────────────────────────────────────────────────
+# --- Customer Profile Routes ---
 
 @router.get("/customers/me", response_model=CustomerProfileResponse, response_model_by_alias=True)
 def get_customer_me(current_customer: Customer = Depends(get_current_customer)):
-    """Get current customer profile. Spec: GET /customers/me"""
+    """Get current customer profile."""
     return _customer_response(current_customer)
-
-
-# ── PUT /customers/me ─────────────────────────────────────────────────
 
 @router.put("/customers/me", response_model=CustomerProfileResponse, response_model_by_alias=True)
 def update_customer_me(
@@ -184,7 +198,7 @@ def update_customer_me(
     db: Session = Depends(get_db),
     current_customer: Customer = Depends(get_current_customer),
 ):
-    """Update current customer profile. Spec: PUT /customers/me"""
+    """Update current customer profile."""
     updated_customer = customer_service.update_customer_profile(
         db,
         current_customer,
@@ -194,6 +208,8 @@ def update_customer_me(
     )
     return _customer_response(updated_customer)
 
+
+# --- Customer Event Routes ---
 
 @router.get(
     "/customers/events",
@@ -226,7 +242,6 @@ def list_customer_events(
         nextCursor=next_cursor,
     )
 
-
 @router.post(
     "/customers/events",
     response_model=EventCreateResponse,
@@ -247,7 +262,6 @@ def create_customer_event(
     )
     return EventCreateResponse(eventId=event.event_id, status=event.status)
 
-
 @router.get(
     "/customers/events/{event_id}",
     response_model=EventResponse,
@@ -265,7 +279,6 @@ def get_customer_event(
     )
     persona_ids = customer_service.get_event_persona_ids(db, event_ids=[event.event_id]).get(event.event_id, [])
     return _event_response(event, persona_ids)
-
 
 @router.put(
     "/customers/events/{event_id}/personas",
@@ -287,7 +300,6 @@ def set_event_personas(
     persona_ids = customer_service.get_event_persona_ids(db, event_ids=[event.event_id]).get(event.event_id, [])
     return _event_response(event, persona_ids)
 
-
 @router.delete("/customers/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_customer_event(
     event_id: str,
@@ -302,15 +314,18 @@ def delete_customer_event(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+# --- Event Metadata Routes ---
+
 @router.get("/event-types", response_model=StringListResponse)
 def list_event_types(_: Customer = Depends(get_current_customer)):
     return StringListResponse(items=customer_service.list_event_types())
-
 
 @router.get("/event-templates", response_model=StringListResponse)
 def list_event_templates(_: Customer = Depends(get_current_customer)):
     return StringListResponse(items=customer_service.list_event_templates())
 
+
+# --- Event Chat & Summary Routes ---
 
 @router.post(
     "/customers/events/{event_id}/chat",
@@ -331,7 +346,6 @@ def send_event_chat_message(
     )
     return ChatSendResponse(reply=reply, suggestedTasks=suggested_tasks)
 
-
 @router.post(
     "/customers/events/{event_id}/summarize",
     response_model=EventSummaryResponse,
@@ -348,7 +362,6 @@ def summarize_event(
             event_id=event_id,
         )
     )
-
 
 @router.get(
     "/customers/events/{event_id}/messages",
@@ -375,6 +388,8 @@ def list_event_messages(
     )
 
 
+# --- Event Task Routes ---
+
 @router.get(
     "/customers/events/{event_id}/tasks",
     response_model=TaskListResponse,
@@ -391,7 +406,6 @@ def list_event_tasks(
         event_id=event_id,
     )
     return TaskListResponse(items=[_task_response(task) for task in tasks])
-
 
 @router.post(
     "/customers/events/{event_id}/tasks",
@@ -412,7 +426,6 @@ def create_event_task(
         payload=body.model_dump(),
     )
     return _task_response(task)
-
 
 @router.post(
     "/customers/events/{event_id}/tasks/confirm",
@@ -437,7 +450,6 @@ def confirm_event_tasks(
         tasks=[_task_response(task) for task in tasks],
     )
 
-
 @router.put(
     "/customers/events/{event_id}/tasks/{task_id}",
     response_model=TaskResponse,
@@ -459,7 +471,6 @@ def update_event_task(
     )
     return _task_response(task)
 
-
 @router.delete("/customers/events/{event_id}/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_event_task(
     event_id: str,
@@ -475,6 +486,43 @@ def delete_event_task(
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
+
+# --- Event Recommendation Package Routes ---
+
+@router.post(
+    "/customers/events/{event_id}/recommendations",
+    response_model=RecommendationPackageListResponse,
+    response_model_by_alias=True,
+)
+def generate_event_recommendations(
+    event_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.generate_packages(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+    )
+
+@router.get(
+    "/customers/events/{event_id}/packages",
+    response_model=RecommendationPackageListResponse,
+    response_model_by_alias=True,
+)
+def list_event_recommendation_packages(
+    event_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.get_packages(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+    )
+
+
+# --- Event Schedule & Reminders ---
 
 @router.get(
     "/customers/events/{event_id}/schedule",
@@ -492,7 +540,6 @@ def get_event_schedule(
         event_id=event_id,
     )
     return _schedule_response(event)
-
 
 @router.put(
     "/customers/events/{event_id}/schedule",
@@ -513,7 +560,6 @@ def upsert_event_schedule(
     )
     return _schedule_response(event)
 
-
 @router.get(
     "/customers/events/{event_id}/reminders",
     response_model=EventRemindersResponse,
@@ -530,7 +576,6 @@ def get_event_reminders(
         event_id=event_id,
     )
     return _reminders_response(event)
-
 
 @router.put(
     "/customers/events/{event_id}/reminders",
@@ -550,7 +595,6 @@ def upsert_event_reminders(
         payload=body.model_dump(),
     )
     return _reminders_response(event)
-
 
 @router.get(
     "/customers/events/{event_id}/occurrences",
@@ -579,6 +623,8 @@ def list_event_occurrences(
     )
 
 
+# --- Calendar Sync Routes ---
+
 @router.get(
     "/customers/events/{event_id}/calendar-sync",
     response_model=EventCalendarSyncStatusResponse,
@@ -595,7 +641,6 @@ def get_event_calendar_sync(
         event_id=event_id,
     )
     return _event_calendar_sync_response(event)
-
 
 @router.put(
     "/customers/events/{event_id}/calendar-sync",
@@ -616,7 +661,6 @@ def upsert_event_calendar_sync(
     )
     return _event_calendar_sync_response(event)
 
-
 @router.get(
     "/customers/calendar/providers",
     response_model=CalendarProviderListResponse,
@@ -624,7 +668,6 @@ def upsert_event_calendar_sync(
 )
 def list_calendar_providers(_: Customer = Depends(get_current_customer)):
     return CalendarProviderListResponse(providers=event_planning_service.list_calendar_providers())
-
 
 @router.post(
     "/customers/calendar/connect",
@@ -645,7 +688,6 @@ def start_calendar_connect(
         )
     )
 
-
 @router.post(
     "/customers/calendar/exchange-code",
     response_model=CalendarConnectionStatusResponse,
@@ -665,7 +707,6 @@ def exchange_calendar_code(
     )
     return _calendar_status_response(customer)
 
-
 @router.get(
     "/customers/calendar/status",
     response_model=CalendarConnectionStatusResponse,
@@ -677,7 +718,6 @@ def get_calendar_status(
 ):
     customer = event_planning_service.get_calendar_status(db, customer_id=current_customer.customer_id)
     return _calendar_status_response(customer)
-
 
 @router.delete("/customers/calendar/disconnect", status_code=status.HTTP_204_NO_CONTENT)
 def disconnect_calendar(

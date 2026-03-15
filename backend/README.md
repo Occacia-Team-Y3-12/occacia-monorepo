@@ -10,23 +10,16 @@ Python backend for Occacia (FastAPI).
 
 ## Quickstart (local)
 
-1) Start Postgres (from monorepo root):
+1) Create `backend/.env`
 
-```bash
-docker compose -f docker-compose-local.yml up -d
-```
-
-2) Set env vars
-
-Settings load env vars from `backend/.env` if present, otherwise they fall back to the monorepo root `../.env`.
-
-Minimum required:
+Copy [`backend/.env.example`](./.env.example) to `backend/.env` and set at least:
 
 - `SECRET_KEY`
-- `DATABASE_URL`
+- `DB_PASSWORD`
 
-Optional (required only for AI planning endpoints):
+Optional:
 
+- `DATABASE_URL` to override the assembled local connection string
 - `LANGFLOW_URL`
 - `LANGFLOW_TOKEN`
 - `LANGFLOW_ORG_ID`
@@ -35,6 +28,13 @@ Generate a dev secret:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(64))"
+```
+
+2) Start local Postgres from `backend/`
+
+```bash
+cd backend
+docker compose -f docker-compose-local.yml up -d
 ```
 
 3) Create `.venv` + install dependencies
@@ -50,29 +50,25 @@ make install
 No `make`?
 
 ```bash
-cd backend
 poetry sync --no-root
 ```
 
-4) Run the API
+4) Run migrations
 
 ```bash
-cd backend
-make run
-```
-
-No `make`?
-
-```bash
-cd backend
-poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-5) Run migrations (when needed)
-
-```bash
-cd backend
 poetry run alembic upgrade head
+```
+
+Or run the one-off migration container:
+
+```bash
+docker compose -f docker-compose-local.yml --profile tools run --rm migrate
+```
+
+5) Run the API
+
+```bash
+make run
 ```
 
 ## Useful commands
@@ -87,10 +83,16 @@ poetry run alembic upgrade head
 - Poetry using wrong Python: `cd backend && poetry env use python3.11`
 - `.venv` not created in `backend/`: ensure `backend/poetry.toml` has `virtualenvs.in-project = true`, then reinstall: `make clean-venv && make install` (Windows: `Remove-Item -Recurse -Force .venv; poetry sync --no-root`)
 - PowerShell can’t activate venv: run once `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (or skip activation and use `poetry run ...`)
-- `.env` not being read: confirm `backend/.env` exists (symlink or copy from `../.env`)
-- DB connection errors: confirm Postgres is running and `DATABASE_URL` matches the exposed host/port (`localhost:5432` by default)
+- `.env` not being read: confirm `backend/.env` exists and includes `SECRET_KEY` plus either `DATABASE_URL` or `DB_PASSWORD`
+- DB connection errors: confirm Postgres is running from `backend/docker-compose-local.yml` and that `DB_HOST=localhost`, `DB_PORT=5432`
 - Port already in use: stop the conflicting process or change the Uvicorn port (`--port 8001`)
 - Lock/deps out of sync: `poetry lock` then `poetry sync --no-root`
+
+## Monorepo Boundary
+
+- `backend/.env` is the local backend development env file.
+- `backend/docker-compose-local.yml` is the local backend Docker entrypoint.
+- The monorepo root `.env` and root `docker-compose.yml` are for root-level orchestration and deployment, not backend-local startup.
 
 ## URLs
 
