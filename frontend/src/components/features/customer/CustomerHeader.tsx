@@ -94,9 +94,15 @@ const CustomerHeader = ({ isSidebarOpen, onToggleSidebar }: CustomerHeaderProps)
 
         {isEventFlow && <span className="h-10 w-px bg-[#D9DEE8]" aria-hidden="true" />}
 
-        {isEventFlow && (
-          <div className="flex items-center gap-4 pl-1">
-            <span className="text-[17px] font-semibold text-[#182039]">Alex Rivers</span>
+        {!isEventFlow && <span className="h-14 w-px bg-[#D9DEE8]" aria-hidden="true" />}
+
+        <div className="relative" ref={profileMenuRef}>
+          <button
+            onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+            className={`flex items-center ${isEventFlow ? 'gap-4 pl-1' : 'gap-4'}`}
+            aria-label="Open profile menu"
+          >
+            <span className={`${isEventFlow ? 'inline' : 'hidden sm:inline'} text-[17px] font-semibold text-[#182039]`}>Alex Rivers</span>
             <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-[#F4CE95] shadow-[0_6px_18px_rgba(25,35,72,0.18)]">
               <Image
                 src="/icons/customer/dashboard/profile.svg"
@@ -106,42 +112,19 @@ const CustomerHeader = ({ isSidebarOpen, onToggleSidebar }: CustomerHeaderProps)
                 className="h-full w-full object-contain"
               />
             </span>
-          </div>
-        )}
+          </button>
 
-        {!isEventFlow && <span className="h-14 w-px bg-[#D9DEE8]" aria-hidden="true" />}
-
-        {!isEventFlow && (
-          <div className="relative" ref={profileMenuRef}>
-            <button
-              onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-              className="flex items-center gap-4"
-              aria-label="Open profile menu"
-            >
-              <span className="hidden text-[17px] font-semibold text-[#182039] sm:inline">Alex Rivera</span>
-              <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-[#F4CE95] shadow-[0_6px_18px_rgba(25,35,72,0.18)]">
-                <Image
-                  src="/icons/customer/dashboard/profile.svg"
-                  alt="Alex Rivera"
-                  width={48}
-                  height={48}
-                  className="h-full w-full object-contain"
-                />
-              </span>
-            </button>
-
-            {isProfileMenuOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-44 rounded-xl border border-[#E5E8F0] bg-white p-2 shadow-[0_14px_28px_rgba(23,34,73,0.12)]">
-                <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#1F293F] transition-colors hover:bg-[#F3F5FA]">
-                  My Profile
-                </button>
-                <button className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#C22525] transition-colors hover:bg-[#FFF1F1]">
-                  Logout
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+          {isProfileMenuOpen && (
+            <div className="absolute right-0 top-full z-50 mt-2 w-44 rounded-xl border border-[#E5E8F0] bg-white p-2 shadow-[0_14px_28px_rgba(23,34,73,0.12)]">
+              <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#1F293F] transition-colors hover:bg-[#F3F5FA]">
+                My Profile
+              </button>
+              <button className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#C22525] transition-colors hover:bg-[#FFF1F1]">
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
