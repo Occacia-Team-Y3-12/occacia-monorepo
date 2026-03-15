@@ -10,6 +10,7 @@ from app.core.exceptions import add_exception_handlers
 from app.routers import api_router
 from app.scripts.seed import seed_data
 
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -105,3 +106,45 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+# backend/app/main.py
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.routers import (
+    auth_router,
+    vendor_router,
+    package_router,
+    order_router,
+    review_router,
+    health_router,
+    admin_router  # Add this
+)
+
+app = FastAPI(
+    title="Occacia API",
+    description="AI-powered occasion planning platform",
+    version="1.0.0"
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(auth_router.router, prefix="/api/v1")
+app.include_router(vendor_router.router, prefix="/api/v1")
+app.include_router(package_router.router, prefix="/api/v1")
+app.include_router(order_router.router, prefix="/api/v1")
+app.include_router(review_router.router, prefix="/api/v1")
+app.include_router(admin_router.router, prefix="/api/v1")  # Add this
+app.include_router(health_router.router, prefix="/api/v1")
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Occacia API"}
