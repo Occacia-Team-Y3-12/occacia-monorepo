@@ -223,7 +223,7 @@ export default function CustomerEventRecommendationsPage() {
 
   const [phase, setPhase] = useState<'ready' | 'generating' | 'packages' | 'expired'>('ready');
   const [packages, setPackages] = useState<RecommendationPackage[]>([]);
-  const [event, setEvent] = useState<EventContext>({ ...MOCK_EVENT, eventId });
+  const [event] = useState<EventContext>({ ...MOCK_EVENT, eventId });
 
   // Check if packages already exist and are valid
   useEffect(() => {
