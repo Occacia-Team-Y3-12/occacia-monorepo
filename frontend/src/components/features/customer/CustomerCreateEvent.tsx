@@ -59,13 +59,13 @@ const CustomerCreateEvent = () => {
               aria-hidden="true"
               className="h-4 w-4"
             />
-            <span className="text-sm font-semibold text-[#1B2237]">General Information</span>
+            <span className="text-[15px] font-semibold text-[#1B2237]">General Information</span>
           </div>
 
           <div className="space-y-4 px-5 py-5">
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div>
-                <label className="mb-2 block text-xs font-medium text-[#667085]">Event Type</label>
+                <label className="mb-2 block text-sm font-semibold text-[#5F6D86]">Event Type</label>
                 <select
                   value={eventType}
                   onChange={(event) => setEventType(event.target.value)}
@@ -83,7 +83,7 @@ const CustomerCreateEvent = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-xs font-medium text-[#667085]">Event Title</label>
+                <label className="mb-2 block text-sm font-semibold text-[#5F6D86]">Event Title</label>
                 <input
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
@@ -98,7 +98,7 @@ const CustomerCreateEvent = () => {
             </div>
 
             <div>
-              <label className="mb-2 block text-xs font-medium text-[#667085]">Description</label>
+              <label className="mb-2 block text-sm font-semibold text-[#5F6D86]">Description</label>
               <textarea
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
@@ -113,11 +113,11 @@ const CustomerCreateEvent = () => {
         <div className="overflow-hidden rounded-2xl border border-[#E4E8F2] bg-[#FFFFFF]">
           <div className="flex items-center gap-2 border-b border-[#E4E8F2] px-5 py-4">
             <img src="/icons/customer/events/Add_People_Icon.svg" alt="" aria-hidden="true" className="h-4 w-4" />
-            <span className="text-sm font-semibold text-[#1B2237]">Assign People</span>
+            <span className="text-[15px] font-semibold text-[#1B2237]">Assign People</span>
           </div>
 
           <div className="px-5 py-5">
-            <p className="mb-4 text-xs text-[#6C7891]">
+            <p className="mb-4 text-sm text-[#61708D]">
               Select one or more people to customize the event experience for specific audience types.
             </p>
 
@@ -130,10 +130,12 @@ const CustomerCreateEvent = () => {
                       type="button"
                       key={persona.id}
                       onClick={() => togglePersona(persona.id)}
-                      className={`flex flex-1 items-center gap-4 px-6 py-6 text-left transition-colors first:rounded-l-3xl ${
+                      className={`flex flex-1 items-center gap-4 px-6 py-6 text-left transition-all duration-200 first:rounded-l-3xl ${
                         index !== 0 ? 'border-l border-[#DEE3EC]' : ''
                       } ${
-                        selected ? 'bg-[#EAF0FF]' : 'hover:bg-[#E8EDF5]'
+                        selected
+                          ? 'bg-[#DCE8FF] shadow-[inset_0_0_0_2px_#3B6FE3]'
+                          : 'hover:bg-[#E8EDF5]'
                       }`}
                     >
                       <div className="flex items-center gap-4">
@@ -141,11 +143,13 @@ const CustomerCreateEvent = () => {
                           src={persona.imageUrl || DEFAULT_PERSONA_IMAGE}
                           alt=""
                           aria-hidden="true"
-                          className="h-[56px] w-[56px] rounded-full object-cover"
+                          className={`h-[56px] w-[56px] rounded-full object-cover transition-all duration-200 ${
+                            selected ? 'ring-2 ring-[#2F63D8] ring-offset-2 ring-offset-[#DCE8FF]' : ''
+                          }`}
                         />
                         <div className="min-w-0">
-                          <p className="truncate text-[15px] font-semibold text-[#141A2A]">{persona.name}</p>
-                          <p className="truncate text-[12px] text-[#63728D]">{persona.role}</p>
+                          <p className={`truncate text-[15px] font-semibold ${selected ? 'text-[#173D97]' : 'text-[#141A2A]'}`}>{persona.name}</p>
+                          <p className={`truncate text-[12px] ${selected ? 'text-[#2556C3]' : 'text-[#63728D]'}`}>{persona.role}</p>
                         </div>
                       </div>
                     </button>
