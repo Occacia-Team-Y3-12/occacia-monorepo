@@ -3,9 +3,10 @@ app/schemas/vendor_schema.py
 """
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-# --- Requests ---
+# 1. Registration Input
+
 
 class VendorRegisterRequest(BaseModel):
     business_name: str
@@ -16,16 +17,27 @@ class VendorRegisterRequest(BaseModel):
     display_name: Optional[str] = None
     contact_phone: Optional[str] = None
 
+# 2. Login Input
+
+
 class VendorLoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-# FIX: Added strict schema for profile updates
-class VendorUpdate(BaseModel):
-    displayName: Optional[str] = None
-    contactPhone: Optional[str] = None
+# Update this class back
 
-# --- Responses ---
+
+class VendorUpdate(BaseModel):
+    business_name: Optional[str] = Field(default=None, alias="businessName")
+    location_base: Optional[str] = Field(default=None, alias="locationBase")
+    phone: Optional[str] = None
+    display_name: Optional[str] = Field(default=None, alias="displayName")
+    contact_phone: Optional[str] = Field(default=None, alias="contactPhone")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+# 3. Standard Output (Safe Response)
+
 
 class VendorResponse(BaseModel):
     id: int
@@ -41,6 +53,9 @@ class VendorResponse(BaseModel):
     approved_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+# 4. Token Output
+
 
 class Token(BaseModel):
     access_token: str

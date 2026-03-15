@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 # DELETED duplicate auth logic. We import the central vault guard.
-from app.core.dependencies import get_current_vendor 
+from app.core.dependencies import get_current_vendor
 from app.models.vendor import Vendor
 from app.schemas.vendor_schema import VendorResponse, VendorUpdate
 from app.schemas.package_schema import PackageCreate, PackageUpdate, PackageResponse
@@ -24,6 +24,7 @@ router = APIRouter(prefix="/vendors", tags=["Vendors"])
 
 # --- Local Guardrail ---
 
+
 def require_approved_vendor(vendor: Vendor = Depends(get_current_vendor)) -> Vendor:
     """Blocks any action if vendor is not approved by admin."""
     if vendor.approval_status != "APPROVED":
@@ -31,7 +32,8 @@ def require_approved_vendor(vendor: Vendor = Depends(get_current_vendor)) -> Ven
             "PENDING": "Your account is pending admin approval. You will be notified by email once approved.",
             "REJECTED": "Your vendor application was not approved. Please contact support.",
         }.get(vendor.approval_status, "Your account is not active.")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=status_msg)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=status_msg)
     return vendor
 
 
@@ -42,14 +44,16 @@ def get_my_profile(vendor: Vendor = Depends(get_current_vendor)):
     """Get current vendor profile."""
     return vendor
 
+
 @router.put("/me", response_model=VendorResponse)
 def update_my_profile(
-    body: VendorUpdate, # SECURE: Uses strict Pydantic model instead of a raw dict
+    body: VendorUpdate,
     vendor: Vendor = Depends(get_current_vendor),
     db: Session = Depends(get_db),
 ):
     """Update current vendor profile."""
-    return vendor_service.update_profile(db, vendor, body.model_dump(exclude_unset=True))
+    # Add by_alias=True to the model_dump call
+    return vendor_service.update_profile(db, vendor, body.model_dump(exclude_unset=True, by_alias=True))
 
 
 # --- Packages Routes ---
@@ -62,6 +66,7 @@ def list_my_packages(
     """Any logged-in vendor can view their own packages."""
     return vendor_service.get_packages_by_vendor(db, vendor.id)
 
+
 @router.post("/me/packages", response_model=PackageResponse, status_code=status.HTTP_201_CREATED)
 def create_package(
     payload: PackageCreate,
@@ -71,6 +76,7 @@ def create_package(
     """Only APPROVED vendors can create packages."""
     # Service expects the Pydantic object based on original code, so we pass 'payload'
     return vendor_service.create_package(db, vendor.id, payload)
+
 
 @router.put("/me/packages/{package_id}", response_model=PackageResponse)
 def update_package(
@@ -83,8 +89,10 @@ def update_package(
     # SECURE: vendor.id is now strictly enforced in the service layer
     pkg = vendor_service.update_package(db, package_id, payload, vendor.id)
     if not pkg:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package not found or unauthorized.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Package not found or unauthorized.")
     return pkg
+
 
 @router.delete("/me/packages/{package_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_package(
@@ -96,5 +104,6 @@ def delete_package(
     # SECURE: vendor.id is now strictly enforced in the service layer
     success = vendor_service.delete_package(db, package_id, vendor.id)
     if not success:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package not found or unauthorized.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Package not found or unauthorized.")
     return None
