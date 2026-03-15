@@ -1,12 +1,13 @@
 """
 app/schemas/vendor_schema.py
 """
+
 from datetime import datetime
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr
 
-# --- Requests ---
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
 
 class VendorRegisterRequest(BaseModel):
     business_name: str
@@ -17,16 +18,21 @@ class VendorRegisterRequest(BaseModel):
     display_name: Optional[str] = None
     contact_phone: Optional[str] = None
 
+
 class VendorLoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-# FIX: Added strict schema for profile updates
-class VendorUpdate(BaseModel):
-    displayName: Optional[str] = None
-    contactPhone: Optional[str] = None
 
-# --- Responses ---
+class VendorUpdate(BaseModel):
+    business_name: Optional[str] = Field(default=None, alias="businessName")
+    location_base: Optional[str] = Field(default=None, alias="locationBase")
+    phone: Optional[str] = None
+    display_name: Optional[str] = Field(default=None, alias="displayName")
+    contact_phone: Optional[str] = Field(default=None, alias="contactPhone")
+
+    model_config = ConfigDict(populate_by_name=True)
+
 
 class VendorResponse(BaseModel):
     id: int
@@ -42,6 +48,7 @@ class VendorResponse(BaseModel):
     approved_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class Token(BaseModel):
     access_token: str
