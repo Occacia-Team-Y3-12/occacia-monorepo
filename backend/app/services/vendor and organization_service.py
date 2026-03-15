@@ -1,5 +1,6 @@
 # backend/app/services/vendor_service.py
 
+from datetime import datetime
 from typing import Optional, List
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, desc

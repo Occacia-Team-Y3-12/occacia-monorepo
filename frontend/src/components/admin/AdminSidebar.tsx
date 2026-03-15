@@ -15,7 +15,6 @@ import {
   HelpCircle,
   ClipboardList,
   ShoppingBag,
-  Bell,
 } from 'lucide-react';
 
 interface NavItem {
