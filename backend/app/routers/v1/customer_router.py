@@ -53,8 +53,10 @@ from app.schemas.event_planning_schema import (
     TaskResponse,
     TaskUpdateRequest,
 )
+from app.schemas.recommendation_schema import RecommendationPackageListResponse
 from app.services.customer_service import customer_service
 from app.services.event_planning_service import event_planning_service
+from app.services.recommendation_service import recommendation_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Customer"])
@@ -483,6 +485,41 @@ def delete_event_task(
         task_id=task_id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Event Recommendation Package Routes ---
+
+@router.post(
+    "/customers/events/{event_id}/recommendations",
+    response_model=RecommendationPackageListResponse,
+    response_model_by_alias=True,
+)
+def generate_event_recommendations(
+    event_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.generate_packages(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+    )
+
+@router.get(
+    "/customers/events/{event_id}/packages",
+    response_model=RecommendationPackageListResponse,
+    response_model_by_alias=True,
+)
+def list_event_recommendation_packages(
+    event_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.get_packages(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+    )
 
 
 # --- Event Schedule & Reminders ---
