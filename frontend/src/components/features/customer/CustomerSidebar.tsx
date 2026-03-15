@@ -28,7 +28,7 @@ const CustomerSidebar = ({ isOpen }: CustomerSidebarProps) => {
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-40 h-screen w-[240px] max-w-[85vw] overflow-y-auto border-r border-[#ECECF0] bg-[#FFFFFF] px-4 py-5 transition-transform duration-300 ${
+      className={`fixed left-0 top-0 z-40 flex h-screen w-[240px] max-w-[85vw] flex-col overflow-y-auto border-r border-[#ECECF0] bg-[#FFFFFF] px-4 py-5 transition-transform duration-300 ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       } lg:translate-x-0`}
     >
@@ -63,18 +63,27 @@ const CustomerSidebar = ({ isOpen }: CustomerSidebarProps) => {
         ))}
       </nav>
 
-      <div className="absolute bottom-8 left-4 right-4 flex items-center gap-3 rounded-2xl bg-[#EEF0F7] px-4 py-4">
-        <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[#F4CE95]">
-          <Image
-            src="/icons/customer/dashboard/profile.svg"
-            alt="Alex Rivera"
-            width={48}
-            height={48}
-            className="h-full w-full object-contain"
-          />
-        </span>
-        <p className="text-[17px] font-semibold leading-none text-[#182039]">Alex Rivera</p>
+      <div className="mt-auto space-y-3 rounded-xl bg-[#EFF1F5] px-3 py-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#92A0B5]">Plan Usage</p>
+          <div className="mt-2.5 h-3.5 w-full rounded-full bg-[#D1D7E2]">
+            <div className="h-full w-3/5 rounded-full bg-[#4C24D6]" />
+          </div>
+          <p className="mt-2.5 text-[12px] font-medium leading-none text-[#5F708D]">6 of 10 events used</p>
+        </div>
       </div>
+
+      <button
+        type="button"
+        className="mt-5 inline-flex items-center gap-2.5 px-1 text-[14px] font-medium text-[#556987] transition-colors hover:text-[#334966]"
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" />
+          <path d="M17 16l5-4-5-4" />
+          <path d="M22 12H9" />
+        </svg>
+        Logout
+      </button>
     </aside>
   );
 };
