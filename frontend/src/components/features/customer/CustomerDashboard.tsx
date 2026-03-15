@@ -1,7 +1,12 @@
+"use client";
+
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useCustomerDashboard } from '@/hooks/customer/useCustomerDashboard';
+import { ROUTES } from '@/lib/routes';
 
 export default function CustomerDashboard() {
+  const router = useRouter();
   const { templates } = useCustomerDashboard();
 
   return (
@@ -16,12 +21,15 @@ export default function CustomerDashboard() {
         </div>
 
         <h2 className="text-4xl leading-[1.05] font-extrabold tracking-tight sm:text-[50px]">Welcome back, Alex!</h2>
-        <p className="mt-3 max-w-[560px] text-base font-medium leading-relaxed text-[#E4EAFF] sm:mt-4 sm:text-[22px]">
-          Ready to plan your next event? We&apos;ve updated our vendor lists with top-rated local catering and decor services just for
-          you.
+        <p className="mt-3 max-w-[860px] text-base font-medium leading-relaxed text-[#E4EAFF] sm:mt-4 sm:text-[22px]">
+          <span className="block">Ready to plan your next event? We&apos;ve updated our vendor lists with top-rated</span>
+          <span className="block">local catering and decor services just for you.</span>
         </p>
 
-        <button className="mt-6 inline-flex items-center gap-2 rounded-lg border border-white/30 bg-white px-4 py-2.5 text-sm font-semibold text-[#2443F4] sm:mt-8 sm:px-5 sm:py-3">
+        <button
+          onClick={() => router.push(ROUTES.CUSTOMER.EVENTS)}
+          className="mt-6 inline-flex items-center gap-2 rounded-lg border border-white/30 bg-white px-4 py-2.5 text-sm font-semibold text-[#2443F4] sm:mt-8 sm:px-5 sm:py-3"
+        >
           <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[#2443F4]">+</span>
           Start Planning
         </button>
@@ -86,7 +94,14 @@ export default function CustomerDashboard() {
       </section>
 
       <section className="flex min-h-[220px] flex-col items-center justify-center rounded-3xl border border-dashed border-[#D9BCFA] bg-[#F5ECFF] px-4 text-center">
-        <Image src="/icons/customer/dashboard/event.svg" alt="No events" width={72} height={72} className="h-14 w-14 sm:h-[72px] sm:w-[72px]" />
+        <button
+          type="button"
+          onClick={() => router.push(ROUTES.CUSTOMER.EVENTS)}
+          className="rounded-full p-1 transition-transform duration-200 hover:scale-105"
+          aria-label="Go to events page"
+        >
+          <Image src="/icons/customer/dashboard/event.svg" alt="No events" width={72} height={72} className="h-14 w-14 sm:h-[72px] sm:w-[72px]" />
+        </button>
         <h4 className="mt-3 text-3xl font-bold text-[#262E45] sm:text-[35px]">No upcoming events?</h4>
         <p className="mt-2 max-w-[410px] text-base leading-relaxed text-[#7E869C] sm:text-lg">
           You don&apos;t have any new events planned yet. Let&apos;s create something memorable together.
