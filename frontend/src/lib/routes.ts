@@ -1,8 +1,15 @@
 export const ROUTES = {
   HOME: '/',
   CUSTOMER: {
+    LOGIN: '/customer/auth/login',
     DASHBOARD: '/customer/dashboard',
     REGISTER: '/customer/register',
+    EVENTS: '/customer/events',
+    EVENT_CHAT: (eventId: string) => `/customer/events/${eventId}/chat`,
+    EVENT_DRAFT_REVIEW: (eventId: string) => `/customer/events/${eventId}/draft`,
+    EVENT_RECOMMENDATIONS: (eventId: string) => `/customer/events/${eventId}/recommendations`,
+    EVENT_PACKAGES: (eventId: string) => `/customer/events/${eventId}/packages`,
+    EVENT_PACKAGE_DETAIL: (eventId: string, packageId: string) => `/customer/events/${eventId}/packages/${packageId}`,
     PRODUCTS: '/customer/products',
     CART: '/customer/cart',
     ORDERS: '/customer/orders',
@@ -16,6 +23,7 @@ export const ROUTES = {
     ACTIVATED: '/vendor/activated',
     PRODUCTS: '/vendor/products',
     ORDERS: '/vendor/orders',
+    OFFERINGS: '/vendor/offerings',
   },
   VENDORS: {
     DASHBOARD: '/vendors/dashboard',

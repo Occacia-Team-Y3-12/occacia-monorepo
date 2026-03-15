@@ -79,11 +79,9 @@ export default function RegisterPage() {
         
         {/* Left Section - Form */}
         <div className="flex-1 p-8">
-          <div className="flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 rounded-lg flex items-center justify-center shadow-md">
-              <span className="text-white font-bold text-xl">O</span>
-            </div>
-            <span className="text-2xl font-bold text-gray-900">OCCACIA</span>
+          <div className="flex items-center gap-3 mb-6">
+            <img src="/images/customer/logo.png" alt="Occacia" className="h-10 w-auto" />
+            <span className="text-2xl font-bold" style={{ color: '#1562CC' }}>OCCACIA</span>
           </div>
 
           <div className="mb-6">

@@ -1,32 +1,42 @@
-from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field
-from app.common.enums import VendorStatus
+"""
+app/schemas/vendor_schema.py
+"""
+from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel, ConfigDict, EmailStr
 
-# contains fields common to both reading and writing vendor data
-class VendorBase(BaseModel):
-    business_name: str = Field(..., min_length=2, max_length=100)
-    phone: str = Field(..., min_length=5, max_length=20)
-    description: Optional[str] = Field(None, max_length=500)
-    website: Optional[str] = None
-
-class VendorCreate(VendorBase):
+# 1. Registration Input
+class VendorRegisterRequest(BaseModel):
+    business_name: str
     email: EmailStr
-    password: str = Field(..., min_length=8)
-# VendorUpdate is used for patch requests to modify existing profiles
-class VendorUpdate(BaseModel):
-    business_name: Optional[str] = None
-    contact_name: Optional[str] = None
-    phone_number: Optional[str] = None
-    description: Optional[str] = None
-    website: Optional[str] = None
+    password: str
+    location_base: Optional[str] = None
+    phone: Optional[str] = None
+    display_name: Optional[str] = None
+    contact_phone: Optional[str] = None
 
-# VendorResponse defines the structure of data sent back to the client
-class VendorResponse(VendorBase):
+# 2. Login Input
+class VendorLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+# 3. Standard Output (Safe Response)
+class VendorResponse(BaseModel):
     id: int
-    user_id: str
-    # status: The current approval state (PENDING, APPROVED, etc.)
-    status: VendorStatus
-    
-    # this enables something ( Pydantic to read data directly from SQLAlchemy model objects)
-    class Config:
-        from_attributes = True
+    vendor_id: Optional[str] = None
+    business_name: str
+    email: EmailStr
+    location_base: Optional[str] = None
+    is_verified: bool
+    phone: Optional[str] = None
+    display_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    approval_status: Optional[str] = None
+    approved_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+# 4. Token Output
+class Token(BaseModel):
+    access_token: str
+    token_type: str

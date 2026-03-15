@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "🏗️  STAGING: Running Database Migrations..."
-# This command looks at your migrations/versions folder and updates OCI Postgres
-poetry run alembic upgrade head
+# nject the virtual environment directly into the system path.
+# This tells Linux exactly where to find alembic and uvicorn without needing Poetry.
+export PATH="/app/.venv/bin:$PATH"
 
-echo "🚀 IGNITION: Starting FastAPI Engine..."
-# Bind to 0.0.0.0 so Nginx can reach the container
-exec poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000
+echo "Running Database Migrations..."
+alembic upgrade head
+
+echo "Starting FastAPI Engine..."
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000

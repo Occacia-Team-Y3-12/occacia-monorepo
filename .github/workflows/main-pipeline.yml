@@ -1,4 +1,4 @@
-name: CI/CD Pipeline - OCCACIA - FINAL
+name: Occacia CI/CD
 
 on:
   push:
@@ -6,142 +6,203 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Prevents overlapping deployments from corrupting your server
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  # =======================================================
-  # ZONE 1 & 2: THE QUALITY GATE (Runs on EVERY PUSH)
-  # Purpose: Syntax, Logic, and Unit Tests
-  # =======================================================
-  quality-gate:
-    name: Zone 1 & 2 - Quality & Logic
+
+  # --- Backend Quality Gate ---
+  backend:
+    name: Backend Quality Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Python
+
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.11'
           cache: 'pip'
 
       - name: Install Poetry
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install --user "poetry==2.3.2"
+          pip install --upgrade pip
+          pip install --user "poetry==2.3.2"
           echo "$HOME/.local/bin" >> $GITHUB_PATH
-          poetry --version
-      
-      - name: Backend Lint & Logic
-        run: |
-          cd backend
-          poetry sync --no-root
-          # 1. Syntax Check (Stop build on errors)
-          poetry run ruff check . --select E9,F63,F7,F82
-          # 2. Run Tests (if they exist)
-          if [ -d "tests" ]; then poetry run pytest; fi
 
-      - name: Frontend Build Check
-        run: |
-          cd frontend
-          npm ci
-          npm run build
+      - name: Install dependencies
+        run: poetry install --no-root --no-ansi
 
-  # =======================================================
-  # ZONE 3: THE SECURITY AUDIT (Runs on EVERY PUSH)
-  # Purpose: Vulnerability Scanning (Now active on Dev too!)
-  # =======================================================
-  security-audit:
-    name: Zone 3 - Security Scan
-    needs: quality-gate
+      - name: Lint code
+        run: poetry run ruff check . --select E9,F63,F7,F82
+
+      - name: Run tests
+        run: |
+          if [ -d "tests" ]; then
+            poetry run pytest --tb=short -q
+          else
+            echo "No tests directory found, skipping"
+          fi
+
+  # --- Frontend Build Check ---
+  frontend:
+    name: Frontend Build Check
     runs-on: ubuntu-latest
-    # REMOVED the 'if' condition. This now runs on dev/kashmika too.
-    
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  # --- Security Audit ---
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [ backend, frontend ]
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
-      
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-          cache: 'pip'
+          fetch-depth: 0
 
-      - name: Trufflehog (Secret Scan)
+      - name: Secret scan
         uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --only-verified
 
-      - name: Bandit (Python Security)
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install bandit
-          cd backend
-          # Scan strictly, skip test folder, ignore B104 (binding to all interfaces in Docker is normal)
-          bandit -r . -x tests --severity-level medium --skip B104
+      - name: Setup Python for Bandit
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Build Local Image for Scan
+      - name: Python security scan
+        run: |
+          pip install bandit
+          bandit -r backend/ -x backend/tests --severity-level medium --skip B104 -f txt
+
+      - name: Build image for container scan
         run: docker build -t occacia-scan ./backend
 
-      - name: Trivy (Container Scan)
+      - name: Container vulnerability scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'occacia-scan'
-          format: 'table'
-          exit-code: '1' # Fail the build if CRITICAL bugs are found
+          image-ref: occacia-scan
+          format: table
+          exit-code: '1'
           ignore-unfixed: true
-          severity: 'CRITICAL'
+          severity: CRITICAL,HIGH
 
-  # =======================================================
-  # ZONE 4: THE DEPLOYMENT (Runs ONLY on MAIN)
-  # Purpose: Ship to Production. Dev branches STOP before this.
-  # =======================================================
+  # --- Deploy to Production ---
   deploy:
-    name: Zone 4 - OCI Orchestration
-    needs: security-audit
+    name: Deploy to Production
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: security
     environment: production
-    # THE GATEKEEPER: This prevents 'dev' code from hitting your live server
     if: github.ref == 'refs/heads/main'
-    
     steps:
       - uses: actions/checkout@v4
 
-      - name: Transport Payload (SCP)
-        uses: appleboy/scp-action@v0.1.7 
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "backend/,frontend/,docker-compose.yml,nginx.conf" 
+          source: "backend/,frontend/,docker-compose.yml,nginx.conf"
           target: "~/occacia-app"
 
-      - name: Remote Orchestration & DB Migration
-        uses: appleboy/ssh-action@v1.0.3 
+      - name: Deploy and migrate
+        uses: appleboy/ssh-action@v1.0.3
         env:
+          LANGFLOW_URL: ${{ secrets.LANGFLOW_URL }}
+          LANGFLOW_ORG_ID: ${{ secrets.LANGFLOW_ORG_ID }}
+          LANGFLOW_TOKEN: ${{ secrets.LANGFLOW_TOKEN }}
+          DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ALGORITHM: ${{ secrets.ALGORITHM }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          DISABLE_ADMIN_REGISTER: ${{ secrets.DISABLE_ADMIN_REGISTER }}
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DB_PASSWORD,DATABASE_URL
+          envs: LANGFLOW_URL,LANGFLOW_ORG_ID,LANGFLOW_TOKEN,DB_USER,DB_PASSWORD,DB_NAME,DATABASE_URL,SECRET_KEY,ALGORITHM,SENDGRID_API_KEY,FROM_EMAIL,REDIS_PASSWORD,DISABLE_ADMIN_REGISTER
           script: |
+            set -e
             cd ~/occacia-app
-            
-            # 1. Build Production .env
-            cat <<EOF > backend/.env
-            DATABASE_URL=$DATABASE_URL
+
+            # Write .env file
+            cat <<EOF > .env
+            LANGFLOW_URL=${LANGFLOW_URL}
+            LANGFLOW_ORG_ID=${LANGFLOW_ORG_ID}
+            LANGFLOW_TOKEN=${LANGFLOW_TOKEN}
+            DB_USER=${DB_USER}
+            DB_PASSWORD=${DB_PASSWORD}
+            DB_NAME=${DB_NAME}
+            DATABASE_URL=${DATABASE_URL}
+            SECRET_KEY=${SECRET_KEY}
+            ALGORITHM=${ALGORITHM:-HS256}
+            SENDGRID_API_KEY=${SENDGRID_API_KEY}
+            FROM_EMAIL=${FROM_EMAIL}
+            REDIS_PASSWORD=${REDIS_PASSWORD}
+            REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+            DISABLE_ADMIN_REGISTER=${DISABLE_ADMIN_REGISTER}
+            DOCKER_SOCKET=/var/run/docker.sock
             EOF
 
-            # 2. Restart Containers
-            sudo docker compose down --remove-orphans || true 
+            # 🛑 The Architect and Foreman are fixed. No --no-cache.
+            sudo docker compose down --remove-orphans || true
+            sudo docker rm -f occacia-radar || true
+            sudo docker rm -f \
+              occacia-db \
+              occacia-redis \
+              occacia-backend \
+              occacia-frontend \
+              occacia-nginx \
+              occacia-backup \
+              occacia-radar || true
             sudo docker compose up --build -d
-            
-            # 3. Apply Migrations
-            echo "🧠 Running Database Migrations..."
+
+            # Wait for backend healthcheck
+            echo "Waiting for backend..."
+            for i in $(seq 1 15); do
+              if sudo docker compose exec -T backend curl -sf http://localhost:8000/api/v1/health > /dev/null; then
+                echo "Backend is up"
+                break
+              fi
+              echo "Attempt $i/15..."
+              sleep 4
+            done
+
+            # Run database migrations
             sudo docker compose exec -T backend alembic upgrade head
-            
-            # 4. Cleanup
+
+            # Cleanup images
             sudo docker image prune -f
-            
-            echo "✅ Deployment finished successfully at $(date)" >> ~/occacia-app/deploy_history.log
+            echo "Deployed at $(date)" >> ~/occacia-app/deploy_history.log

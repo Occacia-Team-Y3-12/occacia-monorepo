@@ -1,7 +1,7 @@
 .PHONY: install lock update run test lint audit tools-upgrade clean-venv
 
 install: lock
-	poetry install --sync --no-root
+	poetry sync --no-root
 
 lock:
 	poetry lock

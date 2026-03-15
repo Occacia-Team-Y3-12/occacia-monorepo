@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+
 import os
 import sys
 from pathlib import Path
@@ -5,7 +7,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 # ── Environment must be set before any app imports ───────────────────
 os.environ.update({
@@ -25,19 +27,31 @@ repo_root = Path(__file__).resolve().parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
+from app.core.database import Base, SessionLocal, engine
+from app.core.security import create_access_token, get_password_hash
 from app.main import app  # noqa: E402
-from app.core.database import SessionLocal, engine, Base
-from app.models.customer import Customer
-from app.models.vendor import Vendor
-from app.models.persona import Persona
+from app.models import registry  # noqa: F401
 from app.models.chat_model import ChatMessage
+from app.models.customer import Customer
+from app.models.event import Event
+from app.models.event_chat_message import EventChatMessage
+from app.models.event_persona import EventPersona
+from app.models.offering import Offering
 from app.models.package import Package
-from app.core.security import get_password_hash, create_access_token
+from app.models.package_execution_request import PackageExecutionRequest
+from app.models.package_item import PackageItem
+from app.models.persona import Persona
+from app.models.recommendation_package import RecommendationPackage
+from app.models.task import Task
+from app.models.task_recommendation import TaskRecommendation
+from app.models.task_request import TaskRequest
+from app.models.vendor import Vendor
 
 
 # ── Create all tables once ───────────────────────────────────────────
 @pytest.fixture(scope="session", autouse=True)
 def create_tables():
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
@@ -49,11 +63,27 @@ def clean_tables():
     yield
     db = SessionLocal()
     try:
-        db.query(ChatMessage).delete()
-        db.query(Persona).delete()
-        db.query(Package).delete()
-        db.query(Vendor).delete()
-        db.query(Customer).delete()
+        for model in (
+            ChatMessage,
+            EventChatMessage,
+            PackageExecutionRequest,
+            TaskRequest,
+            PackageItem,
+            RecommendationPackage,
+            TaskRecommendation,
+            Task,
+            EventPersona,
+            Event,
+            Persona,
+            Offering,
+            Package,
+            Vendor,
+            Customer,
+        ):
+            try:
+                db.query(model).delete()
+            except OperationalError:
+                db.rollback()
         db.commit()
     finally:
         db.close()
