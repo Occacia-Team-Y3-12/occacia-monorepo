@@ -27,14 +27,7 @@ export default function CustomerDashboard() {
         </p>
 
         <button
-<<<<<<< ours
-<<<<<<< HEAD
-=======
           type="button"
->>>>>>> ac05b80aad8dbf429eb07ede3e0ef47de2c23251
-=======
-          type="button"
->>>>>>> theirs
           onClick={() => router.push(ROUTES.CUSTOMER.EVENTS)}
           className="mt-6 inline-flex items-center gap-2 rounded-lg border border-white/30 bg-white px-4 py-2.5 text-sm font-semibold text-[#2443F4] sm:mt-8 sm:px-5 sm:py-3"
         >

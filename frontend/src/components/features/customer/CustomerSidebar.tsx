@@ -63,13 +63,13 @@ const CustomerSidebar = ({ isOpen }: CustomerSidebarProps) => {
         ))}
       </nav>
 
-      <div className="mt-auto space-y-3 rounded-xl bg-[#EFF1F5] px-3 py-3">
+      <div className="mt-auto w-[190px] rounded-lg bg-[#EFF1F5] px-2.5 py-2.5">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#92A0B5]">Plan Usage</p>
-          <div className="mt-2.5 h-3.5 w-full rounded-full bg-[#D1D7E2]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#92A0B5]">Plan Usage</p>
+          <div className="mt-2 h-2.5 w-[150px] rounded-full bg-[#D1D7E2]">
             <div className="h-full w-3/5 rounded-full bg-[#4C24D6]" />
           </div>
-          <p className="mt-2.5 text-[12px] font-medium leading-none text-[#5F708D]">6 of 10 events used</p>
+          <p className="mt-2 text-[11px] font-medium leading-none text-[#5F708D]">6 of 10 events used</p>
         </div>
       </div>
 
