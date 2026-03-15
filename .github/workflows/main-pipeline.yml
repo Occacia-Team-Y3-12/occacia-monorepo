@@ -180,7 +180,14 @@ jobs:
 
             # Remove compose-managed containers and any stale fixed-name containers.
             sudo docker compose down --remove-orphans || true
-            sudo docker rm -f occacia-radar || true
+            sudo docker rm -f \
+              occacia-db \
+              occacia-redis \
+              occacia-backend \
+              occacia-frontend \
+              occacia-nginx \
+              occacia-backup \
+              occacia-radar || true
             sudo docker compose up --build -d
 
             # Wait for backend healthcheck
