@@ -1,11 +1,12 @@
 """
 app/schemas/vendor_schema.py
 """
-from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-# 1. Registration Input
+from datetime import datetime
+from enum import Enum
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class VendorRegisterRequest(BaseModel):
@@ -17,14 +18,10 @@ class VendorRegisterRequest(BaseModel):
     display_name: Optional[str] = None
     contact_phone: Optional[str] = None
 
-# 2. Login Input
-
 
 class VendorLoginRequest(BaseModel):
     email: EmailStr
     password: str
-
-# Update this class back
 
 
 class VendorUpdate(BaseModel):
@@ -35,8 +32,6 @@ class VendorUpdate(BaseModel):
     contact_phone: Optional[str] = Field(default=None, alias="contactPhone")
 
     model_config = ConfigDict(populate_by_name=True)
-
-# 3. Standard Output (Safe Response)
 
 
 class VendorResponse(BaseModel):
@@ -54,9 +49,97 @@ class VendorResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-# 4. Token Output
-
 
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class VendorStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class OrganizationStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class VendorType(str, Enum):
+    INDIVIDUAL = "individual"
+    ORGANIZATION = "organization"
+
+
+class VendorDetailResponse(VendorResponse):
+    status_reason: Optional[str] = None
+    reviewed_by: Optional[int] = None
+    reviewed_at: Optional[datetime] = None
+    vendor_type: Optional[VendorType] = None
+    organization_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class OrganizationResponse(BaseModel):
+    id: int
+    name: str
+    legal_name: Optional[str] = None
+    registration_number: Optional[str] = None
+    tax_id: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    website: Optional[str] = None
+    description: Optional[str] = None
+    logo_url: Optional[str] = None
+    status: Optional[OrganizationStatus] = None
+    status_reason: Optional[str] = None
+    reviewed_by: Optional[int] = None
+    reviewed_at: Optional[datetime] = None
+    business_license_url: Optional[str] = None
+    tax_certificate_url: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OrganizationDetailResponse(OrganizationResponse):
+    pass
+
+
+class VendorListResponse(BaseModel):
+    items: list[VendorResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class OrganizationListResponse(BaseModel):
+    items: list[OrganizationResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class VendorStatusUpdate(BaseModel):
+    status: VendorStatus
+    reason: Optional[str] = None
+
+
+class OrganizationStatusUpdate(BaseModel):
+    status: OrganizationStatus
+    reason: Optional[str] = None
+
+
+class VendorFilter(BaseModel):
+    status: Optional[VendorStatus] = None
+    vendor_type: Optional[str] = None
+    search: Optional[str] = None
+
+
+class OrganizationFilter(BaseModel):
+    status: Optional[OrganizationStatus] = None
+    search: Optional[str] = None
