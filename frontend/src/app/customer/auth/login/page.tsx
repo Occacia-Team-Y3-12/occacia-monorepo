@@ -32,7 +32,7 @@ export default function LoginPage() {
       <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 lg:px-12">
         <div className="max-w-md w-full">
           <div className="flex items-center gap-3 mb-10">
-            <img src="/images/customer/logo.png" alt="Occacia" className="h-10 w-auto" />
+            <img src="/images/customer/logo.png" alt="Occacia" className="h-12 w-auto" />
             <span className="text-2xl font-bold" style={{ color: '#1562CC' }}>OCCACIA</span>
           </div>
 
