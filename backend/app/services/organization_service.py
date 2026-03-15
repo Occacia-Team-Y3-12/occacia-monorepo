@@ -1,19 +1,20 @@
-# backend/app/services/vendor_service.py
+# backend/app/services/organization_service.py
 
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import or_, desc
-from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
+from sqlalchemy import desc, or_
+from sqlalchemy.orm import Session
 
-from app.models.marketplace import Organization
+from app.models.organization import Organization
 from app.schemas.vendor_schema import (
     OrganizationCreate, OrganizationUpdate, OrganizationStatusUpdate,
     OrganizationFilter
 )
 
-class VendorService:
+
+class OrganizationService:
     def __init__(self, db: Session):
         self.db = db
 
@@ -43,9 +44,7 @@ class VendorService:
         return organizations, total
 
     def get_organization_by_id(self, org_id: int) -> Optional[Organization]:
-        return self.db.query(Organization).options(
-            joinedload(Organization.vendors)
-        ).filter(Organization.id == org_id).first()
+        return self.db.query(Organization).filter(Organization.id == org_id).first()
 
     def create_organization(self, org_data: OrganizationCreate) -> Organization:
         db_org = Organization(**org_data.model_dump())
@@ -86,7 +85,7 @@ class VendorService:
             )
         
         org.status = status_update.status
-        org.status_reason = status_update.status_reason
+        org.status_reason = status_update.reason
         org.reviewed_by = reviewed_by
         org.reviewed_at = datetime.utcnow()
         

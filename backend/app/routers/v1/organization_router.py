@@ -1,25 +1,24 @@
-# backend/app/routers/admin_router.py
+# backend/app/routers/v1/organization_router.py
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Optional, List
-from datetime import datetime
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin as get_current_admin_user
-from app.models.user import User
+from app.models.admin import Admin
 from app.schemas.vendor_schema import (
     OrganizationResponse, OrganizationDetailResponse, OrganizationListResponse,
     OrganizationStatusUpdate,
     OrganizationFilter, OrganizationStatus
 )
-from app.services.organization_service import VendorService
+from app.services.organization_service import OrganizationService
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
-# Dependency
 def get_vendor_service(db: Session = Depends(get_db)):
-    return VendorService(db)
+    return OrganizationService(db)
 
 # ==================== ORGANIZATION ENDPOINTS ====================
 
@@ -30,8 +29,8 @@ async def list_organizations(
     status: Optional[OrganizationStatus] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user),
-    vendor_service: VendorService = Depends(get_vendor_service)
+    current_admin: Admin = Depends(get_current_admin_user),
+    vendor_service: OrganizationService = Depends(get_vendor_service)
 ):
     """
     List all organizations with filtering and pagination.
@@ -56,8 +55,8 @@ async def list_organizations(
 async def get_organization(
     org_id: int,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user),
-    vendor_service: VendorService = Depends(get_vendor_service)
+    current_admin: Admin = Depends(get_current_admin_user),
+    vendor_service: OrganizationService = Depends(get_vendor_service)
 ):
     """
     Get detailed information about a specific organization.
@@ -75,8 +74,8 @@ async def update_organization_status(
     org_id: int,
     status_update: OrganizationStatusUpdate,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user),
-    vendor_service: VendorService = Depends(get_vendor_service)
+    current_admin: Admin = Depends(get_current_admin_user),
+    vendor_service: OrganizationService = Depends(get_vendor_service)
 ):
     """
     Update organization approval status (pending, approved, rejected).
@@ -92,8 +91,8 @@ async def update_organization_status(
 async def delete_organization(
     org_id: int,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user),
-    vendor_service: VendorService = Depends(get_vendor_service)
+    current_admin: Admin = Depends(get_current_admin_user),
+    vendor_service: OrganizationService = Depends(get_vendor_service)
 ):
     """
     Delete an organization (admin only).
