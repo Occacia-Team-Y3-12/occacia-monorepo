@@ -65,6 +65,15 @@ class Settings(BaseSettings):
     SENDGRID_API_KEY: str | None = None
     FROM_EMAIL: str = "noreply@occacia.com"
 
+    GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_CLIENT_SECRET: str | None = None
+    GOOGLE_REDIRECT_URI: str | None = None
+    GOOGLE_CALENDAR_SCOPES: str = (
+        "openid email https://www.googleapis.com/auth/calendar.events "
+        "https://www.googleapis.com/auth/calendar.readonly"
+    )
+    CALENDAR_TOKEN_ENCRYPTION_KEY: str | None = None
+
     SKIP_EMAIL_VERIFICATION: bool = False
     SKIP_DB_STARTUP: bool = False
 

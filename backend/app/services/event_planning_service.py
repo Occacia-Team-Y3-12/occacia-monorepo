@@ -11,18 +11,20 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.common.utils import generate_prefixed_id, now_utc
+from app.core.encryption import decrypt_value, encrypt_value
 from app.models.customer import Customer
 from app.models.event import Event
 from app.models.event_chat_message import EventChatMessage
 from app.models.event_persona import EventPersona
 from app.models.persona import Persona
 from app.models.task import Task
+from app.services.google_calendar_service import google_calendar_service
 
 _RRULE_PART_RE = re.compile(r"^(?P<key>[A-Z]+)=(?P<value>.+)$")
 _DURATION_RE = re.compile(r"^P(?:(?P<days>\d+)D)?(?:T(?:(?P<hours>\d+)H)?(?:(?P<minutes>\d+)M)?)?$")
 _SUPPORTED_FREQ = {"DAILY", "WEEKLY", "MONTHLY", "YEARLY"}
 _REMINDER_CHANNELS = {"PUSH", "EMAIL", "IN_APP"}
-_CALENDAR_PROVIDERS = {"GOOGLE", "MICROSOFT", "APPLE"}
+_CALENDAR_PROVIDERS = {"GOOGLE"}
 _TIMEZONE_ALIASES = {
     "utc": "UTC",
     "gmt": "UTC",
@@ -277,9 +279,11 @@ class EventPlanningService:
                 event.calendar_sync_state = "DISABLED"
                 event.calendar_last_sync_status = "FAILED"
             else:
-                event.external_calendar_event_id = event.external_calendar_event_id or generate_prefixed_id("CAL")
-                event.calendar_last_sync_at = confirmed_at
-                event.calendar_last_sync_status = "SUCCESS" if event.start_at else "PENDING"
+                self._sync_event_if_needed(
+                    db,
+                    customer_id=customer_id,
+                    event=event,
+                )
         db.add(event)
         db.commit()
         db.refresh(event)
@@ -329,7 +333,11 @@ class EventPlanningService:
         event.recurrence_until = recurrence_until or (parsed_rrule.get("UNTIL") if parsed_rrule else None)
         event.recurrence_count = recurrence_count or (parsed_rrule.get("COUNT") if parsed_rrule else None)
         if event.calendar_sync_state == "ENABLED":
-            event.calendar_last_sync_status = "PENDING"
+            self._sync_event_if_needed(
+                db,
+                customer_id=customer_id,
+                event=event,
+            )
         db.add(event)
         db.commit()
         db.refresh(event)
@@ -368,7 +376,11 @@ class EventPlanningService:
             "SCHEDULED" if payload["enabled"] and event.start_at else "PENDING_DATE"
         ) if payload["enabled"] else "DISABLED"
         if event.calendar_sync_state == "ENABLED":
-            event.calendar_last_sync_status = "PENDING"
+            self._sync_event_if_needed(
+                db,
+                customer_id=customer_id,
+                event=event,
+            )
         db.add(event)
         db.commit()
         db.refresh(event)
@@ -415,11 +427,14 @@ class EventPlanningService:
         if state not in {"DISABLED", "ENABLED"}:
             raise HTTPException(status_code=400, detail="Invalid calendar sync state")
         if state == "DISABLED":
+            deleted = self._delete_synced_event(db, customer_id=customer_id, event=event)
             event.calendar_sync_state = "DISABLED"
             event.calendar_sync_provider = None
             event.calendar_sync_calendar_id = None
-            event.external_calendar_event_id = None
-            event.calendar_last_sync_status = None
+            if deleted:
+                event.external_calendar_event_id = None
+                event.calendar_last_sync_status = None
+                event.calendar_last_sync_at = None
         else:
             provider = payload.get("provider") or customer.calendar_provider
             if provider not in _CALENDAR_PROVIDERS:
@@ -431,11 +446,11 @@ class EventPlanningService:
             event.calendar_sync_calendar_id = payload.get("calendar_id") or customer.calendar_default_id
             event.calendar_last_sync_status = "PENDING"
             if event.start_at:
-                event.external_calendar_event_id = event.external_calendar_event_id or generate_prefixed_id("CAL")
-                event.calendar_last_sync_status = "SUCCESS"
-                event.calendar_last_sync_at = now_utc()
-                customer.calendar_last_sync_at = event.calendar_last_sync_at
-                db.add(customer)
+                self._sync_event_if_needed(
+                    db,
+                    customer_id=customer_id,
+                    event=event,
+                )
         db.add(event)
         db.commit()
         db.refresh(event)
@@ -446,16 +461,6 @@ class EventPlanningService:
             {
                 "type": "GOOGLE",
                 "displayName": "Google Calendar",
-                "capabilities": {"recurrence": True, "reminders": True, "directLinkSync": True},
-            },
-            {
-                "type": "MICROSOFT",
-                "displayName": "Microsoft Outlook",
-                "capabilities": {"recurrence": True, "reminders": True, "directLinkSync": True},
-            },
-            {
-                "type": "APPLE",
-                "displayName": "Apple Calendar",
                 "capabilities": {"recurrence": True, "reminders": True, "directLinkSync": True},
             },
         ]
@@ -477,7 +482,10 @@ class EventPlanningService:
         db.commit()
         return {
             "provider": provider,
-            "authorizationUrl": f"{redirect_uri}?provider={provider}&state={state}",
+            "authorizationUrl": google_calendar_service.build_google_auth_url(
+                state=state,
+                redirect_uri=redirect_uri,
+            ),
             "state": state,
         }
 
@@ -489,19 +497,38 @@ class EventPlanningService:
         provider: str,
         code: str,
         state: str | None,
+        redirect_uri: str | None = None,
     ) -> Customer:
         if provider not in _CALENDAR_PROVIDERS:
             raise HTTPException(status_code=400, detail="Unsupported calendar provider")
         if not code.strip():
             raise HTTPException(status_code=400, detail="code must not be empty")
         customer = self._get_customer(db, customer_id)
-        if customer.calendar_oauth_state and state and customer.calendar_oauth_state != state:
+        if customer.calendar_oauth_state and customer.calendar_oauth_state != state:
             raise HTTPException(status_code=400, detail="Invalid OAuth state")
+
+        token_payload = google_calendar_service.exchange_google_code(
+            code=code,
+            redirect_uri=redirect_uri,
+        )
+        access_token = token_payload.get("access_token")
+        if not access_token:
+            raise HTTPException(status_code=502, detail="Google OAuth response did not include an access token")
+        profile = google_calendar_service.get_google_account_profile(access_token=access_token)
         connected_at = now_utc()
         customer.calendar_provider = provider
-        customer.calendar_default_id = f"{provider.lower()}-default"
+        customer.calendar_default_id = profile.get("calendar_id") or "primary"
         customer.calendar_connected_at = connected_at
+        customer.calendar_last_sync_at = None
         customer.calendar_oauth_state = None
+        customer.calendar_account_email = profile.get("email")
+        customer.calendar_access_token_encrypted = encrypt_value(access_token)
+        refresh_token = token_payload.get("refresh_token")
+        if refresh_token:
+            customer.calendar_refresh_token_encrypted = encrypt_value(refresh_token)
+        customer.calendar_token_expires_at = google_calendar_service.parse_expiry(token_payload)
+        customer.calendar_token_scope = token_payload.get("scope")
+        customer.calendar_token_type = token_payload.get("token_type")
         db.add(customer)
         db.commit()
         db.refresh(customer)
@@ -517,8 +544,113 @@ class EventPlanningService:
         customer.calendar_connected_at = None
         customer.calendar_last_sync_at = None
         customer.calendar_oauth_state = None
+        customer.calendar_account_email = None
+        customer.calendar_access_token_encrypted = None
+        customer.calendar_refresh_token_encrypted = None
+        customer.calendar_token_expires_at = None
+        customer.calendar_token_scope = None
+        customer.calendar_token_type = None
         db.add(customer)
         db.commit()
+
+    def _sync_event_if_needed(self, db: Session, *, customer_id: str, event: Event) -> None:
+        if event.calendar_sync_state != "ENABLED":
+            return
+        if not event.start_at or not event.calendar_sync_provider:
+            event.calendar_last_sync_status = "PENDING"
+            event.calendar_last_sync_at = None
+            return
+
+        customer = self._get_customer(db, customer_id)
+        try:
+            access_token = self._get_google_access_token(db, customer)
+            reminder_overrides = self._build_google_reminder_overrides(event)
+            event_payload = google_calendar_service.build_event_payload(
+                event=event,
+                description=event.description or self.summarize_event_context_from_event(event),
+                reminder_overrides=reminder_overrides,
+            )
+            calendar_id = event.calendar_sync_calendar_id or customer.calendar_default_id or "primary"
+            if event.external_calendar_event_id:
+                synced_event = google_calendar_service.update_google_event(
+                    access_token=access_token,
+                    calendar_id=calendar_id,
+                    event_id=event.external_calendar_event_id,
+                    payload=event_payload,
+                )
+            else:
+                synced_event = google_calendar_service.create_google_event(
+                    access_token=access_token,
+                    calendar_id=calendar_id,
+                    payload=event_payload,
+                )
+            event.calendar_sync_calendar_id = calendar_id
+            event.external_calendar_event_id = synced_event.get("id") or event.external_calendar_event_id
+            event.calendar_last_sync_status = "SUCCESS"
+            event.calendar_last_sync_at = now_utc()
+            customer.calendar_last_sync_at = event.calendar_last_sync_at
+            db.add(customer)
+        except HTTPException:
+            event.calendar_last_sync_status = "FAILED"
+            event.calendar_last_sync_at = now_utc()
+
+    def _delete_synced_event(self, db: Session, *, customer_id: str, event: Event) -> bool:
+        if not event.external_calendar_event_id or event.calendar_sync_provider != "GOOGLE":
+            return True
+        customer = self._get_customer(db, customer_id)
+        try:
+            access_token = self._get_google_access_token(db, customer)
+            calendar_id = event.calendar_sync_calendar_id or customer.calendar_default_id or "primary"
+            google_calendar_service.delete_google_event(
+                access_token=access_token,
+                calendar_id=calendar_id,
+                event_id=event.external_calendar_event_id,
+            )
+            return True
+        except HTTPException:
+            event.calendar_last_sync_status = "FAILED"
+            event.calendar_last_sync_at = now_utc()
+            return False
+
+    def _get_google_access_token(self, db: Session, customer: Customer) -> str:
+        if customer.calendar_provider != "GOOGLE":
+            raise HTTPException(status_code=400, detail="Google Calendar is not connected")
+
+        access_token = decrypt_value(customer.calendar_access_token_encrypted)
+        refresh_token = decrypt_value(customer.calendar_refresh_token_encrypted)
+        expires_at = self._ensure_aware_datetime(customer.calendar_token_expires_at)
+        if access_token and (not expires_at or expires_at > now_utc() + timedelta(minutes=1)):
+            return access_token
+        if not refresh_token:
+            raise HTTPException(status_code=400, detail="Google Calendar needs to be reconnected")
+
+        token_payload = google_calendar_service.refresh_google_access_token(refresh_token=refresh_token)
+        next_access_token = token_payload.get("access_token")
+        if not next_access_token:
+            raise HTTPException(status_code=502, detail="Google refresh response did not include an access token")
+
+        customer.calendar_access_token_encrypted = encrypt_value(next_access_token)
+        if token_payload.get("refresh_token"):
+            customer.calendar_refresh_token_encrypted = encrypt_value(token_payload["refresh_token"])
+        customer.calendar_token_expires_at = google_calendar_service.parse_expiry(token_payload)
+        customer.calendar_token_scope = token_payload.get("scope", customer.calendar_token_scope)
+        customer.calendar_token_type = token_payload.get("token_type", customer.calendar_token_type)
+        db.add(customer)
+        db.commit()
+        db.refresh(customer)
+        return next_access_token
+
+    def _build_google_reminder_overrides(self, event: Event) -> list[dict[str, object]]:
+        if not event.reminders_enabled:
+            return []
+
+        overrides = []
+        for offset in event.reminder_offsets or []:
+            minutes = self._duration_seconds(offset) // 60
+            if minutes < 0:
+                continue
+            overrides.append({"method": "popup", "minutes": minutes})
+        return overrides
 
     def build_calendar_link(self, event: Event) -> str | None:
         start_at = self._ensure_aware_datetime(event.start_at)
@@ -664,23 +796,14 @@ class EventPlanningService:
         if "local reminder" in lowered or "local reminders" in lowered:
             event.calendar_sync_state = "DISABLED"
 
-        if "calendar sync" in lowered or "sync to" in lowered or "google calendar" in lowered or "outlook" in lowered:
+        if "calendar sync" in lowered or "sync to" in lowered or "google calendar" in lowered:
             if "google" in lowered:
                 event.calendar_sync_provider = "GOOGLE"
-            elif "microsoft" in lowered or "outlook" in lowered:
-                event.calendar_sync_provider = "MICROSOFT"
-            elif "apple" in lowered or "icloud" in lowered:
-                event.calendar_sync_provider = "APPLE"
             if event.calendar_sync_provider:
                 event.calendar_sync_state = "ENABLED"
-                event.calendar_last_sync_status = "SUCCESS" if event.start_at else "PENDING"
-                event.calendar_last_sync_at = now_utc() if event.start_at else None
+                event.calendar_last_sync_status = "PENDING"
+                event.calendar_last_sync_at = None
                 event.calendar_sync_calendar_id = event.calendar_sync_calendar_id or "primary"
-
-        if event.calendar_sync_state == "ENABLED" and event.start_at:
-            event.external_calendar_event_id = event.external_calendar_event_id or generate_prefixed_id("CAL")
-            event.calendar_last_sync_status = "SUCCESS"
-            event.calendar_last_sync_at = now_utc()
 
     def _normalize_vendor_category(
         self,

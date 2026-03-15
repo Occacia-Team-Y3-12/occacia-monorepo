@@ -6,7 +6,11 @@ from app.models.event import Event
 from app.models.task import Task
 
 
-def test_whenCustomerCompletesEventChatFlow_chatScheduleRemindersAndConfirm_success(auth_client, active_customer):
+def test_whenCustomerCompletesEventChatFlow_chatScheduleRemindersAndConfirm_success(
+    auth_client,
+    active_customer,
+    mock_google_calendar,
+):
     create_response = auth_client.post(
         "/api/v1/customers/events",
         json={"eventType": "Birthday", "title": "Mom Birthday Dinner"},

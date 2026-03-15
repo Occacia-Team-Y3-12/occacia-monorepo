@@ -1,99 +1,315 @@
-# Occacia Backend (FastAPI)
+# Occacia Backend
 
-Python backend for Occacia (FastAPI).
+> FastAPI backend service for the Occacia platform.
 
-## Requirements
+[Getting Started: macOS/Linux](#getting-started-macoslinux) | [Getting Started: Windows](#getting-started-windows) | [Configuration](#configuration) | [Troubleshooting](#troubleshooting)
 
-- Python 3.11+
+## Overview
+
+This service handles the backend APIs for Occacia. Local development in this directory uses:
+
+- `backend/.env` for local-only backend environment variables
+- `backend/.env.example` as the local env template
+- `backend/docker-compose-local.yml` for local Postgres
+- `backend/.venv` for the local Python virtual environment
+
+This README is only for working inside `backend/`. It does not use the monorepo root `.env` or the root `docker-compose.yml`.
+
+## Choose Your Setup Path
+
+Start in the `backend/` directory.
+
+- macOS/Linux: [Install Python 3.11](#install-python) -> [Getting Started: macOS/Linux](#getting-started-macoslinux)
+- Windows: [Install Python 3.11](#windows) -> [Getting Started: Windows](#getting-started-windows)
+
+If you are on Windows and PowerShell blocks `.\.venv\Scripts\Activate.ps1`, do not stop there. The Windows setup section includes both:
+
+- an execution policy fix
+- a no-activation fallback using `.\.venv\Scripts\poetry`
+
+## Tech Stack
+
+- Python `3.11`
+- FastAPI
 - Poetry
-- Postgres (Docker recommended)
+- PostgreSQL
 
-## Quickstart (local)
+## Prerequisites
 
-1) Create `backend/.env`
+Before starting, make sure you have:
 
-Copy [`backend/.env.example`](./.env.example) to `backend/.env` and set at least:
+- Python `3.11`
+- Docker Desktop, or Docker Engine with Docker Compose
+- `pip`
 
-- `SECRET_KEY`
-- `DB_PASSWORD`
+## Install Python
 
-Optional:
-
-- `DATABASE_URL` to override the assembled local connection string
-- `LANGFLOW_URL`
-- `LANGFLOW_TOKEN`
-- `LANGFLOW_ORG_ID`
-
-Generate a dev secret:
+### macOS
 
 ```bash
-python -c "import secrets; print(secrets.token_urlsafe(64))"
+brew install python@3.11
+python3.11 --version
 ```
 
-2) Start local Postgres from `backend/`
+If Homebrew is not installed, install it first from `https://brew.sh`.
+
+### Windows
+
+Install Python first, then restart PowerShell before continuing to the Windows setup steps.
+
+```powershell
+winget install Python.Python.3.11
+py -3.11 --version
+```
+
+If `winget` is unavailable, install Python 3.11 from `https://www.python.org/downloads/windows/` and enable `Add python.exe to PATH`.
+
+## Getting Started: macOS/Linux
+
+1. Create and activate the virtual environment.
 
 ```bash
 cd backend
-docker compose -f docker-compose-local.yml up -d
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install poetry
 ```
 
-3) Create `.venv` + install dependencies
-
-Poetry is configured to create the virtualenv in-project at `backend/.venv` (`poetry.toml`).
-
-```bash
-cd backend
-poetry env use python3.11
-make install
-```
-
-No `make`?
+2. Install dependencies.
 
 ```bash
 poetry sync --no-root
 ```
 
-4) Run migrations
+3. Create the local env file.
+
+```bash
+cp .env.example .env
+```
+
+4. Update `backend/.env` with at least:
+
+- `SECRET_KEY`
+- `DB_PASSWORD`
+
+Generate a secret if needed:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+```
+
+5. Start Postgres.
+
+```bash
+docker compose -f docker-compose-local.yml up -d
+```
+
+6. Run migrations.
 
 ```bash
 poetry run alembic upgrade head
 ```
 
-Or run the one-off migration container:
+7. Start the API.
+
+```bash
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## Getting Started: Windows
+
+Open Windows PowerShell after Python 3.11 is installed, then continue here.
+
+1. Create the virtual environment.
+
+```powershell
+cd backend
+py -3.11 -m venv .venv
+```
+
+2. Activate it.
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+If PowerShell blocks activation because script execution is disabled, choose one of these:
+
+Current terminal only:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+Current user:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+.\.venv\Scripts\Activate.ps1
+```
+
+No activation:
+
+```powershell
+.\.venv\Scripts\python -m pip install --upgrade pip
+.\.venv\Scripts\python -m pip install poetry
+.\.venv\Scripts\poetry sync --no-root
+```
+
+3. If activation worked, install dependencies.
+
+```powershell
+python -m pip install --upgrade pip
+pip install poetry
+poetry sync --no-root
+```
+
+4. Create the local env file.
+
+```powershell
+Copy-Item .env.example .env
+```
+
+5. Update `backend/.env` with at least:
+
+- `SECRET_KEY`
+- `DB_PASSWORD`
+
+Generate a secret if needed:
+
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+```
+
+6. Start Postgres.
+
+```powershell
+docker compose -f docker-compose-local.yml up -d
+```
+
+7. Run migrations.
+
+Activated venv:
+
+```powershell
+poetry run alembic upgrade head
+```
+
+No activation:
+
+```powershell
+.\.venv\Scripts\poetry run alembic upgrade head
+```
+
+8. Start the API.
+
+Activated venv:
+
+```powershell
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+No activation:
+
+```powershell
+.\.venv\Scripts\poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## Configuration
+
+Required variables in local-only `backend/.env`:
+
+- `SECRET_KEY`
+- `DB_PASSWORD`
+
+Defaults already provided in local-only `backend/.env.example`:
+
+- `DB_USER`
+- `DB_NAME`
+- `DB_HOST`
+- `DB_PORT`
+
+Optional variables:
+
+- `DATABASE_URL`
+- `LANGFLOW_URL`
+- `LANGFLOW_TOKEN`
+- `LANGFLOW_ORG_ID`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI`
+- `GOOGLE_CALENDAR_SCOPES`
+- `CALENDAR_TOKEN_ENCRYPTION_KEY`
+- `REDIS_URL`
+- `SKIP_EMAIL_VERIFICATION`
+
+`DATABASE_URL` overrides the assembled local database connection string.
+
+## Running the Service
+
+Local API URL:
+
+- `http://localhost:8000`
+
+Useful endpoints:
+
+- Health: `http://localhost:8000/api/v1/health`
+- Swagger UI: `http://localhost:8000/api/docs`
+
+## Common Commands
+
+- Install dependencies:
+  `poetry sync --no-root`
+- Run migrations:
+  `poetry run alembic upgrade head`
+- Start API:
+  `poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+- Run tests:
+  `poetry run pytest`
+- Run lint:
+  `poetry run ruff check .`
+- Run audit:
+  `poetry run python -m pip install -U pip setuptools wheel && poetry run pip-audit -l`
+- Start Postgres:
+  `docker compose -f docker-compose-local.yml up -d`
+- Stop Postgres:
+  `docker compose -f docker-compose-local.yml down`
+- Reset Postgres volume:
+  `docker compose -f docker-compose-local.yml down -v`
+
+## Makefile Shortcuts
+
+If `make` is available, `backend/Makefile` provides:
+
+- `make install`
+- `make run`
+- `make test`
+- `make lint`
+- `make audit`
+- `make clean-venv`
+
+Windows setup should not depend on `make`.
+
+## Alternative Migration Path
+
+You can run migrations using the helper container instead of your local venv:
 
 ```bash
 docker compose -f docker-compose-local.yml --profile tools run --rm migrate
 ```
 
-5) Run the API
-
-```bash
-make run
-```
-
-## Useful commands
-
-- Tests: `make test` (Windows: `poetry run pytest`)
-- Lint: `make lint` (Windows: `poetry run ruff check .`)
-- Audit: `make audit` (Windows: `poetry run python -m pip install -U pip setuptools wheel; poetry run pip-audit -l`)
-- Remove venv: `make clean-venv` (Windows: `Remove-Item -Recurse -Force .venv`)
-
 ## Troubleshooting
 
-- Poetry using wrong Python: `cd backend && poetry env use python3.11`
-- `.venv` not created in `backend/`: ensure `backend/poetry.toml` has `virtualenvs.in-project = true`, then reinstall: `make clean-venv && make install` (Windows: `Remove-Item -Recurse -Force .venv; poetry sync --no-root`)
-- PowerShell can’t activate venv: run once `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (or skip activation and use `poetry run ...`)
-- `.env` not being read: confirm `backend/.env` exists and includes `SECRET_KEY` plus either `DATABASE_URL` or `DB_PASSWORD`
-- DB connection errors: confirm Postgres is running from `backend/docker-compose-local.yml` and that `DB_HOST=localhost`, `DB_PORT=5432`
-- Port already in use: stop the conflicting process or change the Uvicorn port (`--port 8001`)
-- Lock/deps out of sync: `poetry lock` then `poetry sync --no-root`
-
-## Monorepo Boundary
-
-- `backend/.env` is the local backend development env file.
-- `backend/docker-compose-local.yml` is the local backend Docker entrypoint.
-- The monorepo root `.env` and root `docker-compose.yml` are for root-level orchestration and deployment, not backend-local startup.
-
-## URLs
-
-- Swagger UI: `http://localhost:8000/api/docs`
+- Poetry uses the wrong Python:
+  - macOS/Linux: `poetry env use python3.11`
+  - Windows: `poetry env use 3.11`
+- `backend/.env` is not being read:
+  Ensure it exists and contains `SECRET_KEY` plus either `DB_PASSWORD` or `DATABASE_URL`.
+- Database auth errors after changing credentials:
+  Reset the local database volume with `docker compose -f docker-compose-local.yml down -v`.
+- Port `8000` is already in use:
+  Start Uvicorn on another port, for example `--port 8001`.
+- `.venv` is broken:
+  Delete `.venv`, recreate it, reinstall Poetry, and run `poetry sync --no-root` again.
