@@ -2,7 +2,7 @@ import re
 import hashlib
 import json
 import logging
-from typing import List, Optional
+from typing import Any, List
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -174,6 +174,75 @@ class AIService:
                 "Langflow is not configured (missing LANGFLOW_URL/LANGFLOW_TOKEN/LANGFLOW_ORG_ID). "
                 "AI endpoints will fail until these are set."
             )
+
+    def recommend_offerings_for_task(
+        self,
+        *,
+        event_context: dict[str, Any],
+        personas: list[dict[str, Any]],
+        task: dict[str, Any],
+        offerings: list[dict[str, Any]],
+        limit: int = 5,
+    ) -> list[str] | None:
+        if (
+            not self.base_url
+            or not self.token
+            or not self.org_id
+            or not offerings
+            or "test-flow" in self.base_url
+        ):
+            return None
+
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+            "X-DataStax-Current-Org": self.org_id,
+        }
+
+        prompt = (
+            "SYSTEM: Rank candidate vendor offerings for a single event task.\n"
+            "Return JSON only with the shape {\"recommended_offering_ids\": [\"OFF-...\"], \"reasoning\": \"...\"}.\n"
+            f"Choose up to {limit} offerings from different vendors when possible.\n"
+            "Prioritize event context, persona preferences, task constraints, budget, and suitability.\n\n"
+            f"EVENT_CONTEXT: {json.dumps(event_context, ensure_ascii=True)}\n"
+            f"PERSONAS: {json.dumps(personas, ensure_ascii=True)}\n"
+            f"TASK: {json.dumps(task, ensure_ascii=True)}\n"
+            f"CANDIDATE_OFFERINGS: {json.dumps(offerings, ensure_ascii=True)}"
+        )
+
+        payload = {
+            "input_value": prompt,
+            "inputType": "chat",
+            "outputType": "chat",
+            "tweaks": {},
+        }
+
+        try:
+            with httpx.Client(timeout=8.0) as client:
+                response = client.post(self.base_url, json=payload, headers=headers)
+                response.raise_for_status()
+            data = response.json()
+            raw = data["outputs"][0]["outputs"][0]["results"]["message"]["text"]
+            clean = raw.replace("```json", "").replace("```", "").strip()
+            if not clean.startswith("{"):
+                match = re.search(r"\{.*\}", clean, re.DOTALL)
+                if match:
+                    clean = match.group(0)
+            parsed = json.loads(clean)
+            ordered_ids = parsed.get("recommended_offering_ids") or []
+            valid_ids = {offering["offering_id"] for offering in offerings}
+            shortlist: list[str] = []
+            seen: set[str] = set()
+            for offering_id in ordered_ids:
+                if offering_id in valid_ids and offering_id not in seen:
+                    shortlist.append(offering_id)
+                    seen.add(offering_id)
+                if len(shortlist) == limit:
+                    break
+            return shortlist or None
+        except Exception as exc:
+            logger.warning("AI offering recommendation failed, using fallback ranking: %s", exc)
+            return None
 
     @retry(
         stop=stop_after_attempt(2),

@@ -22,6 +22,7 @@ from app.schemas.recommendation_schema import (
     RecommendationPackageListResponse,
     RecommendationPackageResponse,
 )
+from app.services.ai_service import ai_service
 from app.services.event_planning_service import event_planning_service
 
 logger = logging.getLogger(__name__)
@@ -349,21 +350,28 @@ class RecommendationService:
         )
 
         seen_vendors: set[str] = set()
-        ranked: list[RankedOffering] = []
+        unique_ranked: list[RankedOffering] = []
         for offering, score in scored:
             if offering.vendor_id in seen_vendors:
                 continue
             seen_vendors.add(offering.vendor_id)
-            ranked.append(
+            unique_ranked.append(
                 RankedOffering(
                     offering=offering,
                     score=round(score, 4),
-                    rank=len(ranked) + 1,
+                    rank=len(unique_ranked) + 1,
                 )
             )
-            if len(ranked) == 5:
+            if len(unique_ranked) == 12:
                 break
-        return ranked
+
+        ai_ranked = self._apply_ai_shortlist(
+            ranked_offerings=unique_ranked,
+            task=task,
+            event=event,
+            personas=personas,
+        )
+        return ai_ranked[:5]
 
     def _score_offering(self, *, offering: Offering, task: Task, task_tokens: set[str], event) -> float:
         offering_tokens = self._tokenize(
@@ -438,6 +446,84 @@ class RecommendationService:
         if value.tzinfo is None:
             return value.replace(tzinfo=now_utc().tzinfo)
         return value
+
+    def _apply_ai_shortlist(
+        self,
+        *,
+        ranked_offerings: list[RankedOffering],
+        task: Task,
+        event,
+        personas: list[Persona],
+    ) -> list[RankedOffering]:
+        ai_shortlist = ai_service.recommend_offerings_for_task(
+            event_context={
+                "event_id": event.event_id,
+                "title": event.title,
+                "description": event.description,
+                "event_type": event.event_type,
+                "location_text": event.location_text,
+                "status": event.status,
+            },
+            personas=[
+                {
+                    "persona_id": persona.persona_id,
+                    "name": persona.name,
+                    "relationship": persona.relationship,
+                    "personality": persona.personality,
+                    "food_preferences": persona.food_preferences or [],
+                    "color_preferences": persona.color_preferences or [],
+                    "music_preferences": persona.music_preferences or [],
+                    "personality_tags": persona.personality_tags or [],
+                }
+                for persona in personas
+            ],
+            task={
+                "task_id": task.task_id,
+                "name": task.name,
+                "description": task.description,
+                "quantity": task.quantity,
+                "vendor_category": task.needs_vendor,
+                "budget_min": task.budget_min,
+                "budget_max": task.budget_max,
+                "currency": task.currency,
+            },
+            offerings=[
+                {
+                    "offering_id": ranked.offering.offering_id,
+                    "vendor_id": ranked.offering.vendor_id,
+                    "name": ranked.offering.name,
+                    "category": ranked.offering.category,
+                    "description": ranked.offering.description,
+                    "price": ranked.offering.price,
+                    "currency": ranked.offering.currency,
+                    "fallback_score": ranked.score,
+                    "fallback_rank": ranked.rank,
+                }
+                for ranked in ranked_offerings
+            ],
+            limit=5,
+        )
+        if not ai_shortlist:
+            return ranked_offerings
+
+        ranked_by_id = {ranked.offering.offering_id: ranked for ranked in ranked_offerings}
+        ordered: list[RankedOffering] = []
+        for offering_id in ai_shortlist:
+            ranked = ranked_by_id.get(offering_id)
+            if ranked is not None:
+                ordered.append(ranked)
+        for ranked in ranked_offerings:
+            if ranked.offering.offering_id not in {item.offering.offering_id for item in ordered}:
+                ordered.append(ranked)
+
+        return [
+            RankedOffering(
+                offering=ranked.offering,
+                score=ranked.score,
+                rank=index + 1,
+            )
+            for index, ranked in enumerate(ordered)
+        ]
 
     def _select_ranked_offering(self, package_type: str, ranked_offerings: list[RankedOffering]) -> RankedOffering:
         if package_type == "BUDGET":
