@@ -6,6 +6,8 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 # 1. Registration Input
+
+
 class VendorRegisterRequest(BaseModel):
     business_name: str
     email: EmailStr
@@ -16,11 +18,25 @@ class VendorRegisterRequest(BaseModel):
     contact_phone: Optional[str] = None
 
 # 2. Login Input
+
+
 class VendorLoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+# Add this class back
+
+
+class VendorUpdate(BaseModel):
+    business_name: Optional[str] = None
+    location_base: Optional[str] = None
+    phone: Optional[str] = None
+    display_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+
 # 3. Standard Output (Safe Response)
+
+
 class VendorResponse(BaseModel):
     id: int
     vendor_id: Optional[str] = None
@@ -37,6 +53,8 @@ class VendorResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 # 4. Token Output
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str
