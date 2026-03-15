@@ -6,7 +6,7 @@ from typing import Optional, List
 from datetime import datetime
 
 from app.core.database import get_db
-from app.core.security import get_current_admin_user
+from app.core.dependencies import get_current_admin as get_current_admin_user
 from app.models.user import User
 from app.schemas.vendor_schema import (
     VendorResponse, VendorDetailResponse, VendorListResponse,
