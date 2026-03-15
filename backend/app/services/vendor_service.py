@@ -5,16 +5,20 @@ import logging
 from datetime import date, timedelta
 from typing import List, Optional
 
+from fastapi import HTTPException, status
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.user import User
-from app.models.vendor import Vendor
 from app.common.enums import UserRole
-from app.schemas.vendor_schema import VendorRegisterRequest as VendorCreate
-from app.models.package import Package
-from fastapi import HTTPException, status
-from app.core.security import get_password_hash
 from app.common.utils import generate_prefixed_id
+from app.models.package import Package
+from app.models.vendor import Vendor
+from app.models.user import User
+from app.schemas.vendor_schema import (
+    VendorFilter,
+    VendorRegisterRequest as VendorCreate,
+    VendorStatusUpdate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -440,6 +444,67 @@ class VendorService:
             if alias in lower:
                 return _CITY_ALIASES[alias]
         return None
+
+
+class AdminVendorService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_vendors(
+        self,
+        skip: int = 0,
+        limit: int = 20,
+        filters: VendorFilter | None = None
+    ) -> tuple[List[Vendor], int]:
+        query = self.db.query(Vendor)
+
+        if filters:
+            if filters.status:
+                query = query.filter(Vendor.approval_status == filters.status.value.upper())
+            if filters.search:
+                search_filter = or_(
+                    Vendor.business_name.ilike(f"%{filters.search}%"),
+                    Vendor.email.ilike(f"%{filters.search}%"),
+                    Vendor.phone.ilike(f"%{filters.search}%")
+                )
+                query = query.filter(search_filter)
+
+        total = query.count()
+        vendors = query.order_by(desc(Vendor.id)).offset(skip).limit(limit).all()
+        return vendors, total
+
+    def get_vendor_by_id(self, vendor_id: int) -> Vendor | None:
+        return self.db.query(Vendor).filter(Vendor.id == vendor_id).first()
+
+    def update_vendor_status(
+        self,
+        vendor_id: int,
+        status_update: VendorStatusUpdate,
+        reviewed_by: int
+    ) -> Vendor:
+        vendor = self.get_vendor_by_id(vendor_id)
+        if not vendor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Vendor not found"
+            )
+
+        vendor.approval_status = status_update.status.value.upper()
+
+        self.db.commit()
+        self.db.refresh(vendor)
+        return vendor
+
+    def get_pending_counts(self) -> dict:
+        vendor_pending = self.db.query(Vendor).filter(
+            Vendor.approval_status == "PENDING"
+        ).count()
+
+        return {
+            "vendors_pending": vendor_pending,
+            "organizations_pending": 0,
+            "total_pending": vendor_pending,
+        }
 
 
 vendor_service = VendorService()

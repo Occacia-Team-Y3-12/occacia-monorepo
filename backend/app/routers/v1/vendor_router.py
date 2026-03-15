@@ -8,19 +8,23 @@ from __future__ import annotations
 import logging
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-# DELETED duplicate auth logic. We import the central vault guard.
-from app.core.dependencies import get_current_vendor
+from app.core.dependencies import get_current_admin as get_current_admin_user, get_current_vendor
+from app.models.user import User
 from app.models.vendor import Vendor
-from app.schemas.vendor_schema import VendorResponse, VendorUpdate
+from app.schemas.vendor_schema import (
+    VendorResponse, VendorDetailResponse, VendorListResponse,
+    VendorStatusUpdate, VendorFilter, VendorStatus, VendorUpdate
+)
 from app.schemas.package_schema import PackageCreate, PackageUpdate, PackageResponse
-from app.services.vendor_service import vendor_service
+from app.services.vendor_service import AdminVendorService, vendor_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/vendors", tags=["Vendors"])
+admin_router = APIRouter(prefix="/admin", tags=["Admin"])
 
 # --- Local Guardrail ---
 
@@ -35,6 +39,91 @@ def require_approved_vendor(vendor: Vendor = Depends(get_current_vendor)) -> Ven
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail=status_msg)
     return vendor
+
+
+def get_vendor_service(db: Session = Depends(get_db)):
+    return AdminVendorService(db)
+
+
+@admin_router.get("/vendors", response_model=VendorListResponse)
+async def list_vendors(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    status: VendorStatus | None = None,
+    vendor_type: str | None = None,
+    search: str | None = None,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user),
+    vendor_service: AdminVendorService = Depends(get_vendor_service)
+):
+    """
+    List all vendors with filtering and pagination.
+    Accessible only by admin users.
+    """
+    filters = VendorFilter(
+        status=status,
+        vendor_type=vendor_type,
+        search=search
+    )
+
+    vendors, total = vendor_service.get_vendors(skip=skip, limit=limit, filters=filters)
+
+    return VendorListResponse(
+        items=[VendorResponse.model_validate(v) for v in vendors],
+        total=total,
+        page=skip // limit + 1,
+        page_size=limit
+    )
+
+
+@admin_router.get("/vendors/{vendor_id}", response_model=VendorDetailResponse)
+async def get_vendor(
+    vendor_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user),
+    vendor_service: AdminVendorService = Depends(get_vendor_service)
+):
+    """
+    Get detailed information about a specific vendor.
+    """
+    vendor = vendor_service.get_vendor_by_id(vendor_id)
+    if not vendor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vendor not found"
+        )
+    return VendorDetailResponse.model_validate(vendor)
+
+
+@admin_router.put("/vendors/{vendor_id}/status", response_model=VendorResponse)
+async def update_vendor_status(
+    vendor_id: int,
+    status_update: VendorStatusUpdate,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user),
+    vendor_service: AdminVendorService = Depends(get_vendor_service)
+):
+    """
+    Update vendor approval status (pending, approved, rejected).
+    """
+    vendor = vendor_service.update_vendor_status(
+        vendor_id=vendor_id,
+        status_update=status_update,
+        reviewed_by=current_admin.id
+    )
+    return VendorResponse.model_validate(vendor)
+
+
+@admin_router.get("/vendors/stats/pending")
+async def get_vendor_pending_stats(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user),
+    vendor_service: AdminVendorService = Depends(get_vendor_service)
+):
+    """
+    Get counts of pending vendors and organizations.
+    """
+    return vendor_service.get_pending_counts()
 
 
 # --- Profile Routes ---
