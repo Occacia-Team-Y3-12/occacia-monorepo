@@ -21,6 +21,7 @@ export const ROUTES = {
     ACTIVATED: '/vendor/activated',
     PRODUCTS: '/vendor/products',
     ORDERS: '/vendor/orders',
+    OFFERINGS: '/vendor/offerings',
   },
   VENDORS: {
     DASHBOARD: '/vendors/dashboard',
