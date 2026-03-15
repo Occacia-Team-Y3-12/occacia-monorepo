@@ -17,18 +17,56 @@ const toErrorMessage = (error: unknown): string => {
   return 'Unexpected error occurred.';
 };
 
+const normalizeErrorText = (value?: string): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  const lowered = trimmed.toLowerCase();
+  if (lowered === 'internal server error' || lowered.includes('internal server error')) {
+    return 'Something went wrong. Please try again.';
+  }
+
+  return trimmed;
+};
+
+const parseBody = <T>(raw: string, contentType: string): (T & { message?: string }) | undefined => {
+  if (!raw) {
+    return undefined;
+  }
+
+  if (!contentType.includes('application/json')) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(raw) as T & { message?: string };
+  } catch {
+    return undefined;
+  }
+};
+
 const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<ServiceResult<T>> => {
   try {
     const response = await fetch(input, init);
     const raw = await response.text();
-    const data = raw ? (JSON.parse(raw) as T & { message?: string }) : undefined;
+    const contentType = response.headers.get('content-type') || '';
+    const data = parseBody<T>(raw, contentType);
+    const fallbackMessage = raw && !contentType.includes('application/json')
+      ? raw.slice(0, 180)
+      : undefined;
 
     if (!response.ok) {
+      const normalizedMessage = normalizeErrorText(data?.message)
+        || normalizeErrorText(fallbackMessage)
+        || `Request failed with status ${response.status}.`;
+
       return {
         ok: false,
         status: response.status,
         data,
-        error: data?.message || 'Request failed. Please try again.',
+        error: normalizedMessage,
       };
     }
 

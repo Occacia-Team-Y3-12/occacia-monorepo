@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [ "main" ]
 
-# 🛑 DEVSECOPS UPGRADE: The Traffic Cop
 # Prevents overlapping deployments from corrupting your server
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -91,7 +90,6 @@ jobs:
         with:
           extra_args: --only-verified
 
-      # 🛑 CRITICAL FIX: The Naked Runner is now clothed.
       - name: Setup Python for Bandit
         uses: actions/setup-python@v5
         with:
@@ -180,6 +178,15 @@ jobs:
 
             # 🛑 The Architect and Foreman are fixed. No --no-cache.
             sudo docker compose down --remove-orphans || true
+            sudo docker rm -f occacia-radar || true
+            sudo docker rm -f \
+              occacia-db \
+              occacia-redis \
+              occacia-backend \
+              occacia-frontend \
+              occacia-nginx \
+              occacia-backup \
+              occacia-radar || true
             sudo docker compose up --build -d
 
             # Wait for backend healthcheck

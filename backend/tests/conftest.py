@@ -30,14 +30,21 @@ if str(repo_root) not in sys.path:
 from app.core.database import Base, SessionLocal, engine
 from app.core.security import create_access_token, get_password_hash
 from app.main import app  # noqa: E402
+from app.models import registry  # noqa: F401
 from app.models.chat_model import ChatMessage
 from app.models.customer import Customer
 from app.models.event import Event
 from app.models.event_chat_message import EventChatMessage
 from app.models.event_persona import EventPersona
+from app.models.offering import Offering
 from app.models.package import Package
+from app.models.package_execution_request import PackageExecutionRequest
+from app.models.package_item import PackageItem
 from app.models.persona import Persona
+from app.models.recommendation_package import RecommendationPackage
 from app.models.task import Task
+from app.models.task_recommendation import TaskRecommendation
+from app.models.task_request import TaskRequest
 from app.models.vendor import Vendor
 
 
@@ -56,7 +63,23 @@ def clean_tables():
     yield
     db = SessionLocal()
     try:
-        for model in (ChatMessage, EventChatMessage, Task, EventPersona, Event, Persona, Package, Vendor, Customer):
+        for model in (
+            ChatMessage,
+            EventChatMessage,
+            PackageExecutionRequest,
+            TaskRequest,
+            PackageItem,
+            RecommendationPackage,
+            TaskRecommendation,
+            Task,
+            EventPersona,
+            Event,
+            Persona,
+            Offering,
+            Package,
+            Vendor,
+            Customer,
+        ):
             try:
                 db.query(model).delete()
             except OperationalError:

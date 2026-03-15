@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CreateCustomerEventPayload, CreateCustomerEventResponse } from '@/types/customer';
+import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 export async function POST(request: NextRequest): Promise<NextResponse<CreateCustomerEventResponse>> {
   try {
@@ -26,16 +27,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateCus
       );
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 450));
-
-    const eventId = `evt_${Date.now()}`;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const event = eventStore.createEvent(body);
 
     return NextResponse.json(
       {
         status: 'success',
         message: 'Event draft created successfully.',
         data: {
-          eventId,
+          eventId: event.eventId,
           state: 'draft',
         },
       },
@@ -43,10 +43,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateCus
     );
   } catch (error) {
     console.error('Create event error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to create event.';
     return NextResponse.json(
       {
         status: 'error',
-        message: 'Failed to create event.',
+        message,
       },
       { status: 500 }
     );
