@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import CustomerSidebar from '@/components/features/customer/CustomerSidebar';
 import CustomerHeader from '@/components/features/customer/CustomerHeader';
 
@@ -10,6 +11,10 @@ export default function CustomerLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const pathname = usePathname();
+  const isAuthPage = pathname?.startsWith('/customer/auth');
+
+  if (isAuthPage) return <>{children}</>;
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#F7F7FA]">
