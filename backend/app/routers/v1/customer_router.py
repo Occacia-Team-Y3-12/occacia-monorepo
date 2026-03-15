@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.customer import Customer
 from app.models.task import Task
-from app.routers.v1.auth_router import get_current_customer
+from app.core.dependencies import get_current_customer
 from app.schemas.customer_schema import (
     CustomerProfileResponse,
     CustomerProfileUpdateRequest,

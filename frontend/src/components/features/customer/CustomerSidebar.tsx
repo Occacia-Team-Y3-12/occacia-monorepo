@@ -11,10 +11,18 @@ type CustomerSidebarProps = {
 const CustomerSidebar = ({ isOpen }: CustomerSidebarProps) => {
   const pathname = usePathname();
 
+  const isActivePath = (href: string): boolean => {
+    if (href === '/customer/dashboard') {
+      return pathname === href;
+    }
+
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
   const navItems = [
     { href: '/customer/dashboard', label: 'Dashboard', icon: '/icons/customer/dashboard/dashboard.svg' },
     { href: '/customer/events', label: 'My Events', icon: '/icons/customer/dashboard/my_events.svg' },
-    { href: '/customer/people', label: 'People', icon: '/icons/customer/dashboard/peoples.svg' },
+    { href: '/customer/people', label: 'People', icon: '/icons/customer/dashboard/people.svg' },
     { href: '/customer/settings', label: 'Settings', icon: '/icons/customer/dashboard/settings.svg' },
   ];
 
@@ -31,16 +39,25 @@ const CustomerSidebar = ({ isOpen }: CustomerSidebarProps) => {
 
       <nav className="space-y-2">
         {navItems.map((item) => (
+          
           <Link
             key={item.href}
             href={item.href}
-            className={`flex items-center gap-3 rounded-xl px-3 py-3 text-[15px] font-medium transition-colors ${
-              pathname === item.href
-                ? 'bg-[#EBE5FF] text-[#3A2B68]'
-                : 'text-[#667085] hover:bg-[#F0F1F6] hover:text-[#3A2B68]'
+            className={`group flex items-center gap-3 rounded-xl px-3 py-3 text-[15px] font-medium transition-all duration-200 ${
+              isActivePath(item.href)
+                ? 'bg-[#EBE5FF] text-[#3A2B68] shadow-[0_2px_8px_rgba(58,43,104,0.08)]'
+                : 'text-[#667085] hover:bg-[#F0F1F6] hover:text-[#3A2B68] hover:translate-x-[2px]'
             }`}
           >
-            <Image src={item.icon} alt="" width={18} height={18} className="h-[18px] w-[18px] opacity-80" />
+            <Image
+              src={item.icon}
+              alt=""
+              width={18}
+              height={18}
+              className={`h-[18px] w-[18px] transition-opacity duration-200 ${
+                isActivePath(item.href) ? 'opacity-100' : 'opacity-80 group-hover:opacity-100'
+              }`}
+            />
             <span>{item.label}</span>
           </Link>
         ))}

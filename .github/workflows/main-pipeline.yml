@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# 🛑 DEVSECOPS UPGRADE: The Traffic Cop
+# Prevents overlapping deployments from corrupting your server
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
 
   # --- Backend Quality Gate ---
@@ -38,7 +44,6 @@ jobs:
         run: poetry run ruff check . --select E9,F63,F7,F82
 
       - name: Run tests
-        # Skips cleanly if the tests directory is missing
         run: |
           if [ -d "tests" ]; then
             poetry run pytest --tb=short -q
@@ -86,6 +91,12 @@ jobs:
         with:
           extra_args: --only-verified
 
+      # 🛑 CRITICAL FIX: The Naked Runner is now clothed.
+      - name: Setup Python for Bandit
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Python security scan
         run: |
           pip install bandit
@@ -110,7 +121,6 @@ jobs:
     timeout-minutes: 15
     needs: security
     environment: production
-    # Restrict deployments to main branch only
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
@@ -168,9 +178,9 @@ jobs:
             DOCKER_SOCKET=/var/run/docker.sock
             EOF
 
-            # Restart containers without cache
+            # 🛑 CRITICAL FIX: The Architect and Foreman are fixed. No --no-cache.
             sudo docker compose down --remove-orphans || true
-            sudo docker compose up --build --no-cache -d
+            sudo docker compose up --build -d
 
             # Wait for backend healthcheck
             echo "Waiting for backend..."
