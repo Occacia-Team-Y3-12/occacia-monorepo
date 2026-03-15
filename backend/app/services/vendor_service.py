@@ -14,11 +14,7 @@ from app.common.utils import generate_prefixed_id
 from app.models.package import Package
 from app.models.vendor import Vendor
 from app.models.user import User
-from app.schemas.vendor_schema import (
-    VendorFilter,
-    VendorRegisterRequest as VendorCreate,
-    VendorStatusUpdate,
-)
+from app.schemas.vendor_schema import VendorRegisterRequest as VendorCreate
 
 logger = logging.getLogger(__name__)
 
@@ -450,49 +446,44 @@ class AdminVendorService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_vendors(
+    def list_vendors(
         self,
-        skip: int = 0,
-        limit: int = 20,
-        filters: VendorFilter | None = None
-    ) -> tuple[List[Vendor], int]:
+        approval_status: str | None = None,
+        status: str | None = None,
+    ) -> list[Vendor]:
         query = self.db.query(Vendor)
 
-        if filters:
-            if filters.status:
-                query = query.filter(Vendor.approval_status == filters.status.value.upper())
-            if filters.search:
-                search_filter = or_(
-                    Vendor.business_name.ilike(f"%{filters.search}%"),
-                    Vendor.email.ilike(f"%{filters.search}%"),
-                    Vendor.phone.ilike(f"%{filters.search}%")
-                )
-                query = query.filter(search_filter)
+        if approval_status:
+            query = query.filter(Vendor.approval_status == approval_status.upper())
+        if status and hasattr(Vendor, "status"):
+            query = query.filter(Vendor.status == status.upper())
 
-        total = query.count()
-        vendors = query.order_by(desc(Vendor.id)).offset(skip).limit(limit).all()
-        return vendors, total
+        return query.order_by(Vendor.id.desc()).all()
 
-    def get_vendor_by_id(self, vendor_id: int) -> Vendor | None:
-        return self.db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    def get_vendor(self, vendor_id: int) -> Vendor:
+        vendor = self.db.query(Vendor).filter(Vendor.id == vendor_id).first()
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Vendor not found.")
+        return vendor
 
     def update_vendor_status(
         self,
         vendor_id: int,
-        status_update: VendorStatusUpdate,
-        reviewed_by: int
+        new_status: str,
+        admin_email: str,
     ) -> Vendor:
-        vendor = self.get_vendor_by_id(vendor_id)
-        if not vendor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Vendor not found"
-            )
+        if not new_status or new_status.upper() not in ("ACTIVE", "SUSPENDED", "DISABLED"):
+            raise HTTPException(status_code=400, detail="status must be ACTIVE, SUSPENDED, or DISABLED")
 
-        vendor.approval_status = status_update.status.value.upper()
+        vendor = self.get_vendor(vendor_id)
+        if hasattr(vendor, "status"):
+            vendor.status = new_status.upper()
+        else:
+            logger.warning("Vendor model has no .status column yet. Skipping admin status write.")
 
         self.db.commit()
         self.db.refresh(vendor)
+        logger.info("Admin %s set vendor %s status to %s", admin_email, vendor_id, new_status)
         return vendor
 
     def get_pending_counts(self) -> dict:

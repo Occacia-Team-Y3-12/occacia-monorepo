@@ -12,14 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_admin as get_current_admin_user, get_current_vendor
-from app.models.user import User
+from app.core.dependencies import get_current_admin, get_current_vendor
+from app.models.admin import Admin
 from app.models.vendor import Vendor
-from app.schemas.vendor_schema import (
-    VendorResponse, VendorDetailResponse, VendorListResponse,
-    VendorStatusUpdate, VendorFilter, VendorStatus, VendorUpdate
-)
+from app.schemas.admin_schema import VendorAdminView
 from app.schemas.package_schema import PackageCreate, PackageUpdate, PackageResponse
+from app.schemas.vendor_schema import VendorResponse, VendorUpdate
 from app.services.vendor_service import AdminVendorService, vendor_service
 
 logger = logging.getLogger(__name__)
@@ -45,79 +43,53 @@ def get_vendor_service(db: Session = Depends(get_db)):
     return AdminVendorService(db)
 
 
-@admin_router.get("/vendors", response_model=VendorListResponse)
+@admin_router.get("/vendors", response_model=list[VendorAdminView])
 async def list_vendors(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    status: VendorStatus | None = None,
-    vendor_type: str | None = None,
-    search: str | None = None,
+    approval_status: str | None = Query(default=None),
+    status: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user),
+    _: Admin = Depends(get_current_admin),
     vendor_service: AdminVendorService = Depends(get_vendor_service)
 ):
-    """
-    List all vendors with filtering and pagination.
-    Accessible only by admin users.
-    """
-    filters = VendorFilter(
+    """List all vendors."""
+    return vendor_service.list_vendors(
+        approval_status=approval_status,
         status=status,
-        vendor_type=vendor_type,
-        search=search
-    )
-
-    vendors, total = vendor_service.get_vendors(skip=skip, limit=limit, filters=filters)
-
-    return VendorListResponse(
-        items=[VendorResponse.model_validate(v) for v in vendors],
-        total=total,
-        page=skip // limit + 1,
-        page_size=limit
     )
 
 
-@admin_router.get("/vendors/{vendor_id}", response_model=VendorDetailResponse)
+@admin_router.get("/vendors/{vendor_id}", response_model=VendorAdminView)
 async def get_vendor(
     vendor_id: int,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user),
+    _: Admin = Depends(get_current_admin),
     vendor_service: AdminVendorService = Depends(get_vendor_service)
 ):
-    """
-    Get detailed information about a specific vendor.
-    """
-    vendor = vendor_service.get_vendor_by_id(vendor_id)
-    if not vendor:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vendor not found"
-        )
-    return VendorDetailResponse.model_validate(vendor)
+    """Get vendor detail."""
+    return vendor_service.get_vendor(vendor_id=vendor_id)
 
 
-@admin_router.put("/vendors/{vendor_id}/status", response_model=VendorResponse)
+@admin_router.put("/vendors/{vendor_id}/status", response_model=VendorAdminView)
 async def update_vendor_status(
     vendor_id: int,
-    status_update: VendorStatusUpdate,
+    body: dict,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user),
+    current_admin: Admin = Depends(get_current_admin),
     vendor_service: AdminVendorService = Depends(get_vendor_service)
 ):
-    """
-    Update vendor approval status (pending, approved, rejected).
-    """
-    vendor = vendor_service.update_vendor_status(
+    """Update vendor account status."""
+    status_val = body.get("status") or ""
+    return vendor_service.update_vendor_status(
         vendor_id=vendor_id,
-        status_update=status_update,
-        reviewed_by=current_admin.id
+        new_status=status_val,
+        admin_email=current_admin.email,
     )
-    return VendorResponse.model_validate(vendor)
 
 
 @admin_router.get("/vendors/stats/pending")
 async def get_vendor_pending_stats(
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user),
+    _: Admin = Depends(get_current_admin),
     vendor_service: AdminVendorService = Depends(get_vendor_service)
 ):
     """
