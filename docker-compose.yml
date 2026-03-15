@@ -34,11 +34,11 @@ services:
     container_name: occacia-redis
     restart: always
     # Password set via command; memory limits removed for high-performance environment
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
     environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
     healthcheck:
-      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -67,7 +67,7 @@ services:
       LANGFLOW_URL: ${LANGFLOW_URL}
       LANGFLOW_TOKEN: ${LANGFLOW_TOKEN}
       LANGFLOW_ORG_ID: ${LANGFLOW_ORG_ID}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379
       DISABLE_ADMIN_REGISTER: ${DISABLE_ADMIN_REGISTER:-true}
     expose:
       - "8000"
