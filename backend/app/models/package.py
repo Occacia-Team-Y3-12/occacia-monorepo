@@ -18,8 +18,6 @@ class Package(Base):
     tags = Column(JSON, default=list)
     location_coverage = Column(String, nullable=True)
 
-    # ── Availability ─────────────────────────────────────────────────
-    # Stores blocked dates as strings: ["2026-03-15", "2026-03-16"]
     blocked_dates = Column(JSON, nullable=True, default=list)
     
     vendor = relationship("Vendor")

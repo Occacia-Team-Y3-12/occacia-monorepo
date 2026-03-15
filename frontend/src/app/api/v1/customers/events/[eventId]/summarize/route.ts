@@ -1,0 +1,51 @@
+import { NextResponse } from 'next/server';
+import { EventSummaryResponse } from '@/types/customerEventChat';
+import { eventStore } from '@/app/api/v1/customers/_eventStore';
+
+type RouteContext = {
+  params: {
+    eventId: string;
+  };
+};
+
+export async function POST(
+  _request: Request,
+  { params }: RouteContext
+): Promise<NextResponse<EventSummaryResponse>> {
+  const { eventId } = params;
+
+  if (!eventId) {
+    return NextResponse.json(
+      {
+        status: 'error',
+        message: 'Event id is required.',
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const summary = eventStore.summarize(eventId);
+
+    return NextResponse.json(
+      {
+        status: 'success',
+        message: 'Event summary generated successfully.',
+        data: {
+          summary,
+        },
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to summarize event.';
+
+    return NextResponse.json(
+      {
+        status: 'error',
+        message,
+      },
+      { status: 404 }
+    );
+  }
+}

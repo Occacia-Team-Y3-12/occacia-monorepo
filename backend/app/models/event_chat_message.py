@@ -5,7 +5,7 @@ from app.core.database import Base
 
 
 class EventChatMessage(Base):
-    __tablename__ = "event_chat_messages"   # ← was "chat_messages" (conflict with ChatMessage)
+    __tablename__ = "event_chat_messages"  
     id = Column(Integer, primary_key=True, index=True)
     message_id = Column(String, unique=True, index=True, default=lambda: generate_prefixed_id("MSG"))
     event_id = Column(String, index=True, nullable=False)

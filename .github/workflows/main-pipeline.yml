@@ -6,11 +6,15 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# 🛑 DEVSECOPS UPGRADE: The Traffic Cop
+# Prevents overlapping deployments from corrupting your server
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
 
-  # -------------------------------------------------------
-  # JOB 1: Backend — lint, type check, tests
-  # -------------------------------------------------------
+  # --- Backend Quality Gate ---
   backend:
     name: Backend Quality Gate
     runs-on: ubuntu-latest
@@ -18,14 +22,13 @@ jobs:
     defaults:
       run:
         working-directory: backend
-
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'   # matches backend/Dockerfile exactly
+          python-version: '3.11'
           cache: 'pip'
 
       - name: Install Poetry
@@ -37,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-root --no-ansi
 
-      - name: Lint (ruff)
+      - name: Lint code
         run: poetry run ruff check . --select E9,F63,F7,F82
 
       - name: Run tests
@@ -48,9 +51,7 @@ jobs:
             echo "No tests directory found, skipping"
           fi
 
-  # -------------------------------------------------------
-  # JOB 2: Frontend — install, type check, build
-  # -------------------------------------------------------
+  # --- Frontend Build Check ---
   frontend:
     name: Frontend Build Check
     runs-on: ubuntu-latest
@@ -58,7 +59,6 @@ jobs:
     defaults:
       run:
         working-directory: frontend
-
     steps:
       - uses: actions/checkout@v4
 
@@ -75,37 +75,37 @@ jobs:
       - name: Build
         run: npm run build
 
-  # -------------------------------------------------------
-  # JOB 3: Security scanning — runs after both pass
-  # -------------------------------------------------------
+  # --- Security Audit ---
   security:
     name: Security Audit
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [ backend, frontend ]
-
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Secret scan (Trufflehog)
+      - name: Secret scan
         uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --only-verified
 
-      - name: Python security scan (Bandit)
+      # 🛑 CRITICAL FIX: The Naked Runner is now clothed.
+      - name: Setup Python for Bandit
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Python security scan
         run: |
           pip install bandit
-          bandit -r backend/ -x backend/tests \
-            --severity-level medium \
-            --skip B104 \
-            -f txt
+          bandit -r backend/ -x backend/tests --severity-level medium --skip B104 -f txt
 
       - name: Build image for container scan
         run: docker build -t occacia-scan ./backend
 
-      - name: Container vulnerability scan (Trivy)
+      - name: Container vulnerability scan
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: occacia-scan
@@ -114,22 +114,18 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
 
-  # -------------------------------------------------------
-  # JOB 4: Deploy to production
-  # -------------------------------------------------------
+  # --- Deploy to Production ---
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: security
     environment: production
-    # Modify this if you want it to deploy from your dev branch instead of just main
     if: github.ref == 'refs/heads/main'
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Ship files to server
+      - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.REMOTE_HOST }}
@@ -163,7 +159,7 @@ jobs:
             set -e
             cd ~/occacia-app
 
-            # Write full production .env
+            # Write .env file
             cat <<EOF > .env
             LANGFLOW_URL=${LANGFLOW_URL}
             LANGFLOW_ORG_ID=${LANGFLOW_ORG_ID}
@@ -182,11 +178,11 @@ jobs:
             DOCKER_SOCKET=/var/run/docker.sock
             EOF
 
-            # Restart containers
+            # 🛑 CRITICAL FIX: The Architect and Foreman are fixed. No --no-cache.
             sudo docker compose down --remove-orphans || true
             sudo docker compose up --build -d
 
-            # Wait for backend to be healthy
+            # Wait for backend healthcheck
             echo "Waiting for backend..."
             for i in $(seq 1 15); do
               if sudo docker compose exec -T backend curl -sf http://localhost:8000/api/v1/health > /dev/null; then
@@ -197,10 +193,9 @@ jobs:
               sleep 4
             done
 
-            # Run migrations
+            # Run database migrations
             sudo docker compose exec -T backend alembic upgrade head
 
-            # Cleanup old images
+            # Cleanup images
             sudo docker image prune -f
-
             echo "Deployed at $(date)" >> ~/occacia-app/deploy_history.log
