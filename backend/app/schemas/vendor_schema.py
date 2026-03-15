@@ -3,7 +3,7 @@ app/schemas/vendor_schema.py
 """
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 # 1. Registration Input
 
@@ -24,15 +24,17 @@ class VendorLoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-# Add this class back
+# Update this class back
 
 
 class VendorUpdate(BaseModel):
-    business_name: Optional[str] = None
-    location_base: Optional[str] = None
+    business_name: Optional[str] = Field(default=None, alias="businessName")
+    location_base: Optional[str] = Field(default=None, alias="locationBase")
     phone: Optional[str] = None
-    display_name: Optional[str] = None
-    contact_phone: Optional[str] = None
+    display_name: Optional[str] = Field(default=None, alias="displayName")
+    contact_phone: Optional[str] = Field(default=None, alias="contactPhone")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 # 3. Standard Output (Safe Response)
 
