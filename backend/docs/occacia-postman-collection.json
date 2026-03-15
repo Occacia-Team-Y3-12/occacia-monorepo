@@ -1,0 +1,4529 @@
+{
+  "info": {
+    "name": "Occacia API Postman Collection",
+    "_postman_id": "occacia-openapi-generated",
+    "description": "Generated from backend/docs/occacia-openapi-3.1.yml",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/customer/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "customer",
+                "register"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Register customer",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"string\",\n  \"email\": \"user@example.com\",\n  \"password\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify customer email",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/customer/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "customer",
+                "verify-email"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "string",
+                  "description": "",
+                  "disabled": false
+                }
+              ],
+              "variable": []
+            },
+            "description": "Verify customer email"
+          },
+          "response": []
+        },
+        {
+          "name": "Resend customer verification email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/customer/email-verification/resend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "customer",
+                "email-verification",
+                "resend"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Resend customer verification email",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Customer login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/customer/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "customer",
+                "login"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Customer login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Customer logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/customer/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "customer",
+                "logout"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Customer logout"
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh customer access token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/customer/token/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "customer",
+                "token",
+                "refresh"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Refresh customer access token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change customer password (authenticated)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/customer/password/change",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "customer",
+                "password",
+                "change"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Authenticated password change only (currentPassword + newPassword). Use the /password/forgot and /password/reset flow for forgotten passwords.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"string\",\n  \"newPassword\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Request customer password reset email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/customer/password/forgot",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "customer",
+                "password",
+                "forgot"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Request customer password reset email",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reset customer password using token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/customer/password/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "customer",
+                "password",
+                "reset"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Reset customer password using token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"string\",\n  \"newPassword\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register vendor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/vendor/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "vendor",
+                "register"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Register vendor",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"string\",\n  \"displayName\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify vendor email",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/vendor/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "vendor",
+                "verify-email"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "string",
+                  "description": "",
+                  "disabled": false
+                }
+              ],
+              "variable": []
+            },
+            "description": "Verify vendor email"
+          },
+          "response": []
+        },
+        {
+          "name": "Resend vendor verification email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/vendor/email-verification/resend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "vendor",
+                "email-verification",
+                "resend"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Resend vendor verification email",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Vendor login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/vendor/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "vendor",
+                "login"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Vendor login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Vendor logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/vendor/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "vendor",
+                "logout"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Vendor logout"
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh vendor access token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/vendor/token/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "vendor",
+                "token",
+                "refresh"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Refresh vendor access token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change vendor password (authenticated)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/vendor/password/change",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "vendor",
+                "password",
+                "change"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Authenticated password change only (currentPassword + newPassword). Use the /password/forgot and /password/reset flow for forgotten passwords.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"string\",\n  \"newPassword\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Request vendor password reset email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/vendor/password/forgot",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "vendor",
+                "password",
+                "forgot"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Request vendor password reset email",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reset vendor password using token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/vendor/password/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "vendor",
+                "password",
+                "reset"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Reset vendor password using token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"string\",\n  \"newPassword\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Provision admin account (internal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/admin/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "admin",
+                "register"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Restricted/internal endpoint; not self-service."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/admin/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "admin",
+                "login"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Admin login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/admin/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "admin",
+                "logout"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Admin logout"
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh admin access token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/admin/token/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "admin",
+                "token",
+                "refresh"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Refresh admin access token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "User Profile",
+      "item": [
+        {
+          "name": "Get current customer profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Get current customer profile"
+          },
+          "response": []
+        },
+        {
+          "name": "Update current customer profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Update current customer profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"string\",\n  \"phone\": \"string\",\n  \"locale\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get current vendor profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Get current vendor profile"
+          },
+          "response": []
+        },
+        {
+          "name": "Update current vendor profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Update current vendor profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"string\",\n  \"contactPhone\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get current admin profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Get current admin profile"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Customer",
+      "item": [
+        {
+          "name": "List personas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/personas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "personas"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List personas"
+          },
+          "response": []
+        },
+        {
+          "name": "Create persona",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/personas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "personas"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Create persona",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get persona",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/personas/{{personaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "personas",
+                "{personaId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "personaId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get persona"
+          },
+          "response": []
+        },
+        {
+          "name": "Update persona",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/personas/{{personaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "personas",
+                "{personaId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "personaId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Update persona",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"description\": \"string\",\n  \"preferences\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete persona",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/personas/{{personaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "personas",
+                "{personaId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "personaId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Delete persona"
+          },
+          "response": []
+        },
+        {
+          "name": "List events",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "DRAFT",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List events"
+          },
+          "response": []
+        },
+        {
+          "name": "Create draft event (UC-12)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Create draft event (UC-12)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventType\": \"string\",\n  \"title\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get event",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get event"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete draft event",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Delete draft event"
+          },
+          "response": []
+        },
+        {
+          "name": "Set personas linked to an event (replace links)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/personas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "personas"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Set personas linked to an event (replace links)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personaIds\": [\n    \"00000000-0000-0000-0000-000000000000\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send chat message + AI reply (UC-13)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "chat"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Send chat message + AI reply (UC-13)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Summarize event context from chat history (UC-13)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/summarize",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "summarize"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Summarize event context from chat history (UC-13)"
+          },
+          "response": []
+        },
+        {
+          "name": "List chat messages for event (optional)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List chat messages for event (optional)"
+          },
+          "response": []
+        },
+        {
+          "name": "List tasks for event",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "tasks"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List tasks for event"
+          },
+          "response": []
+        },
+        {
+          "name": "Create task manually",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "tasks"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Create task manually",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update task (editable states only)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "tasks",
+                "{taskId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                },
+                {
+                  "key": "taskId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Update task (editable states only)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"description\": \"string\",\n  \"quantity\": 0,\n  \"budgetMin\": 0,\n  \"budgetMax\": 0,\n  \"currency\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete task (pre-confirm only)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "tasks",
+                "{taskId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                },
+                {
+                  "key": "taskId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Delete task (pre-confirm only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm tasks (UC-13)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/tasks/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "tasks",
+                "confirm"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Confirms tasks and activates event (DRAFT -> ACTIVE).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"taskIds\": [\n    \"00000000-0000-0000-0000-000000000000\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reassign rejected task (UC-21)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/tasks/{{taskId}}/reassign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "tasks",
+                "{taskId}",
+                "reassign"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                },
+                {
+                  "key": "taskId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Validate shortlist (Atomic reassign) -> set task PENDING -> create new Fulfillment Request attempt.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offeringId\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generate recommendation packages (UC-14)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/recommendations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "recommendations"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Generates 3 packages (BUDGET/RECOMMENDED/HIGH_QUALITY) and stores shortlist per task."
+          },
+          "response": []
+        },
+        {
+          "name": "Get shortlisted offerings for a task (UC-16)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/tasks/{{taskId}}/recommendations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "tasks",
+                "{taskId}",
+                "recommendations"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                },
+                {
+                  "key": "taskId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get shortlisted offerings for a task (UC-16)"
+          },
+          "response": []
+        },
+        {
+          "name": "List packages for event",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/packages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "packages"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List packages for event"
+          },
+          "response": []
+        },
+        {
+          "name": "Create custom package (UC-16)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/packages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "packages"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Create custom package (UC-16)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"packageItemId\": \"00000000-0000-0000-0000-000000000000\",\n      \"packageId\": \"00000000-0000-0000-0000-000000000000\",\n      \"taskId\": \"00000000-0000-0000-0000-000000000000\",\n      \"offeringId\": \"00000000-0000-0000-0000-000000000000\",\n      \"quantity\": 0,\n      \"unitPrice\": 0,\n      \"lineTotal\": 0\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get package details (UC-15)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/packages/{{packageId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "packages",
+                "{packageId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                },
+                {
+                  "key": "packageId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get package details (UC-15)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update custom package (UC-16)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/packages/{{packageId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "packages",
+                "{packageId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                },
+                {
+                  "key": "packageId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Update custom package (UC-16)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"packageItemId\": \"00000000-0000-0000-0000-000000000000\",\n      \"packageId\": \"00000000-0000-0000-0000-000000000000\",\n      \"taskId\": \"00000000-0000-0000-0000-000000000000\",\n      \"offeringId\": \"00000000-0000-0000-0000-000000000000\",\n      \"quantity\": 0,\n      \"unitPrice\": 0,\n      \"lineTotal\": 0\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete custom package (UC-16)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/packages/{{packageId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "packages",
+                "{packageId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                },
+                {
+                  "key": "packageId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Delete custom package (UC-16)"
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm package -> create Package Order (UC-17)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/packages/{{packageId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "packages",
+                "{packageId}",
+                "confirm"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                },
+                {
+                  "key": "packageId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Creates a Package Order (idempotent per eventId+packageId), sets included tasks to PENDING + locks selection, and creates vendor-facing Fulfillment Requests.\n"
+          },
+          "response": []
+        },
+        {
+          "name": "List package orders for an event (UC-18)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/package-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "package-orders"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List package orders for an event (UC-18)"
+          },
+          "response": []
+        },
+        {
+          "name": "List all package orders for current customer (optional)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/package-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "package-orders"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List all package orders for current customer (optional)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get package order detail (optional)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/package-orders/{{packageOrderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "package-orders",
+                "{packageOrderId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "packageOrderId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get package order detail (optional)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get event schedule (UC-13)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/schedule",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "schedule"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get event schedule (UC-13)"
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert event schedule (recurrence/timezone/all-day) (UC-13)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/schedule",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "schedule"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Upsert event schedule (recurrence/timezone/all-day) (UC-13)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startAt\": \"2026-03-12T00:00:00Z\",\n  \"timezone\": \"string\",\n  \"isAllDay\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get event reminders configuration (UC-13)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/reminders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "reminders"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get event reminders configuration (UC-13)"
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert event reminders (offsets + channels) (UC-13)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/reminders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "reminders"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Upsert event reminders (offsets + channels) (UC-13)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": true,\n  \"channels\": [\n    \"PUSH\"\n  ],\n  \"offsets\": [\n    \"string\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List upcoming occurrences for a recurring event (UC-13)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/occurrences",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "occurrences"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-03-12T00:00:00Z",
+                  "description": "Return occurrences starting from this datetime (inclusive)",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List upcoming occurrences for a recurring event (UC-13)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get per-event external calendar sync status (UC-13)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/calendar-sync",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "calendar-sync"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get per-event external calendar sync status (UC-13)"
+          },
+          "response": []
+        },
+        {
+          "name": "Enable/disable per-event external calendar sync (UC-13)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/events/{{eventId}}/calendar-sync",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "events",
+                "{eventId}",
+                "calendar-sync"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Enable/disable per-event external calendar sync (UC-13)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"DISABLED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List supported external calendar providers (UC-13)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/calendar/providers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "calendar",
+                "providers"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "List supported external calendar providers (UC-13)"
+          },
+          "response": []
+        },
+        {
+          "name": "Start calendar OAuth connect (UC-13)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/calendar/connect",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "calendar",
+                "connect"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Start calendar OAuth connect (UC-13)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"GOOGLE\",\n  \"redirectUri\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Exchange OAuth code and link calendar provider (UC-13)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/calendar/exchange-code",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "calendar",
+                "exchange-code"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Exchange OAuth code and link calendar provider (UC-13)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"GOOGLE\",\n  \"code\": \"string\",\n  \"redirectUri\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get calendar connection status (UC-13)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/calendar/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "calendar",
+                "status"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Get calendar connection status (UC-13)"
+          },
+          "response": []
+        },
+        {
+          "name": "Disconnect external calendar provider (UC-13)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/calendar/disconnect",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "calendar",
+                "disconnect"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Disconnect external calendar provider (UC-13)"
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel package order (optional)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/package-orders/{{packageOrderId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "package-orders",
+                "{packageOrderId}",
+                "cancel"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "packageOrderId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Cancel package order (optional)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Vendor",
+      "item": [
+        {
+          "name": "List vendor offerings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/offerings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "offerings"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "List vendor offerings"
+          },
+          "response": []
+        },
+        {
+          "name": "Create offering",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/offerings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "offerings"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Create offering",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"category\": \"string\",\n  \"price\": 0,\n  \"currency\": \"LKR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get offering details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/offerings/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "offerings",
+                "{id}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get offering details"
+          },
+          "response": []
+        },
+        {
+          "name": "Update offering",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/offerings/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "offerings",
+                "{id}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Update offering",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"category\": \"string\",\n  \"description\": \"string\",\n  \"price\": 0,\n  \"currency\": \"string\",\n  \"unit\": \"string\",\n  \"isActive\": true,\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate offering (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/offerings/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "offerings",
+                "{id}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Deactivate offering (soft delete)"
+          },
+          "response": []
+        },
+        {
+          "name": "List fulfillment requests (vendor inbox) (UC-20)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/fulfillment-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "fulfillment-requests"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "SENT",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List fulfillment requests (vendor inbox) (UC-20)"
+          },
+          "response": []
+        },
+        {
+          "name": "Respond to fulfillment request (accept/reject) (UC-20)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/fulfillment-requests/{{fulfillmentRequestId}}/response",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "fulfillment-requests",
+                "{fulfillmentRequestId}",
+                "response"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "fulfillmentRequestId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Respond to fulfillment request (accept/reject) (UC-20)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"ACCEPT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List vendor tasks (Assigned/In Progress/Done) (UC-19)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "tasks"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "DRAFT",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List vendor tasks (Assigned/In Progress/Done) (UC-19)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get vendor task",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "tasks",
+                "{taskId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "taskId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get vendor task"
+          },
+          "response": []
+        },
+        {
+          "name": "Update vendor task progress (ASSIGNED -> IN_PROGRESS -> DONE)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "tasks",
+                "{taskId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "taskId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Update vendor task progress (ASSIGNED -> IN_PROGRESS -> DONE)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get fulfillment request detail (UC-20)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/fulfillment-requests/{{fulfillmentRequestId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "fulfillment-requests",
+                "{fulfillmentRequestId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "fulfillmentRequestId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get fulfillment request detail (UC-20)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "List vendors (management)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/vendors",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "vendors"
+              ],
+              "query": [
+                {
+                  "key": "approval_status",
+                  "value": "PENDING",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List vendors (management)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get vendor detail (management)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/vendors/{{vendorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "vendors",
+                "{vendorId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "vendorId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get vendor detail (management)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update vendor account status (ACTIVE/SUSPENDED/DISABLED)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/vendors/{{vendorId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "vendors",
+                "{vendorId}",
+                "status"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "vendorId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Update vendor account status (ACTIVE/SUSPENDED/DISABLED)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve vendor registration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/vendors/{{vendorId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "vendors",
+                "{vendorId}",
+                "approve"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "vendorId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Approve vendor registration"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject vendor registration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/vendors/{{vendorId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "vendors",
+                "{vendorId}",
+                "reject"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "vendorId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Reject vendor registration",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List customers (management)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List customers (management)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get customer detail (management)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "customers",
+                "{customerId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "customerId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get customer detail (management)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update customer account status (ACTIVE/SUSPENDED/DISABLED)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/customers/{{customerId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "customers",
+                "{customerId}",
+                "status"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "customerId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Update customer account status (ACTIVE/SUSPENDED/DISABLED)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List organizations (management)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/organizations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "organizations"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List organizations (management)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get organization detail (management)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/organizations/{{orgId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "organizations",
+                "{orgId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "orgId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get organization detail (management)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update organization status (ACTIVE/INACTIVE)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/organizations/{{orgId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "organizations",
+                "{orgId}",
+                "status"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "orgId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Update organization status (ACTIVE/INACTIVE)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List inquiries (UC-30)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/inquiries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "inquiries"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "OPEN",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "creatorRole",
+                  "value": "CUSTOMER",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List inquiries (UC-30)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get inquiry",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/inquiries/{{inquiryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "inquiries",
+                "{inquiryId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "inquiryId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get inquiry"
+          },
+          "response": []
+        },
+        {
+          "name": "Update inquiry (reply / status)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/inquiries/{{inquiryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "inquiries",
+                "{inquiryId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "inquiryId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Update inquiry (reply / status)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"OPEN\",\n  \"adminReply\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List internal notes (UC-28)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/internal-notes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "internal-notes"
+              ],
+              "query": [
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "taskId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "vendorId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "packageOrderId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List internal notes (UC-28)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create internal note (UC-28)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/internal-notes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "internal-notes"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Create internal note (UC-28)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"actionType\": \"NOTE_ONLY\",\n  \"note\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin dashboard summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "dashboard"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Admin dashboard summary"
+          },
+          "response": []
+        },
+        {
+          "name": "List package orders (UC-28)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/package-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "package-orders"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "CREATED",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List package orders (UC-28)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get package order detail (UC-28)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/package-orders/{{packageOrderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "package-orders",
+                "{packageOrderId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "packageOrderId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get package order detail (UC-28)"
+          },
+          "response": []
+        },
+        {
+          "name": "List tasks (UC-28)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "tasks"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "DRAFT",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "eventId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "vendorId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List tasks (UC-28)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get task details (UC-28)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "tasks",
+                "{taskId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "taskId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get task details (UC-28)"
+          },
+          "response": []
+        },
+        {
+          "name": "Admin support action on a task (UC-28)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "tasks",
+                "{taskId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "taskId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Admin support action on a task (UC-28)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"UNASSIGN_VENDOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Fulfillment request attempt history for a task (UC-28)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/tasks/{{taskId}}/fulfillment-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "tasks",
+                "{taskId}",
+                "fulfillment-requests"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "taskId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Fulfillment request attempt history for a task (UC-28)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Support & Inquiries",
+      "item": [
+        {
+          "name": "Create customer inquiry (UC-30)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/inquiries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "inquiries"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Create customer inquiry (UC-30)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List customer inquiries (UC-30)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/inquiries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "inquiries"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "OPEN",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List customer inquiries (UC-30)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create vendor inquiry (UC-30)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/inquiries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "inquiries"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Create vendor inquiry (UC-30)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List vendor inquiries (UC-30)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/inquiries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "inquiries"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "OPEN",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "List vendor inquiries (UC-30)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get customer inquiry (UC-30)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/inquiries/{{inquiryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "inquiries",
+                "{inquiryId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "inquiryId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get customer inquiry (UC-30)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get vendor inquiry (UC-30)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vendors/inquiries/{{inquiryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vendors",
+                "inquiries",
+                "{inquiryId}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "inquiryId",
+                  "value": "00000000-0000-0000-0000-000000000000",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get vendor inquiry (UC-30)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Metadata",
+      "item": [
+        {
+          "name": "List event types",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/event-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "event-types"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "List event types"
+          },
+          "response": []
+        },
+        {
+          "name": "List event templates (quick start)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/event-templates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "event-templates"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "List event templates (quick start)"
+          },
+          "response": []
+        },
+        {
+          "name": "List offering categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/offering-categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "offering-categories"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "List offering categories"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "System & Ops",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Health check"
+          },
+          "response": []
+        },
+        {
+          "name": "Build/version info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/version",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "version"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Build/version info"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "vendor_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "customer_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "event_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "task_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "persona_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "package_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "package_order_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "offering_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "inquiry_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "fulfillment_request_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "orgId",
+      "value": "1",
+      "type": "string"
+    }
+  ]
+}
