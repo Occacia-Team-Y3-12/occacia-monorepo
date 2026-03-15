@@ -5,20 +5,18 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
-import LoginForm from '@/components/customer/auth/RegisterForm';
-import SocialLoginButtons from '@/components/ui/SocialLoginButtons';
-import { LoginFormValues } from '@/lib/validators';
+import LoginForm from '@/components/customer/auth/LoginForm';
 import { customerAuthService } from '@/services/customer/authServices';
 
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
-  const onSubmit = async (data: LoginFormValues) => {
+  const onSubmit = async (data: { username: string; password: string }) => {
     setIsLoading(true);
 
     try {
-      await customerAuthService.login(data);
+      await customerAuthService.login({ email: data.username, password: data.password });
       toast.success('Login successful!');
       router.push('/customer/dashboard');
     } catch (error: any) {
@@ -44,17 +42,6 @@ export default function LoginPage() {
           </div>
 
           <LoginForm onSubmit={onSubmit} isLoading={isLoading} />
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-gray-50 text-gray-500">Or continue with</span>
-            </div>
-          </div>
-
-          <SocialLoginButtons />
 
           <p className="text-center text-sm text-gray-600 mt-8">
             Don't have an account?{' '}
