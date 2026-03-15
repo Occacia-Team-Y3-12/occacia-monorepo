@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "Running database migrations..."
-# Ensure the production schema is up to date before the API starts.
-poetry run alembic upgrade head
+# nject the virtual environment directly into the system path.
+# This tells Linux exactly where to find alembic and uvicorn without needing Poetry.
+export PATH="/app/.venv/bin:$PATH"
 
-echo "Starting FastAPI..."
-# Bind to 0.0.0.0 so the container can serve traffic through the ingress layer.
-exec poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000
+echo "Running Database Migrations..."
+alembic upgrade head
+
+echo "Starting FastAPI Engine..."
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000
