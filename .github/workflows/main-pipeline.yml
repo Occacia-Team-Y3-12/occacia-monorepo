@@ -123,6 +123,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Clean app code on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            mkdir -p ~/occacia-app
+            rm -rf ~/occacia-app/backend ~/occacia-app/frontend
+            rm -f ~/occacia-app/docker-compose.yml ~/occacia-app/nginx.conf
+
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
         with:
