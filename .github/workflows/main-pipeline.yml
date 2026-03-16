@@ -133,7 +133,12 @@ jobs:
             set -e
             mkdir -p ~/occacia-app
             rm -rf ~/occacia-app/backend ~/occacia-app/frontend
-            rm -f ~/occacia-app/docker-compose.yml ~/occacia-app/nginx.conf
+            rm -f \
+              ~/occacia-app/docker-compose.yml \
+              ~/occacia-app/nginx.conf \
+              ~/occacia-app/nginx.http.conf \
+              ~/occacia-app/nginx.https.conf \
+              ~/occacia-app/nginx-start.sh
 
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
@@ -141,7 +146,7 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "backend/,frontend/,docker-compose.yml,nginx.conf"
+          source: "backend/,frontend/,docker-compose.yml,nginx.http.conf,nginx.https.conf,nginx-start.sh"
           target: "~/occacia-app"
 
       - name: Deploy and migrate
@@ -228,6 +233,17 @@ jobs:
             fi
 
             sudo docker compose up -d frontend nginx db-backup portainer
+
+            echo "Checking edge service..."
+            if ! sudo docker compose ps; then
+              echo "Unable to inspect compose services."
+            fi
+
+            if ! curl -I --max-time 10 http://localhost >/dev/null 2>&1; then
+              echo "Nginx is not serving traffic on localhost. Recent logs:"
+              sudo docker compose logs --tail=200 nginx frontend backend
+              exit 1
+            fi
 
             # Cleanup images
             sudo docker image prune -f
