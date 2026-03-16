@@ -53,8 +53,10 @@ from app.schemas.event_planning_schema import (
     TaskResponse,
     TaskUpdateRequest,
 )
+from app.schemas.recommendation_schema import RecommendationPackageListResponse
 from app.services.customer_service import customer_service
 from app.services.event_planning_service import event_planning_service
+from app.services.recommendation_service import recommendation_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Customer"])
@@ -82,6 +84,21 @@ def _event_response(event, persona_ids: list[str]) -> EventResponse:
         locationText=event.location_text,
         startAt=event.start_at,
         endAt=event.end_at,
+        timezone=event.timezone,
+        isAllDay=event.is_all_day,
+        recurrenceRule=event.recurrence_rule,
+        recurrenceUntil=event.recurrence_until,
+        recurrenceCount=event.recurrence_count,
+        remindersEnabled=event.reminders_enabled,
+        reminderChannels=event.reminder_channels or [],
+        reminderOffsets=event.reminder_offsets or [],
+        reminderScheduleStatus=event.reminder_schedule_status,
+        calendarSyncState=event.calendar_sync_state,
+        calendarSyncProvider=event.calendar_sync_provider,
+        calendarSyncCalendarId=event.calendar_sync_calendar_id,
+        externalCalendarEventId=event.external_calendar_event_id,
+        calendarLastSyncAt=event.calendar_last_sync_at,
+        calendarLastSyncStatus=event.calendar_last_sync_status,
         status=event.status,
         confirmedAt=event.confirmed_at,
         personaIds=persona_ids,
@@ -96,6 +113,8 @@ def _task_response(task: Task) -> TaskResponse:
         name=task.name,
         description=task.description,
         quantity=task.quantity,
+        needsVendor=bool(task.needs_vendor),
+        vendorCategory=task.needs_vendor,
         budgetMin=task.budget_min,
         budgetMax=task.budget_max,
         currency=task.currency,
@@ -152,6 +171,7 @@ def _event_calendar_sync_response(event) -> EventCalendarSyncStatusResponse:
         provider=event.calendar_sync_provider,
         calendarId=event.calendar_sync_calendar_id,
         externalEventId=event.external_calendar_event_id,
+        calendarLink=event_planning_service.build_calendar_link(event),
         lastSyncAt=event.calendar_last_sync_at,
         lastSyncStatus=event.calendar_last_sync_status,
     )
@@ -467,6 +487,41 @@ def delete_event_task(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+# --- Event Recommendation Package Routes ---
+
+@router.post(
+    "/customers/events/{event_id}/recommendations",
+    response_model=RecommendationPackageListResponse,
+    response_model_by_alias=True,
+)
+def generate_event_recommendations(
+    event_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.generate_packages(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+    )
+
+@router.get(
+    "/customers/events/{event_id}/packages",
+    response_model=RecommendationPackageListResponse,
+    response_model_by_alias=True,
+)
+def list_event_recommendation_packages(
+    event_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.get_packages(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+    )
+
+
 # --- Event Schedule & Reminders ---
 
 @router.get(
@@ -649,6 +704,7 @@ def exchange_calendar_code(
         provider=body.provider,
         code=body.code,
         state=body.state,
+        redirect_uri=body.redirect_uri,
     )
     return _calendar_status_response(customer)
 

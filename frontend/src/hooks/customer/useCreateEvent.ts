@@ -151,16 +151,12 @@ export const useCreateEvent = () => {
 
       const eventId = createResult.data.data.eventId;
       setDraftEventId(eventId);
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem('customer:lastEventTitle', title.trim());
+      }
 
       if (selectedPersonaIds.length > 0) {
-        const personasResult = await customerEventService.updatePersonas(eventId, { personaIds: selectedPersonaIds });
-
-        if (!personasResult.ok) {
-          await customerEventService.deleteDraft(eventId);
-          setDraftEventId(null);
-          setErrors({ form: personasResult.error || 'Unable to assign people. Please try again.' });
-          return;
-        }
+        void customerEventService.updatePersonas(eventId, { personaIds: selectedPersonaIds });
       }
 
       router.push(ROUTES.CUSTOMER.EVENT_CHAT(eventId));

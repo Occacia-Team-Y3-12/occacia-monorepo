@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UpdateEventPersonasPayload, UpdateEventPersonasResponse } from '@/types/customer';
+import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 type RouteContext = {
   params: {
@@ -12,6 +13,18 @@ export async function PUT(
   { params }: RouteContext
 ): Promise<NextResponse<UpdateEventPersonasResponse>> {
   try {
+    const { eventId } = params;
+
+    if (!eventId) {
+      return NextResponse.json(
+        {
+          status: 'error',
+          message: 'Event id is required.',
+        },
+        { status: 400 }
+      );
+    }
+
     const body = (await request.json()) as UpdateEventPersonasPayload;
 
     if (!Array.isArray(body.personaIds)) {
@@ -24,12 +37,14 @@ export async function PUT(
       );
     }
 
+    eventStore.updatePersonas(eventId, body.personaIds);
+
     return NextResponse.json(
       {
         status: 'success',
         message: 'Personas updated successfully.',
         data: {
-          eventId: params.eventId,
+          eventId,
           personaIds: body.personaIds,
         },
       },

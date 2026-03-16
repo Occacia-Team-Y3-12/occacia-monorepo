@@ -8,7 +8,6 @@ from app.models.chat_model import ChatMessage
 
 logger = logging.getLogger(__name__)
 
-# Hard cap to prevent token bloat while retaining conversational flow
 CONTEXT_RECENT_TURNS = 5
 
 
@@ -48,15 +47,31 @@ class ChatService:
         )
 
     def get_last_missing_info(self, db: Session, session_id: str) -> List[str]:
-        """Return missing_info from the most recent message in a session."""
+        """
+        Return missing_info from the most recent message in a session.
+        Guards against the value being a dict (legacy storage format) or None.
+        Always returns a plain list.
+        """
         last = (
             db.query(ChatMessage)
             .filter(ChatMessage.session_id == session_id)
             .order_by(ChatMessage.id.desc())
             .first()
         )
-        if last and last.missing_info:
-            return last.missing_info
+        if not last or not last.missing_info:
+            return []
+
+        val = last.missing_info
+
+        # Plain list — normal case
+        if isinstance(val, list):
+            return val
+
+        # Dict — written by older code that embedded state alongside missing_info
+        if isinstance(val, dict):
+            items = val.get("items", [])
+            return items if isinstance(items, list) else []
+
         return []
 
     # --- Context Compression ---
@@ -69,7 +84,6 @@ class ChatService:
         if not history:
             return ""
 
-        # Short path: no compression needed
         if len(history) <= CONTEXT_RECENT_TURNS + 1:
             lines = ["CONVERSATION HISTORY:"]
             for msg in history:
@@ -77,7 +91,6 @@ class ChatService:
                 lines.append(f"Assistant: {msg.ai_message}")
             return "\n".join(lines)
 
-        # Long path: anchor turn 1, compress middle, keep tail verbatim
         turn_1 = history[0]
         middle = history[1:-CONTEXT_RECENT_TURNS]
         recent = history[-CONTEXT_RECENT_TURNS:]
@@ -96,7 +109,10 @@ class ChatService:
                 summary,
             ]
 
-        lines += ["", f"RECENT CONVERSATION (last {CONTEXT_RECENT_TURNS} turns — verbatim):"]
+        lines += [
+            "",
+            f"RECENT CONVERSATION (last {CONTEXT_RECENT_TURNS} turns — verbatim):",
+        ]
         for msg in recent:
             lines.append(f"User: {msg.user_message}")
             lines.append(f"Assistant: {msg.ai_message}")
@@ -109,41 +125,33 @@ class ChatService:
         return "\n".join(lines)
 
     def _build_summary(self, turns: List[ChatMessage]) -> str:
-        """
-        Build a concise factual summary from a list of old chat turns.
-        """
         facts = []
 
         for msg in turns:
             text = (msg.user_message or "").lower()
 
-            # Event type hints
             for keyword in [
                 "birthday", "wedding", "anniversary", "proposal",
-                "dinner", "party", "retreat", "corporate"
+                "dinner", "party", "retreat", "corporate",
             ]:
                 if keyword in text and f"event: {keyword}" not in facts:
                     facts.append(f"event: {keyword}")
 
-            # Budget
             budget_match = re.search(r"(?:budget|spend|cost)[^\d]*(\d[\d,]*)", text)
             if budget_match:
                 facts.append(f"budget: {budget_match.group(1)}")
 
-            # Guest count
             guest_match = re.search(r"(\d+)\s*(?:people|guests|persons|pax)", text)
             if guest_match:
                 facts.append(f"guests: {guest_match.group(1)}")
 
-            # Location
             for city in [
                 "colombo", "kandy", "galle", "negombo", "ella",
-                "nuwara eliya", "trincomalee", "jaffna", "bentota"
+                "nuwara eliya", "trincomalee", "jaffna", "bentota",
             ]:
                 if city in text and f"location: {city}" not in facts:
                     facts.append(f"location: {city}")
 
-        # Deduplicate while preserving order
         seen = set()
         deduped = []
         for f in facts:

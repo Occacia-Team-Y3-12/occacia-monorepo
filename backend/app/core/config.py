@@ -1,53 +1,38 @@
 from pathlib import Path
-from typing import Optional
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Resolve the .env file path dynamically (checks backend root, then monorepo root)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-ENV_FILE_CANDIDATES = (
-    BASE_DIR / ".env",
-    BASE_DIR.parent / ".env",
-)
-ENV_FILE_PATH = next((p for p in ENV_FILE_CANDIDATES if p.exists()), None)
+LOCAL_ENV_FILE = BASE_DIR / ".env"
 
 
 class Settings(BaseSettings):
-    # --- App Configuration ---
     PROJECT_NAME: str = "Occacia"
-    
-    # --- AI (Langflow) ---
-    LANGFLOW_URL: Optional[str] = None
-    LANGFLOW_ORG_ID: Optional[str] = None
-    LANGFLOW_TOKEN: Optional[str] = None
 
-    # --- Database ---
-    DATABASE_URL: str
+    # Optional: only required when calling AI endpoints.
+    LANGFLOW_URL: str | None = None
+    LANGFLOW_ORG_ID: str | None = None
+    LANGFLOW_TOKEN: str | None = None
+
+    DATABASE_URL: str | None = None
+
     DB_USER: str = "admin"
-    DB_PASSWORD: Optional[str] = None
+    DB_PASSWORD: str | None = None
     DB_NAME: str = "occacia_db"
-
-    # --- Infrastructure ---
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
     DOCKER_SOCKET: str = "N/A"
-    REDIS_URL: Optional[str] = "redis://redis:6379"
 
-    # --- Security ---
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
 
-    # --- Email ---
-    SENDGRID_API_KEY: Optional[str] = None
-    FROM_EMAIL: str = "noreply@occacia.com"
-
-    # --- Feature Flags ---
-    SKIP_EMAIL_VERIFICATION: bool = False
-    SKIP_DB_STARTUP: bool = False
-
-    # --- Pydantic Config ---
     model_config = SettingsConfigDict(
-        # Pass None if file doesn't exist to prevent Pydantic warnings
-        env_file=str(ENV_FILE_PATH) if ENV_FILE_PATH else None,
-        env_file_encoding='utf-8',
-        extra="ignore" 
+        # Local development reads backend/.env when it exists.
+        # Production should inject environment variables directly.
+        env_file=str(LOCAL_ENV_FILE) if LOCAL_ENV_FILE.exists() else None,
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     @classmethod
@@ -61,6 +46,35 @@ class Settings(BaseSettings):
     ):
         return init_settings, env_settings, dotenv_settings
 
+    @model_validator(mode="after")
+    def assemble_database_url(self) -> "Settings":
+        if self.DATABASE_URL:
+            return self
 
-# Initialize settings
+        if not self.DB_PASSWORD:
+            raise ValueError("DATABASE_URL is required when DB_PASSWORD is not set.")
+
+        self.DATABASE_URL = (
+            f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        )
+        return self
+
+    REDIS_URL: str | None = "redis://redis:6379"
+
+    SENDGRID_API_KEY: str | None = None
+    FROM_EMAIL: str = "noreply@occacia.com"
+
+    GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_CLIENT_SECRET: str | None = None
+    GOOGLE_REDIRECT_URI: str | None = None
+    GOOGLE_CALENDAR_SCOPES: str = (
+        "openid email https://www.googleapis.com/auth/calendar.events "
+        "https://www.googleapis.com/auth/calendar.readonly"
+    )
+    CALENDAR_TOKEN_ENCRYPTION_KEY: str | None = None
+
+    SKIP_EMAIL_VERIFICATION: bool = False
+    SKIP_DB_STARTUP: bool = False
+
 settings = Settings()

@@ -12,7 +12,8 @@ from app.core.exceptions import add_exception_handlers
 from app.routers import api_router
 from app.scripts.seed import seed_data
 
-# Configure logging
+
+# Module-level application logging.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -31,10 +32,10 @@ async def lifespan(_: FastAPI):
     logger.info("Starting up... waiting for database...")
     db_connected = False
     
-    # Verify database connection (schema is managed externally by Alembic)
+    # Wait for the database to accept connections; Alembic manages the schema.
     for i in range(15):
         try:
-            with engine.connect() as conn:
+            with engine.connect():
                 db_connected = True
             logger.info("Database connection successful.")
             break
@@ -47,19 +48,19 @@ async def lifespan(_: FastAPI):
         yield
         return
 
-    # Seed initial data if necessary
+    # Seed reference data only after the database is reachable.
     try:
         seed_data()
     except Exception as e:
         logger.warning("Seeding warning: %s", e)
 
-    # Start background tasks
+    # Start long-running background jobs after startup completes.
     cleanup_task = asyncio.create_task(_run_cleanup_job())
     logger.info("Chat history cleanup job started.")
 
     yield
 
-    # Shutdown sequence
+    # Cancel background jobs during shutdown.
     cleanup_task.cancel()
     try:
         await cleanup_task
@@ -67,7 +68,7 @@ async def lifespan(_: FastAPI):
         pass
 
 async def _run_cleanup_job():
-    """Runs every 24 hours to delete chat messages older than 30 days."""
+    """Delete chat messages older than 30 days once every 24 hours."""
     from app.core.database import SessionLocal
     from app.services.chat_service import chat_service
 
@@ -91,7 +92,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     
-    # Configure CORS for local development and production environments
+    # Allow local frontend development and the deployed web app.
     application.add_middleware(
         CORSMiddleware,
         allow_origins=[
@@ -107,6 +108,14 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @application.get("/")
+    def root():
+        return {
+            "service": "occacia-backend",
+            "status": "ok",
+            "docs": "/api/docs",
+        }
     
     add_exception_handlers(application)
     application.include_router(api_router)

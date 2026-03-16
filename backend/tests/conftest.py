@@ -21,6 +21,10 @@ os.environ.update({
     "ALGORITHM": "HS256",
     "DATABASE_URL": "sqlite:///./test.db",
     "REDIS_URL": "redis://localhost:6379",
+    "GOOGLE_CLIENT_ID": "test-google-client-id",
+    "GOOGLE_CLIENT_SECRET": "test-google-client-secret",
+    "GOOGLE_REDIRECT_URI": "https://app.occacia.com/oauth/callback",
+    "CALENDAR_TOKEN_ENCRYPTION_KEY": "test-calendar-token-key",
 })
 
 repo_root = Path(__file__).resolve().parent.parent
@@ -30,15 +34,23 @@ if str(repo_root) not in sys.path:
 from app.core.database import Base, SessionLocal, engine
 from app.core.security import create_access_token, get_password_hash
 from app.main import app  # noqa: E402
+from app.models import registry  # noqa: F401
 from app.models.chat_model import ChatMessage
 from app.models.customer import Customer
 from app.models.event import Event
 from app.models.event_chat_message import EventChatMessage
 from app.models.event_persona import EventPersona
+from app.models.offering import Offering
 from app.models.package import Package
+from app.models.package_execution_request import PackageExecutionRequest
+from app.models.package_item import PackageItem
 from app.models.persona import Persona
+from app.models.recommendation_package import RecommendationPackage
 from app.models.task import Task
+from app.models.task_recommendation import TaskRecommendation
+from app.models.task_request import TaskRequest
 from app.models.vendor import Vendor
+from app.services.google_calendar_service import google_calendar_service
 
 
 # ── Create all tables once ───────────────────────────────────────────
@@ -56,7 +68,23 @@ def clean_tables():
     yield
     db = SessionLocal()
     try:
-        for model in (ChatMessage, EventChatMessage, Task, EventPersona, Event, Persona, Package, Vendor, Customer):
+        for model in (
+            ChatMessage,
+            EventChatMessage,
+            PackageExecutionRequest,
+            TaskRequest,
+            PackageItem,
+            RecommendationPackage,
+            TaskRecommendation,
+            Task,
+            EventPersona,
+            Event,
+            Persona,
+            Offering,
+            Package,
+            Vendor,
+            Customer,
+        ):
             try:
                 db.query(model).delete()
             except OperationalError:
@@ -105,6 +133,68 @@ def auth_token(active_customer):
 def auth_client(client, auth_token):
     client.headers.update({"Authorization": f"Bearer {auth_token}"})
     return client
+
+
+@pytest.fixture(autouse=True)
+def mock_google_calendar(monkeypatch):
+    monkeypatch.setattr(
+        google_calendar_service,
+        "build_google_auth_url",
+        lambda *, state, redirect_uri: (
+            "https://accounts.google.com/o/oauth2/v2/auth"
+            f"?state={state}&redirect_uri={redirect_uri}"
+        ),
+    )
+    monkeypatch.setattr(
+        google_calendar_service,
+        "exchange_google_code",
+        lambda *, code, redirect_uri: {
+            "access_token": "google-access-token",
+            "refresh_token": "google-refresh-token",
+            "expires_in": 3600,
+            "scope": "openid email https://www.googleapis.com/auth/calendar.events",
+            "token_type": "Bearer",
+        },
+    )
+    monkeypatch.setattr(
+        google_calendar_service,
+        "get_google_account_profile",
+        lambda *, access_token: {
+            "email": "calendar-user@example.com",
+            "calendar_id": "primary",
+        },
+    )
+    monkeypatch.setattr(
+        google_calendar_service,
+        "create_google_event",
+        lambda *, access_token, calendar_id, payload: {
+            "id": "google-event-123",
+            "htmlLink": "https://calendar.google.com/event?eid=google-event-123",
+        },
+    )
+    monkeypatch.setattr(
+        google_calendar_service,
+        "update_google_event",
+        lambda *, access_token, calendar_id, event_id, payload: {
+            "id": event_id,
+            "htmlLink": f"https://calendar.google.com/event?eid={event_id}",
+        },
+    )
+    monkeypatch.setattr(
+        google_calendar_service,
+        "delete_google_event",
+        lambda *, access_token, calendar_id, event_id: None,
+    )
+    monkeypatch.setattr(
+        google_calendar_service,
+        "refresh_google_access_token",
+        lambda *, refresh_token: {
+            "access_token": "google-access-token-refreshed",
+            "expires_in": 3600,
+            "scope": "openid email https://www.googleapis.com/auth/calendar.events",
+            "token_type": "Bearer",
+        },
+    )
 
 
 # ── Helper: create a verified vendor with packages ───────────────────

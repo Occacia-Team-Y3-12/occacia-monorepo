@@ -351,10 +351,10 @@ export default function VendorDashboard() {
                     <Image src="/icons/vendor/dashboard/quick-package.svg" alt="" aria-hidden="true" width={18} height={18} className="h-[18px] w-[18px]" />
                     Create New Package
                   </button>
-                  <button className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-2" type="button">
+                  <Link href={ROUTES.VENDOR.OFFERINGS} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-2">
                     <Image src="/icons/vendor/dashboard/quick-inventory.svg" alt="" aria-hidden="true" width={18} height={18} className="h-[18px] w-[18px]" />
-                    Update Inventory
-                  </button>
+                    Manage Offerings
+                  </Link>
                   <button className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-2" type="button">
                     <Image src="/icons/vendor/dashboard/quick-delivery.svg" alt="" aria-hidden="true" width={18} height={18} className="h-[18px] w-[18px]" />
                     Schedule Delivery
