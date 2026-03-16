@@ -176,7 +176,7 @@ jobs:
             DOCKER_SOCKET=/var/run/docker.sock
             EOF
 
-            # 🛑 The Architect and Foreman are fixed. No --no-cache.
+            # Recreate containers while preserving named volumes.
             sudo docker compose down --remove-orphans || true
             sudo docker rm -f occacia-radar || true
             sudo docker rm -f \
@@ -187,21 +187,35 @@ jobs:
               occacia-nginx \
               occacia-backup \
               occacia-radar || true
-            sudo docker compose up --build -d
+            sudo docker compose up --build -d db redis backend
 
-            # Wait for backend healthcheck
-            echo "Waiting for backend..."
-            for i in $(seq 1 15); do
-              if sudo docker compose exec -T backend curl -sf http://localhost:8000/api/v1/health > /dev/null; then
-                echo "Backend is up"
+            echo "Waiting for backend health..."
+            backend_healthy=0
+            for i in $(seq 1 30); do
+              status="$(sudo docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' occacia-backend 2>/dev/null || echo missing)"
+              echo "Backend status: ${status} (${i}/30)"
+
+              if [ "${status}" = "healthy" ]; then
+                backend_healthy=1
                 break
               fi
-              echo "Attempt $i/15..."
+
+              if [ "${status}" = "unhealthy" ] || [ "${status}" = "exited" ] || [ "${status}" = "dead" ] || [ "${status}" = "missing" ]; then
+                echo "Backend failed to become healthy. Recent logs:"
+                sudo docker compose logs --tail=200 backend db redis
+                exit 1
+              fi
+
               sleep 4
             done
 
-            # Run database migrations
-            sudo docker compose exec -T backend alembic upgrade head
+            if [ "${backend_healthy}" -ne 1 ]; then
+              echo "Backend did not become healthy within the expected time. Recent logs:"
+              sudo docker compose logs --tail=200 backend db redis
+              exit 1
+            fi
+
+            sudo docker compose up -d frontend nginx db-backup portainer
 
             # Cleanup images
             sudo docker image prune -f
