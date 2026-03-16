@@ -82,6 +82,36 @@ class VendorDetailResponse(VendorResponse):
     updated_at: Optional[datetime] = None
 
 
+class OrganizationCreate(BaseModel):
+    name: str
+    legal_name: Optional[str] = None
+    registration_number: Optional[str] = None
+    tax_id: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    website: Optional[str] = None
+    description: Optional[str] = None
+    logo_url: Optional[str] = None
+    business_license_url: Optional[str] = None
+    tax_certificate_url: Optional[str] = None
+
+
+class OrganizationUpdate(BaseModel):
+    name: Optional[str] = None
+    legal_name: Optional[str] = None
+    registration_number: Optional[str] = None
+    tax_id: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    website: Optional[str] = None
+    description: Optional[str] = None
+    logo_url: Optional[str] = None
+    business_license_url: Optional[str] = None
+    tax_certificate_url: Optional[str] = None
+
+
 class OrganizationResponse(BaseModel):
     id: int
     name: str

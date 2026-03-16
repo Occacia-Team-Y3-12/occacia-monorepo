@@ -5,16 +5,16 @@ import logging
 from datetime import date, timedelta
 from typing import List, Optional
 
+from fastapi import HTTPException, status
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.user import User
-from app.models.vendor import Vendor
 from app.common.enums import UserRole
-from app.schemas.vendor_schema import VendorRegisterRequest as VendorCreate
-from app.models.package import Package
-from fastapi import HTTPException, status
-from app.core.security import get_password_hash
 from app.common.utils import generate_prefixed_id
+from app.models.package import Package
+from app.models.vendor import Vendor
+from app.models.user import User
+from app.schemas.vendor_schema import VendorRegisterRequest as VendorCreate
 
 logger = logging.getLogger(__name__)
 
@@ -440,6 +440,62 @@ class VendorService:
             if alias in lower:
                 return _CITY_ALIASES[alias]
         return None
+
+
+class AdminVendorService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def list_vendors(
+        self,
+        approval_status: str | None = None,
+        status: str | None = None,
+    ) -> list[Vendor]:
+        query = self.db.query(Vendor)
+
+        if approval_status:
+            query = query.filter(Vendor.approval_status == approval_status.upper())
+        if status and hasattr(Vendor, "status"):
+            query = query.filter(Vendor.status == status.upper())
+
+        return query.order_by(Vendor.id.desc()).all()
+
+    def get_vendor(self, vendor_id: int) -> Vendor:
+        vendor = self.db.query(Vendor).filter(Vendor.id == vendor_id).first()
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Vendor not found.")
+        return vendor
+
+    def update_vendor_status(
+        self,
+        vendor_id: int,
+        new_status: str,
+        admin_email: str,
+    ) -> Vendor:
+        if not new_status or new_status.upper() not in ("ACTIVE", "SUSPENDED", "DISABLED"):
+            raise HTTPException(status_code=400, detail="status must be ACTIVE, SUSPENDED, or DISABLED")
+
+        vendor = self.get_vendor(vendor_id)
+        if hasattr(vendor, "status"):
+            vendor.status = new_status.upper()
+        else:
+            logger.warning("Vendor model has no .status column yet. Skipping admin status write.")
+
+        self.db.commit()
+        self.db.refresh(vendor)
+        logger.info("Admin %s set vendor %s status to %s", admin_email, vendor_id, new_status)
+        return vendor
+
+    def get_pending_counts(self) -> dict:
+        vendor_pending = self.db.query(Vendor).filter(
+            Vendor.approval_status == "PENDING"
+        ).count()
+
+        return {
+            "vendors_pending": vendor_pending,
+            "organizations_pending": 0,
+            "total_pending": vendor_pending,
+        }
 
 
 vendor_service = VendorService()
