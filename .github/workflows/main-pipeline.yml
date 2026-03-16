@@ -132,8 +132,9 @@ jobs:
           script: |
             set -e
             mkdir -p ~/occacia-app
-            rm -rf ~/occacia-app/backend ~/occacia-app/frontend
-            rm -f \
+            rm -rf \
+              ~/occacia-app/backend \
+              ~/occacia-app/frontend \
               ~/occacia-app/docker-compose.yml \
               ~/occacia-app/nginx.conf \
               ~/occacia-app/nginx.http.conf \
