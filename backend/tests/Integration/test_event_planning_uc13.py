@@ -113,7 +113,11 @@ def test_whenCustomerConfirmsTasks_postConfirmTasks_activatesEvent(auth_client):
     assert body["tasks"][0]["status"] == "PENDING"
 
 
-def test_whenCustomerConnectsCalendarAndEnablesSync_putEventCalendarSync_success(auth_client, active_customer):
+def test_whenCustomerConnectsCalendarAndEnablesSync_putEventCalendarSync_success(
+    auth_client,
+    active_customer,
+    mock_google_calendar,
+):
     event_id = _create_event(auth_client)
 
     connect = auth_client.post(
@@ -161,7 +165,10 @@ def test_whenCustomerConnectsCalendarAndEnablesSync_putEventCalendarSync_success
         customer = db.query(Customer).filter(Customer.customer_id == active_customer.customer_id).first()
         event = db.query(Event).filter(Event.event_id == event_id).first()
         assert customer is not None and customer.calendar_provider == "GOOGLE"
+        assert customer.calendar_access_token_encrypted is not None
+        assert customer.calendar_refresh_token_encrypted is not None
         assert event is not None and event.calendar_sync_state == "ENABLED"
+        assert event.external_calendar_event_id == "google-event-123"
     finally:
         db.close()
 

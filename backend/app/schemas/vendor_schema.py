@@ -1,11 +1,12 @@
 """
 app/schemas/vendor_schema.py
 """
-from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-# 1. Registration Input
+from datetime import datetime
+from enum import Enum
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class VendorRegisterRequest(BaseModel):

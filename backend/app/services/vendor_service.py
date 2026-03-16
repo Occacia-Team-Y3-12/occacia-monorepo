@@ -5,6 +5,8 @@ import logging
 from datetime import date, timedelta
 from typing import List, Optional
 
+from fastapi import HTTPException, status
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.user import User

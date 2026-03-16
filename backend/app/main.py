@@ -12,6 +12,7 @@ from app.core.exceptions import add_exception_handlers
 from app.routers import api_router
 from app.scripts.seed import seed_data
 
+
 # Module-level application logging.
 logging.basicConfig(
     level=logging.INFO,
