@@ -1,17 +1,20 @@
 """
-tests/test_persona.py
+tests/Integration/test_persona.py
 
 Complete pytest suite — entire Persona system + AI chat flow.
 
 Tickets covered:
   OCA-249  Implement Persona Update Service
   OCA-245  Implement Persona Confirmation Logic
+  OCA-250  Validate Persona Editing & Update Behavior
   AI flow  Save from chat / Load from chat / Suggest saved profile
 
-Fixtures required (standard project conftest):
+Fixtures (standard project conftest):
     auth_client  — authenticated TestClient (customer JWT)
     client       — unauthenticated TestClient
+    active_customer — raw Customer ORM object
 """
+import time
 import uuid
 from unittest.mock import AsyncMock, patch
 
@@ -22,14 +25,14 @@ PLANNING_URL = "/api/v1/planning/generate"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# HELPERS
+# Helpers
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _uid():
+def _uid() -> str:
     return str(uuid.uuid4())[:8]
 
 
-def _create_payload(**kwargs):
+def _create_payload(**kwargs) -> dict:
     base = {
         "name":              f"Test Person {_uid()}",
         "relationship":      "girlfriend",
@@ -44,25 +47,25 @@ def _create_payload(**kwargs):
 
 
 def _create(auth_client, **kwargs):
-    """POST /personas/ and assert 201. Returns (response, persona_id)."""
+    """POST /personas/ → assert 201, return (response, persona_id)."""
     resp = auth_client.post(PERSONA_URL, json=_create_payload(**kwargs))
     assert resp.status_code == 201, resp.text
     return resp, resp.json()["persona_id"]
 
 
-def _fake_ai(**overrides):
-    """Minimal valid AI result dict, with optional overrides."""
+def _fake_ai(**overrides) -> dict:
+    """Minimal valid AI result with optional field overrides."""
     base = {
-        "intent":          "chat",
-        "chat_response":   "Let me help!",
-        "venue_tags":      [],
-        "missing_info":    [],
-        "gift_suggestion": None,
-        "event_type":      None,
-        "location":        None,
-        "budget_per_head": None,
-        "guest_count":     None,
-        "save_persona":    None,
+        "intent":           "chat",
+        "chat_response":    "Let me help!",
+        "venue_tags":       [],
+        "missing_info":     [],
+        "gift_suggestion":  None,
+        "event_type":       None,
+        "location":         None,
+        "budget_per_head":  None,
+        "guest_count":      None,
+        "save_persona":     None,
         "ask_save_persona": False,
         "use_persona_name": None,
     }
@@ -70,21 +73,29 @@ def _fake_ai(**overrides):
     return base
 
 
-def _plan(auth_client, user_query, session_id=None):
+def _plan(auth_client, user_query: str, session_id: str = None):
     return auth_client.post(PLANNING_URL, json={
         "session_id": session_id or f"sess-{_uid()}",
         "user_query":  user_query,
     })
 
 
-def _mock_plan(auth_client, user_query, ai_result, session_id=None):
-    """POST /planning/generate with AI mocked to return ai_result."""
+def _mock_plan(auth_client, user_query: str, ai_result: dict, session_id: str = None):
+    """POST /planning/generate with generate_date_plan mocked."""
     with patch(
         "app.services.ai_service.ai_service.generate_date_plan",
         new_callable=AsyncMock,
         return_value=ai_result,
     ):
         return _plan(auth_client, user_query, session_id)
+
+
+def _persona_names(auth_client) -> list:
+    return [p["name"] for p in auth_client.get(PERSONA_URL).json()]
+
+
+def _get_persona(auth_client, pid: str) -> dict:
+    return auth_client.get(f"{PERSONA_URL}{pid}").json()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -172,13 +183,12 @@ class TestPersonaList:
         assert auth_client.get(PERSONA_URL).status_code == 200
 
     def test_list_returns_plain_list_not_envelope(self, auth_client):
-        r = auth_client.get(PERSONA_URL)
-        assert isinstance(r.json(), list)
+        assert isinstance(auth_client.get(PERSONA_URL).json(), list)
 
     def test_list_includes_created_persona(self, auth_client):
         name = f"ListTest-{_uid()}"
         _create(auth_client, name=name)
-        assert name in [p["name"] for p in auth_client.get(PERSONA_URL).json()]
+        assert name in _persona_names(auth_client)
 
     def test_list_customer_isolation(self, auth_client, client):
         """Customer A cannot see Customer B's personas."""
@@ -203,6 +213,13 @@ class TestPersonaList:
         confirmed   = next(p for p in personas if p["persona_id"] == pid2)
         unconfirmed = next(p for p in personas if p["persona_id"] == pid1)
         assert personas.index(confirmed) < personas.index(unconfirmed)
+
+    def test_list_contains_multiple_created_personas(self, auth_client):
+        n1, n2 = f"A-{_uid()}", f"B-{_uid()}"
+        _create(auth_client, name=n1)
+        _create(auth_client, name=n2)
+        names = _persona_names(auth_client)
+        assert n1 in names and n2 in names
 
     def test_unauthenticated_list_returns_401(self, client):
         assert client.get(PERSONA_URL).status_code in (401, 403)
@@ -241,7 +258,7 @@ class TestPersonaGet:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 4. UPDATE  — OCA-249
+# 4. UPDATE  — OCA-249 / OCA-250
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestPersonaUpdate:
@@ -292,7 +309,7 @@ class TestPersonaUpdate:
         _, pid = _create(auth_client, name="FullPerson",
                          food_preferences=["sushi"], personality_tags=["romantic"])
         auth_client.put(f"{PERSONA_URL}{pid}", json={"relationship": "partner"})
-        data = auth_client.get(f"{PERSONA_URL}{pid}").json()
+        data = _get_persona(auth_client, pid)
         assert "sushi"    in data["food_preferences"]
         assert "romantic" in data["personality_tags"]
 
@@ -316,6 +333,221 @@ class TestPersonaUpdate:
     def test_unauthenticated_update_returns_401(self, client):
         assert client.put(f"{PERSONA_URL}PER-anything", json={"name": "x"}).status_code in (401, 403)
 
+    # ── OCA-250 additions ────────────────────────────────────────────────────
+
+    def test_edit_name_reflected_immediately(self, auth_client):
+        _, pid = _create(auth_client, name="Before")
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "After"})
+        assert _get_persona(auth_client, pid)["name"] == "After"
+
+    def test_edit_relationship_all_values(self, auth_client):
+        _, pid = _create(auth_client)
+        for rel in ["girlfriend", "wife", "mother", "colleague", "best friend"]:
+            resp = auth_client.put(f"{PERSONA_URL}{pid}", json={"relationship": rel})
+            assert resp.status_code == 200
+            assert resp.json()["relationship"] == rel
+
+    def test_edit_personality_free_text(self, auth_client):
+        _, pid = _create(auth_client)
+        resp = auth_client.put(f"{PERSONA_URL}{pid}",
+                               json={"personality": "Loves early mornings and strong coffee."})
+        assert resp.status_code == 200
+        assert "coffee" in resp.json()["personality"]
+
+    def test_edit_food_preferences_replace(self, auth_client):
+        _, pid = _create(auth_client, food_preferences=["sushi", "pizza"])
+        data = auth_client.put(f"{PERSONA_URL}{pid}", json={"food_preferences": ["tacos"]}).json()
+        assert "tacos" in data["food_preferences"]
+        assert "sushi" not in data["food_preferences"]
+
+    def test_edit_color_preferences_replace(self, auth_client):
+        _, pid = _create(auth_client, color_preferences=["blue", "white"])
+        data = auth_client.put(f"{PERSONA_URL}{pid}", json={"color_preferences": ["gold", "black"]}).json()
+        assert "gold" in data["color_preferences"]
+        assert "blue" not in data["color_preferences"]
+
+    def test_edit_music_preferences_replace(self, auth_client):
+        _, pid = _create(auth_client, music_preferences=["jazz"])
+        data = auth_client.put(f"{PERSONA_URL}{pid}", json={"music_preferences": ["k-pop", "metal"]}).json()
+        assert "k-pop" in data["music_preferences"]
+        assert "jazz" not in data["music_preferences"]
+
+    def test_edit_personality_tags_replace(self, auth_client):
+        _, pid = _create(auth_client, personality_tags=["romantic", "adventurous"])
+        data = auth_client.put(f"{PERSONA_URL}{pid}", json={"personality_tags": ["bookworm"]}).json()
+        assert "bookworm" in data["personality_tags"]
+        assert "romantic" not in data["personality_tags"]
+
+    def test_edit_birthday_valid_iso_date(self, auth_client):
+        _, pid = _create(auth_client)
+        assert "1990-12-25" in (
+            auth_client.put(f"{PERSONA_URL}{pid}", json={"birthday": "1990-12-25"}).json().get("birthday") or ""
+        )
+
+    def test_edit_birthday_clear_with_null(self, auth_client):
+        _, pid = _create(auth_client, birthday="1990-12-25")
+        assert auth_client.put(f"{PERSONA_URL}{pid}", json={"birthday": None}).json().get("birthday") is None
+
+    def test_edit_list_fields_to_empty_clears_them(self, auth_client):
+        _, pid = _create(auth_client, food_preferences=["sushi"], personality_tags=["romantic"])
+        resp = auth_client.put(f"{PERSONA_URL}{pid}", json={
+            "food_preferences": [], "personality_tags": [],
+        })
+        assert resp.json()["food_preferences"] == []
+        assert resp.json()["personality_tags"] == []
+
+    def test_edit_name_only_preserves_all_lists(self, auth_client):
+        _, pid = _create(auth_client, food_preferences=["ramen"], color_preferences=["red"],
+                         music_preferences=["pop"], personality_tags=["cozy"])
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "Updated"})
+        data = _get_persona(auth_client, pid)
+        assert "ramen" in data["food_preferences"]
+        assert "red"   in data["color_preferences"]
+        assert "pop"   in data["music_preferences"]
+        assert "cozy"  in data["personality_tags"]
+
+    def test_edit_one_list_preserves_other_lists(self, auth_client):
+        _, pid = _create(auth_client, food_preferences=["sushi"],
+                         music_preferences=["jazz"], personality_tags=["adventurous"])
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"food_preferences": ["tacos"]})
+        data = _get_persona(auth_client, pid)
+        assert "jazz"        in data["music_preferences"]
+        assert "adventurous" in data["personality_tags"]
+
+    def test_edit_relationship_preserves_birthday(self, auth_client):
+        _, pid = _create(auth_client, birthday="1995-06-15")
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"relationship": "sister"})
+        assert "1995-06-15" in (_get_persona(auth_client, pid).get("birthday") or "")
+
+    def test_sequential_edits_accumulate(self, auth_client):
+        _, pid = _create(auth_client, name="Step0")
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "Step1"})
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"relationship": "partner"})
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"personality_tags": ["thoughtful"]})
+        data = _get_persona(auth_client, pid)
+        assert data["name"]         == "Step1"
+        assert data["relationship"] == "partner"
+        assert "thoughtful"         in data["personality_tags"]
+
+    def test_updated_at_advances_after_edit(self, auth_client):
+        _, pid = _create(auth_client)
+        before = _get_persona(auth_client, pid).get("updated_at") or ""
+        time.sleep(0.05)
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": f"Changed-{_uid()}"})
+        after = _get_persona(auth_client, pid).get("updated_at") or ""
+        if before and after:
+            assert after >= before
+
+    def test_updated_at_present_in_response(self, auth_client):
+        _, pid = _create(auth_client)
+        assert "updated_at" in auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "TS"}).json()
+
+    def test_persona_id_cannot_be_changed(self, auth_client):
+        _, pid = _create(auth_client)
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"persona_id": "PER-HACKED"})
+        assert _get_persona(auth_client, pid)["persona_id"] == pid
+
+    def test_customer_id_cannot_be_changed(self, auth_client):
+        _, pid = _create(auth_client)
+        original = _get_persona(auth_client, pid)["customer_id"]
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"customer_id": "CUS-HACKED"})
+        assert _get_persona(auth_client, pid)["customer_id"] == original
+
+    def test_created_at_does_not_change_on_edit(self, auth_client):
+        _, pid = _create(auth_client)
+        before = _get_persona(auth_client, pid).get("created_at")
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "EditedName"})
+        after = _get_persona(auth_client, pid).get("created_at")
+        if before and after:
+            assert before == after
+
+    def test_other_customer_cannot_edit_persona(self, auth_client, client):
+        _, pid = _create(auth_client, name="Private")
+        email2 = f"edit_other_{_uid()}@test.com"
+        client.post("/api/v1/auth/customers/register",
+                    json={"email": email2, "password": "pass1234", "full_name": "OtherEditor"})
+        tok = client.post("/api/v1/auth/customers/login",
+                          data={"username": email2, "password": "pass1234"}).json().get("access_token")
+        if tok:
+            assert client.put(
+                f"{PERSONA_URL}{pid}", json={"name": "Hacked"},
+                headers={"Authorization": f"Bearer {tok}"},
+            ).status_code == 404
+
+    def test_edit_name_to_empty_string_returns_422(self, auth_client):
+        _, pid = _create(auth_client)
+        assert auth_client.put(f"{PERSONA_URL}{pid}", json={"name": ""}).status_code == 422
+
+    def test_edit_name_to_whitespace_only_returns_422(self, auth_client):
+        _, pid = _create(auth_client)
+        assert auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "   "}).status_code == 422
+
+    def test_edit_invalid_birthday_format_returns_422(self, auth_client):
+        _, pid = _create(auth_client)
+        assert auth_client.put(f"{PERSONA_URL}{pid}", json={"birthday": "25/12/1990"}).status_code == 422
+
+    def test_edit_list_field_with_non_list_returns_422(self, auth_client):
+        _, pid = _create(auth_client)
+        assert auth_client.put(
+            f"{PERSONA_URL}{pid}", json={"food_preferences": "sushi"}
+        ).status_code == 422
+
+    def test_edit_nonexistent_persona_returns_404(self, auth_client):
+        assert auth_client.put(
+            f"{PERSONA_URL}PER-nonexistent999", json={"name": "Ghost"}
+        ).status_code == 404
+
+    def test_edit_confirmed_persona_keeps_is_confirmed_true(self, auth_client):
+        _, pid = _create(auth_client, name="Confirmed")
+        auth_client.post(f"{PERSONA_URL}{pid}/confirm")
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "ConfirmedEdited"})
+        assert _get_persona(auth_client, pid)["is_confirmed"] is True
+
+    def test_edit_confirmed_persona_keeps_confirmed_at(self, auth_client):
+        _, pid = _create(auth_client)
+        auth_client.post(f"{PERSONA_URL}{pid}/confirm")
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"relationship": "partner"})
+        data = _get_persona(auth_client, pid)
+        assert data["is_confirmed"] is True
+        assert data.get("confirmed_at") is not None
+
+    def test_edit_confirmed_persona_appears_in_confirmed_list(self, auth_client):
+        _, pid = _create(auth_client, name="StillConfirmed")
+        auth_client.post(f"{PERSONA_URL}{pid}/confirm")
+        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "StillConfirmedEdited"})
+        pids = [p["persona_id"] for p in auth_client.get(f"{PERSONA_URL}confirmed").json()]
+        assert pid in pids
+
+    def test_edit_response_contains_all_required_keys(self, auth_client):
+        _, pid = _create(auth_client)
+        data = auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "KeyCheck"}).json()
+        for key in ("persona_id", "customer_id", "name", "relationship",
+                    "food_preferences", "color_preferences", "music_preferences",
+                    "personality_tags", "is_confirmed", "updated_at"):
+            assert key in data, f"Missing key in PUT response: {key}"
+
+    def test_edit_response_matches_subsequent_get(self, auth_client):
+        _, pid = _create(auth_client)
+        put_body = auth_client.put(
+            f"{PERSONA_URL}{pid}", json={"name": "SyncCheck", "relationship": "friend"}
+        ).json()
+        get_body = _get_persona(auth_client, pid)
+        for key in ("name", "relationship", "persona_id", "is_confirmed"):
+            assert put_body.get(key) == get_body.get(key), f"Mismatch on {key}"
+
+    def test_two_customers_can_have_same_persona_name(self, auth_client, client):
+        _create(auth_client, name="SharedName")
+        email2 = f"name_coll_{_uid()}@test.com"
+        client.post("/api/v1/auth/customers/register",
+                    json={"email": email2, "password": "pass1234", "full_name": "NameCollision"})
+        tok = client.post("/api/v1/auth/customers/login",
+                          data={"username": email2, "password": "pass1234"}).json().get("access_token")
+        if tok:
+            assert client.post(
+                PERSONA_URL, json={"name": "SharedName"},
+                headers={"Authorization": f"Bearer {tok}"},
+            ).status_code == 201
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 5. DELETE
@@ -331,7 +563,7 @@ class TestPersonaDelete:
         name = f"Delete-{_uid()}"
         _, pid = _create(auth_client, name=name)
         auth_client.delete(f"{PERSONA_URL}{pid}")
-        assert name not in [p["name"] for p in auth_client.get(PERSONA_URL).json()]
+        assert name not in _persona_names(auth_client)
 
     def test_delete_nonexistent_returns_404(self, auth_client):
         assert auth_client.delete(f"{PERSONA_URL}PER-nope").status_code == 404
@@ -372,7 +604,6 @@ class TestPersonaConfirm:
         assert auth_client.post(f"{PERSONA_URL}PER-ghost/confirm").status_code == 404
 
     def test_confirm_idempotent(self, auth_client):
-        """Confirming twice should not error — just stay confirmed."""
         _, pid = _create(auth_client)
         auth_client.post(f"{PERSONA_URL}{pid}/confirm")
         resp = auth_client.post(f"{PERSONA_URL}{pid}/confirm")
@@ -408,7 +639,6 @@ class TestPersonaUnconfirm:
         assert auth_client.delete(f"{PERSONA_URL}PER-ghost/confirm").status_code == 404
 
     def test_confirm_unconfirm_confirm_cycle(self, auth_client):
-        """Full cycle: confirm → unconfirm → confirm again."""
         _, pid = _create(auth_client)
         auth_client.post(f"{PERSONA_URL}{pid}/confirm")
         auth_client.delete(f"{PERSONA_URL}{pid}/confirm")
@@ -437,7 +667,6 @@ class TestConfirmedList:
 
     def test_confirmed_list_excludes_unconfirmed(self, auth_client):
         _, pid = _create(auth_client)
-        # deliberately do NOT confirm
         pids = [p["persona_id"] for p in auth_client.get(f"{PERSONA_URL}confirmed").json()]
         assert pid not in pids
 
@@ -462,9 +691,12 @@ class TestConfirmedList:
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestPersonaSaveFromChat:
+    """
+    Single-turn save: AI returns save_persona AND the user's current message
+    contains a yes-word → persona saved immediately in the same turn.
+    """
 
     def test_ask_save_persona_flag_exposed(self, auth_client):
-        """AI returns ask_save_persona=True → flag is visible in response."""
         resp = _mock_plan(auth_client,
             "Plan a date for my girlfriend Sarah who loves sushi",
             _fake_ai(
@@ -476,56 +708,39 @@ class TestPersonaSaveFromChat:
         assert resp.status_code == 200
         assert resp.json()["ask_save_persona"] is True
 
-    def test_persona_saved_when_user_says_yes(self, auth_client):
-        name = f"AutoSave-{_uid()}"
-        resp = _mock_plan(auth_client, "yes",
+    # ── Parametrized yes-word variants ───────────────────────────────────────
+    # Replaces 7 identical test bodies with a single parametrized test.
+    # Each variant runs and reports independently.
+
+    @pytest.mark.parametrize("yes_word,name_prefix", [
+        ("yes",        "AutoSave"),
+        ("sure",       "Sure"),
+        ("ok",         "Ok"),
+        ("yep",        "Yep"),
+        ("yeah",       "Yeah"),
+        ("yes please", "Please"),
+        ("do it",      "DoIt"),
+    ])
+    def test_persona_saved_for_yes_word(self, auth_client, yes_word, name_prefix):
+        """Every yes-word variant must save the persona immediately."""
+        name = f"{name_prefix}-{_uid()}"
+        resp = _mock_plan(
+            auth_client,
+            yes_word,
             _fake_ai(
                 save_persona={"name": name, "relationship": "girlfriend",
-                              "food_preferences": ["sushi"], "personality_tags": ["romantic"]},
+                              "food_preferences": ["sushi"],
+                              "personality_tags": ["romantic"]},
                 chat_response="Saved!",
-            ))
+            ),
+        )
         assert resp.status_code == 200
-        assert resp.json()["persona_saved"] is True
-        assert name in [p["name"] for p in auth_client.get(PERSONA_URL).json()]
-
-    def test_persona_saved_when_user_says_sure(self, auth_client):
-        name = f"Sure-{_uid()}"
-        _mock_plan(auth_client, "sure",
-            _fake_ai(save_persona={"name": name}, chat_response="Ok!"))
-        assert name in [p["name"] for p in auth_client.get(PERSONA_URL).json()]
-
-    def test_persona_saved_when_user_says_ok(self, auth_client):
-        name = f"Ok-{_uid()}"
-        _mock_plan(auth_client, "ok",
-            _fake_ai(save_persona={"name": name}, chat_response="Done!"))
-        assert name in [p["name"] for p in auth_client.get(PERSONA_URL).json()]
-
-    def test_persona_saved_when_user_says_yep(self, auth_client):
-        name = f"Yep-{_uid()}"
-        _mock_plan(auth_client, "yep",
-            _fake_ai(save_persona={"name": name}, chat_response="Done!"))
-        assert name in [p["name"] for p in auth_client.get(PERSONA_URL).json()]
-
-    def test_persona_saved_when_user_says_yeah(self, auth_client):
-        name = f"Yeah-{_uid()}"
-        _mock_plan(auth_client, "yeah",
-            _fake_ai(save_persona={"name": name}, chat_response="Done!"))
-        assert name in [p["name"] for p in auth_client.get(PERSONA_URL).json()]
-
-    def test_persona_saved_when_user_says_please(self, auth_client):
-        name = f"Please-{_uid()}"
-        _mock_plan(auth_client, "yes please",
-            _fake_ai(save_persona={"name": name}, chat_response="Done!"))
-        assert name in [p["name"] for p in auth_client.get(PERSONA_URL).json()]
-
-    def test_persona_saved_when_user_says_do_it(self, auth_client):
-        name = f"DoIt-{_uid()}"
-        _mock_plan(auth_client, "do it",
-            _fake_ai(save_persona={"name": name}, chat_response="Done!"))
-        assert name in [p["name"] for p in auth_client.get(PERSONA_URL).json()]
+        assert resp.json()["persona_saved"] is True, \
+            f"persona_saved must be True for yes_word={yes_word!r}"
+        assert name in _persona_names(auth_client), \
+            f"Persona '{name}' not in list after yes_word={yes_word!r}"
 
     def test_persona_auto_confirmed_after_save(self, auth_client):
-        """Auto-saved persona must be is_confirmed=True immediately."""
         name = f"AutoConf-{_uid()}"
         _mock_plan(auth_client, "yes save her",
             _fake_ai(save_persona={"name": name, "food_preferences": ["pizza"],
@@ -543,23 +758,21 @@ class TestPersonaSaveFromChat:
                      save_persona={"name": name, "food_preferences": ["sushi"]},
                      chat_response="No problem!"))
         assert resp.status_code == 200
-        assert name not in [p["name"] for p in auth_client.get(PERSONA_URL).json()]
+        assert name not in _persona_names(auth_client)
 
     def test_persona_not_saved_when_user_says_nope(self, auth_client):
         name = f"Nope-{_uid()}"
         _mock_plan(auth_client, "nope",
             _fake_ai(save_persona={"name": name}, chat_response="Ok!"))
-        assert name not in [p["name"] for p in auth_client.get(PERSONA_URL).json()]
+        assert name not in _persona_names(auth_client)
 
     def test_duplicate_persona_not_created(self, auth_client):
-        """Same name already exists → no duplicate, count stays at 1."""
         name = f"NoDupe-{_uid()}"
         _create(auth_client, name=name)
         _mock_plan(auth_client, "yes",
             _fake_ai(save_persona={"name": name, "food_preferences": ["ramen"]},
                      chat_response="Saved!"))
-        count = sum(1 for p in auth_client.get(PERSONA_URL).json() if p["name"] == name)
-        assert count == 1
+        assert sum(1 for p in auth_client.get(PERSONA_URL).json() if p["name"] == name) == 1
 
     def test_save_persona_stores_age_in_personality(self, auth_client):
         name = f"AgeTest-{_uid()}"
@@ -593,7 +806,6 @@ class TestPersonaSaveFromChat:
             assert "purple" in saved.get("color_preferences", [])
 
     def test_save_all_preference_fields_from_chat(self, auth_client):
-        """Every extractable field from AI comes through correctly."""
         name = f"FullPrefs-{_uid()}"
         _mock_plan(auth_client, "yes",
             _fake_ai(save_persona={
@@ -621,7 +833,6 @@ class TestPersonaSaveFromChat:
         assert resp.status_code == 200
 
     def test_save_persona_non_dict_does_not_crash(self, auth_client):
-        """Malformed AI response where save_persona is a string → no crash."""
         resp = _mock_plan(auth_client, "yes",
             _fake_ai(save_persona="Sarah", chat_response="..."))
         assert resp.status_code == 200
@@ -648,37 +859,33 @@ class TestPersonaLoadFromChat:
         assert resp.json()["persona_confirmed"] is True
 
     def test_suggested_persona_confirmed_in_db(self, auth_client):
-        """After AI suggestion, persona is is_confirmed=True in the database."""
+        """After AI suggestion, persona.is_confirmed becomes True in the DB."""
         name = f"DbConf-{_uid()}"
         _, pid = _create(auth_client, name=name, personality_tags=["cozy"])
-        assert auth_client.get(f"{PERSONA_URL}{pid}").json()["is_confirmed"] is False
+        assert _get_persona(auth_client, pid)["is_confirmed"] is False
         _mock_plan(auth_client, f"plan for {name}",
             _fake_ai(use_persona_name=name, chat_response=f"Using {name}!"))
-        assert auth_client.get(f"{PERSONA_URL}{pid}").json()["is_confirmed"] is True
+        assert _get_persona(auth_client, pid)["is_confirmed"] is True
 
     def test_already_confirmed_persona_stays_confirmed(self, auth_client):
-        """Suggesting an already-confirmed persona should be idempotent."""
         name = f"AlreadyConf-{_uid()}"
         _, pid = _create(auth_client, name=name)
         auth_client.post(f"{PERSONA_URL}{pid}/confirm")
         _mock_plan(auth_client, f"plan for {name}",
             _fake_ai(use_persona_name=name, chat_response="Using profile!"))
-        assert auth_client.get(f"{PERSONA_URL}{pid}").json()["is_confirmed"] is True
+        assert _get_persona(auth_client, pid)["is_confirmed"] is True
 
     def test_nonexistent_use_persona_name_no_crash(self, auth_client):
-        """use_persona_name for unknown person → graceful skip, no 500."""
         resp = _mock_plan(auth_client, "plan a date",
             _fake_ai(use_persona_name="GhostPerson", chat_response="Let me help!"))
         assert resp.status_code == 200
 
     def test_persona_confirmed_false_when_use_persona_name_empty(self, auth_client):
-        """Empty string for use_persona_name → persona_confirmed=False."""
         resp = _mock_plan(auth_client, "plan something",
             _fake_ai(use_persona_name="", chat_response="Sure!"))
         assert resp.json()["persona_confirmed"] is False
 
     def test_persona_confirmed_false_when_no_use_persona_name(self, auth_client):
-        """No use_persona_name in AI result → persona_confirmed=False."""
         resp = _mock_plan(auth_client, "plan something", _fake_ai())
         assert resp.json()["persona_confirmed"] is False
 
@@ -687,8 +894,7 @@ class TestPersonaLoadFromChat:
         _, pid2 = _create(auth_client, name=f"Bob-{_uid()}")
         auth_client.post(f"{PERSONA_URL}{pid1}/confirm")
         auth_client.post(f"{PERSONA_URL}{pid2}/confirm")
-        confirmed_ids = [p["persona_id"] for p in
-                         auth_client.get(f"{PERSONA_URL}confirmed").json()]
+        confirmed_ids = [p["persona_id"] for p in auth_client.get(f"{PERSONA_URL}confirmed").json()]
         assert pid1 in confirmed_ids and pid2 in confirmed_ids
 
     def test_planning_200_with_confirmed_persona(self, auth_client):
@@ -717,15 +923,13 @@ class TestPersonaLoadFromChat:
 class TestPlanResponsePersonaFlags:
 
     def test_response_always_has_all_three_flags(self, auth_client):
-        resp = _mock_plan(auth_client, "Hello", _fake_ai(chat_response="Hi!"))
-        data = resp.json()
+        data = _mock_plan(auth_client, "Hello", _fake_ai(chat_response="Hi!")).json()
         assert "ask_save_persona"  in data
         assert "persona_saved"     in data
         assert "persona_confirmed" in data
 
     def test_all_flags_false_by_default(self, auth_client):
-        resp = _mock_plan(auth_client, "Hello", _fake_ai())
-        data = resp.json()
+        data = _mock_plan(auth_client, "Hello", _fake_ai()).json()
         assert data["ask_save_persona"]  is False
         assert data["persona_saved"]     is False
         assert data["persona_confirmed"] is False
@@ -757,30 +961,23 @@ class TestPlanningEndpointValidation:
         assert resp.status_code == 400
 
     def test_missing_session_id_returns_422(self, auth_client):
-        resp = auth_client.post(PLANNING_URL, json={"user_query": "plan something"})
-        assert resp.status_code == 422
+        assert auth_client.post(PLANNING_URL, json={"user_query": "plan something"}).status_code == 422
 
     def test_missing_user_query_returns_422(self, auth_client):
-        resp = auth_client.post(PLANNING_URL, json={"session_id": "sess-abc"})
-        assert resp.status_code == 422
+        assert auth_client.post(PLANNING_URL, json={"session_id": "sess-abc"}).status_code == 422
 
     def test_unauthenticated_planning_returns_401(self, client):
-        resp = client.post(PLANNING_URL, json={
-            "session_id": "sess-abc", "user_query": "plan something"
-        })
+        resp = client.post(PLANNING_URL, json={"session_id": "sess-abc", "user_query": "plan something"})
         assert resp.status_code in (401, 403)
 
     def test_rate_limit_triggers_429(self, auth_client):
-        """Exceed rate limit → 429. Fails open if Redis not available (skipped)."""
-        fake = _fake_ai(chat_response="ok")
+        """Exceed rate limit → 429. Fails open if Redis not available (all 200s — acceptable)."""
         session = f"ratelimit-{_uid()}"
         responses = []
         with patch("app.services.ai_service.ai_service.generate_date_plan",
-                   new_callable=AsyncMock, return_value=fake):
+                   new_callable=AsyncMock, return_value=_fake_ai(chat_response="ok")):
             for _ in range(15):
-                r = _plan(auth_client, "plan", session_id=session)
-                responses.append(r.status_code)
-        # Either 429 was triggered OR Redis is unavailable (all 200s — acceptable)
+                responses.append(_plan(auth_client, "plan", session_id=session).status_code)
         assert all(s in (200, 429) for s in responses)
 
 
@@ -793,24 +990,22 @@ class TestPersonaServiceBehaviour:
     def test_create_and_retrieve(self, auth_client):
         name = f"SvcTest-{_uid()}"
         _, pid = _create(auth_client, name=name)
-        data = auth_client.get(f"{PERSONA_URL}{pid}").json()
+        data = _get_persona(auth_client, pid)
         assert data["name"] == name
         assert data["persona_id"].startswith("PER")
 
     def test_full_confirm_unconfirm_cycle(self, auth_client):
         _, pid = _create(auth_client)
         c = auth_client.post(f"{PERSONA_URL}{pid}/confirm").json()
-        assert c["is_confirmed"] is True
-        assert c["confirmed_at"] is not None
+        assert c["is_confirmed"] is True and c["confirmed_at"] is not None
         u = auth_client.delete(f"{PERSONA_URL}{pid}/confirm").json()
-        assert u["is_confirmed"] is False
-        assert u["confirmed_at"] is None
+        assert u["is_confirmed"] is False and u["confirmed_at"] is None
 
     def test_delete_removes_persona_from_list(self, auth_client):
         name = f"DelSvc-{_uid()}"
         _, pid = _create(auth_client, name=name)
         auth_client.delete(f"{PERSONA_URL}{pid}")
-        assert name not in [p["name"] for p in auth_client.get(PERSONA_URL).json()]
+        assert name not in _persona_names(auth_client)
 
     def test_confirmed_first_ordering_in_list(self, auth_client):
         _, p1 = _create(auth_client, name=f"Last-{_uid()}")
@@ -821,7 +1016,7 @@ class TestPersonaServiceBehaviour:
 
     def test_response_has_all_expected_keys(self, auth_client):
         _, pid = _create(auth_client, food_preferences=["pizza"], personality_tags=["cozy"])
-        data = auth_client.get(f"{PERSONA_URL}{pid}").json()
+        data = _get_persona(auth_client, pid)
         for key in ("food_preferences", "color_preferences", "music_preferences",
                     "personality_tags", "is_confirmed", "confirmed_at",
                     "created_at", "updated_at"):
@@ -835,7 +1030,7 @@ class TestPersonaServiceBehaviour:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 14. LEGACY REGRESSION (merged from original test_personas.py)
+# 14. LEGACY REGRESSION
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestPersonaLegacy:
@@ -873,335 +1068,3 @@ class TestPersonaLegacy:
 
     def test_get_not_found_returns_404(self, auth_client):
         assert auth_client.get(f"{PERSONA_URL}PER-doesnotexist").status_code == 404
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 15. PERSONA EDITING & UPDATE VALIDATION  — OCA-250 [E23][TE]
-#
-# Ticket:  [E23][TE] - Validate Persona Editing & Update Behavior
-# Goal:    Verify that every editable field updates correctly, that partial
-#          updates never corrupt untouched fields, that updated_at advances,
-#          that ownership isolation is enforced, and that invalid payloads are
-#          rejected with the right HTTP status codes.
-# ══════════════════════════════════════════════════════════════════════════════
-
-class TestPersonaEditValidation:
-    """OCA-250 — Validate Persona Editing & Update Behavior.
-
-    These tests exercise:
-      • Field-level update correctness for every editable field
-      • Partial-update isolation (no field wiping)
-      • updated_at timestamp advances after edit
-      • persona_id / customer_id / created_at are immutable
-      • Ownership: another customer cannot edit your persona
-      • Blank / whitespace-only name rejected (422)
-      • Name-collision between two customers is allowed (different owners)
-      • List fields accept empty list (explicit clear)
-      • Sequential multi-field edits accumulate correctly
-      • Confirmed persona remains confirmed after edit
-      • Response body always reflects the new state (not stale cache)
-    """
-
-    # ── Field-level correctness ───────────────────────────────────────────────
-
-    def test_edit_name_reflected_immediately(self, auth_client):
-        """PUT with new name → GET returns updated name without re-create."""
-        _, pid = _create(auth_client, name="Before")
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "After"})
-        assert auth_client.get(f"{PERSONA_URL}{pid}").json()["name"] == "After"
-
-    def test_edit_relationship_all_values(self, auth_client):
-        """Relationship can be updated to any free-text string."""
-        _, pid = _create(auth_client)
-        for rel in ["girlfriend", "wife", "mother", "colleague", "best friend"]:
-            resp = auth_client.put(f"{PERSONA_URL}{pid}", json={"relationship": rel})
-            assert resp.status_code == 200
-            assert resp.json()["relationship"] == rel
-
-    def test_edit_personality_free_text(self, auth_client):
-        """Personality accepts any free-text description."""
-        _, pid = _create(auth_client)
-        long_text = "Loves early mornings, strong coffee, indie bookshops, and hiking on weekends."
-        resp = auth_client.put(f"{PERSONA_URL}{pid}", json={"personality": long_text})
-        assert resp.status_code == 200
-        assert "coffee" in resp.json()["personality"]
-
-    def test_edit_food_preferences_replace(self, auth_client):
-        """Replacing food_preferences fully replaces the list."""
-        _, pid = _create(auth_client, food_preferences=["sushi", "pizza"])
-        resp = auth_client.put(f"{PERSONA_URL}{pid}", json={"food_preferences": ["tacos"]})
-        assert resp.status_code == 200
-        data = resp.json()["food_preferences"]
-        assert "tacos" in data
-        assert "sushi" not in data   # old value gone
-
-    def test_edit_color_preferences_replace(self, auth_client):
-        """Replacing color_preferences fully replaces the list."""
-        _, pid = _create(auth_client, color_preferences=["blue", "white"])
-        resp = auth_client.put(f"{PERSONA_URL}{pid}", json={"color_preferences": ["gold", "black"]})
-        assert resp.status_code == 200
-        data = resp.json()["color_preferences"]
-        assert "gold" in data
-        assert "blue" not in data
-
-    def test_edit_music_preferences_replace(self, auth_client):
-        """Replacing music_preferences fully replaces the list."""
-        _, pid = _create(auth_client, music_preferences=["jazz"])
-        resp = auth_client.put(f"{PERSONA_URL}{pid}", json={"music_preferences": ["k-pop", "metal"]})
-        assert resp.status_code == 200
-        data = resp.json()["music_preferences"]
-        assert "k-pop" in data
-        assert "jazz" not in data
-
-    def test_edit_personality_tags_replace(self, auth_client):
-        """Replacing personality_tags fully replaces the list."""
-        _, pid = _create(auth_client, personality_tags=["romantic", "adventurous"])
-        resp = auth_client.put(f"{PERSONA_URL}{pid}", json={"personality_tags": ["bookworm"]})
-        assert resp.status_code == 200
-        data = resp.json()["personality_tags"]
-        assert "bookworm" in data
-        assert "romantic" not in data
-
-    def test_edit_birthday_valid_iso_date(self, auth_client):
-        """Birthday accepts ISO-8601 date string."""
-        _, pid = _create(auth_client)
-        resp = auth_client.put(f"{PERSONA_URL}{pid}", json={"birthday": "1990-12-25"})
-        assert resp.status_code == 200
-        assert "1990-12-25" in (resp.json().get("birthday") or "")
-
-    def test_edit_birthday_clear_with_null(self, auth_client):
-        """Birthday can be cleared by sending null."""
-        _, pid = _create(auth_client, birthday="1990-12-25")
-        resp = auth_client.put(f"{PERSONA_URL}{pid}", json={"birthday": None})
-        assert resp.status_code == 200
-        assert resp.json().get("birthday") is None
-
-    def test_edit_list_fields_to_empty_clears_them(self, auth_client):
-        """Explicitly sending [] clears the list field."""
-        _, pid = _create(auth_client, food_preferences=["sushi"],
-                         personality_tags=["romantic"])
-        resp = auth_client.put(f"{PERSONA_URL}{pid}", json={
-            "food_preferences":  [],
-            "personality_tags":  [],
-        })
-        assert resp.status_code == 200
-        assert resp.json()["food_preferences"] == []
-        assert resp.json()["personality_tags"] == []
-
-    # ── Partial update isolation ──────────────────────────────────────────────
-
-    def test_edit_name_only_preserves_all_lists(self, auth_client):
-        """Updating only name must not touch any preference list."""
-        _, pid = _create(auth_client,
-                         name="Original",
-                         food_preferences=["ramen"],
-                         color_preferences=["red"],
-                         music_preferences=["pop"],
-                         personality_tags=["cozy"])
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "Updated"})
-        data = auth_client.get(f"{PERSONA_URL}{pid}").json()
-        assert "ramen"  in data["food_preferences"]
-        assert "red"    in data["color_preferences"]
-        assert "pop"    in data["music_preferences"]
-        assert "cozy"   in data["personality_tags"]
-
-    def test_edit_one_list_preserves_other_lists(self, auth_client):
-        """Updating food_preferences must not touch music or personality."""
-        _, pid = _create(auth_client,
-                         food_preferences=["sushi"],
-                         music_preferences=["jazz"],
-                         personality_tags=["adventurous"])
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"food_preferences": ["tacos"]})
-        data = auth_client.get(f"{PERSONA_URL}{pid}").json()
-        assert "jazz"        in data["music_preferences"]
-        assert "adventurous" in data["personality_tags"]
-
-    def test_edit_relationship_preserves_birthday(self, auth_client):
-        """Updating relationship must not clear birthday."""
-        _, pid = _create(auth_client, birthday="1995-06-15")
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"relationship": "sister"})
-        bday = auth_client.get(f"{PERSONA_URL}{pid}").json().get("birthday") or ""
-        assert "1995-06-15" in bday
-
-    def test_sequential_edits_accumulate(self, auth_client):
-        """Three successive partial updates all take effect."""
-        _, pid = _create(auth_client, name="Step0")
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "Step1"})
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"relationship": "partner"})
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"personality_tags": ["thoughtful"]})
-        data = auth_client.get(f"{PERSONA_URL}{pid}").json()
-        assert data["name"]         == "Step1"
-        assert data["relationship"] == "partner"
-        assert "thoughtful"         in data["personality_tags"]
-
-    # ── updated_at behaviour ─────────────────────────────────────────────────
-
-    def test_updated_at_advances_after_edit(self, auth_client):
-        """updated_at after PUT must be >= updated_at before PUT."""
-        import time
-        _, pid = _create(auth_client)
-        before = auth_client.get(f"{PERSONA_URL}{pid}").json().get("updated_at") or ""
-        time.sleep(0.05)   # small sleep so timestamps differ
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": f"Changed-{_uid()}"})
-        after = auth_client.get(f"{PERSONA_URL}{pid}").json().get("updated_at") or ""
-        # If both are present, after must be >= before
-        if before and after:
-            assert after >= before
-
-    def test_updated_at_present_in_response(self, auth_client):
-        """PUT response body contains updated_at field."""
-        _, pid = _create(auth_client)
-        resp = auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "CheckTS"})
-        assert "updated_at" in resp.json()
-
-    # ── Immutable fields ──────────────────────────────────────────────────────
-
-    def test_persona_id_cannot_be_changed(self, auth_client):
-        """Sending a different persona_id in the body must not change it."""
-        _, pid = _create(auth_client)
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"persona_id": "PER-HACKED"})
-        assert auth_client.get(f"{PERSONA_URL}{pid}").json()["persona_id"] == pid
-
-    def test_customer_id_cannot_be_changed(self, auth_client):
-        """customer_id is read-only — body value must be ignored."""
-        _, pid = _create(auth_client)
-        original_cid = auth_client.get(f"{PERSONA_URL}{pid}").json()["customer_id"]
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"customer_id": "CUS-HACKED"})
-        assert auth_client.get(f"{PERSONA_URL}{pid}").json()["customer_id"] == original_cid
-
-    def test_created_at_does_not_change_on_edit(self, auth_client):
-        """created_at must be identical before and after PUT."""
-        _, pid = _create(auth_client)
-        before = auth_client.get(f"{PERSONA_URL}{pid}").json().get("created_at")
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "EditedName"})
-        after = auth_client.get(f"{PERSONA_URL}{pid}").json().get("created_at")
-        if before and after:
-            assert before == after
-
-    # ── Ownership isolation ───────────────────────────────────────────────────
-
-    def test_other_customer_cannot_edit_persona(self, auth_client, client):
-        """Customer B must get 404 when trying to PUT Customer A's persona."""
-        _, pid = _create(auth_client, name="Private")
-        email2 = f"edit_other_{_uid()}@test.com"
-        client.post("/api/v1/auth/customers/register",
-                    json={"email": email2, "password": "pass1234", "full_name": "OtherEditor"})
-        tok = client.post("/api/v1/auth/customers/login",
-                          data={"username": email2, "password": "pass1234"}).json().get("access_token")
-        if tok:
-            resp = client.put(
-                f"{PERSONA_URL}{pid}",
-                json={"name": "Hacked"},
-                headers={"Authorization": f"Bearer {tok}"},
-            )
-            assert resp.status_code == 404
-
-    # ── Input validation ──────────────────────────────────────────────────────
-
-    def test_edit_name_to_empty_string_returns_422(self, auth_client):
-        """name: '' must be rejected with 422."""
-        _, pid = _create(auth_client)
-        assert auth_client.put(f"{PERSONA_URL}{pid}", json={"name": ""}).status_code == 422
-
-    def test_edit_name_to_whitespace_only_returns_422(self, auth_client):
-        """name: '   ' (whitespace only) must be rejected with 422."""
-        _, pid = _create(auth_client)
-        assert auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "   "}).status_code == 422
-
-    def test_edit_invalid_birthday_format_returns_422(self, auth_client):
-        """Non-ISO birthday string must be rejected with 422."""
-        _, pid = _create(auth_client)
-        assert auth_client.put(f"{PERSONA_URL}{pid}", json={"birthday": "25/12/1990"}).status_code == 422
-
-    def test_edit_list_field_with_non_list_returns_422(self, auth_client):
-        """Sending a string instead of a list for food_preferences → 422."""
-        _, pid = _create(auth_client)
-        assert auth_client.put(
-            f"{PERSONA_URL}{pid}", json={"food_preferences": "sushi"}
-        ).status_code == 422
-
-    def test_edit_nonexistent_persona_returns_404(self, auth_client):
-        """PUT on a persona_id that does not exist → 404."""
-        assert auth_client.put(
-            f"{PERSONA_URL}PER-nonexistent999",
-            json={"name": "Ghost"},
-        ).status_code == 404
-
-    def test_unauthenticated_edit_returns_401(self, client):
-        """No Bearer token → 401."""
-        assert client.put(
-            f"{PERSONA_URL}PER-anything",
-            json={"name": "x"},
-        ).status_code in (401, 403)
-
-    # ── Confirmed-persona behaviour ───────────────────────────────────────────
-
-    def test_edit_confirmed_persona_keeps_is_confirmed_true(self, auth_client):
-        """Editing a confirmed persona must not reset is_confirmed to False."""
-        _, pid = _create(auth_client, name="Confirmed")
-        auth_client.post(f"{PERSONA_URL}{pid}/confirm")
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "ConfirmedEdited"})
-        assert auth_client.get(f"{PERSONA_URL}{pid}").json()["is_confirmed"] is True
-
-    def test_edit_confirmed_persona_keeps_confirmed_at(self, auth_client):
-        """Editing a confirmed persona must not clear confirmed_at."""
-        _, pid = _create(auth_client)
-        confirmed_at = auth_client.post(f"{PERSONA_URL}{pid}/confirm").json().get("confirmed_at")
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"relationship": "partner"})
-        data = auth_client.get(f"{PERSONA_URL}{pid}").json()
-        assert data["is_confirmed"] is True
-        if confirmed_at:
-            assert data.get("confirmed_at") is not None
-
-    def test_edit_confirmed_persona_appears_in_confirmed_list(self, auth_client):
-        """After editing a confirmed persona it must still appear in /confirmed."""
-        _, pid = _create(auth_client, name="StillConfirmed")
-        auth_client.post(f"{PERSONA_URL}{pid}/confirm")
-        auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "StillConfirmedEdited"})
-        pids = [p["persona_id"]
-                for p in auth_client.get(f"{PERSONA_URL}confirmed").json()]
-        assert pid in pids
-
-    # ── Response shape after edit ─────────────────────────────────────────────
-
-    def test_edit_response_contains_all_required_keys(self, auth_client):
-        """PUT response must include every field the GET response has."""
-        _, pid = _create(auth_client)
-        resp = auth_client.put(f"{PERSONA_URL}{pid}", json={"name": "KeyCheck"})
-        data = resp.json()
-        for key in ("persona_id", "customer_id", "name", "relationship",
-                    "food_preferences", "color_preferences", "music_preferences",
-                    "personality_tags", "is_confirmed", "updated_at"):
-            assert key in data, f"Missing key in PUT response: {key}"
-
-    def test_edit_response_matches_subsequent_get(self, auth_client):
-        """PUT response body must be identical to the following GET."""
-        _, pid = _create(auth_client)
-        put_body = auth_client.put(
-            f"{PERSONA_URL}{pid}",
-            json={"name": "SyncCheck", "relationship": "friend"},
-        ).json()
-        get_body = auth_client.get(f"{PERSONA_URL}{pid}").json()
-        # Compare key subset
-        for key in ("name", "relationship", "persona_id", "is_confirmed"):
-            assert put_body.get(key) == get_body.get(key), f"Mismatch on key: {key}"
-
-    # ── Cross-customer name collision (allowed) ───────────────────────────────
-
-    def test_two_customers_can_have_same_persona_name(self, auth_client, client):
-        """Different customers are allowed to have personas with the same name."""
-        _, pid1 = _create(auth_client, name="SharedName")
-        email2 = f"name_coll_{_uid()}@test.com"
-        client.post("/api/v1/auth/customers/register",
-                    json={"email": email2, "password": "pass1234",
-                          "full_name": "NameCollision"})
-        tok = client.post("/api/v1/auth/customers/login",
-                          data={"username": email2, "password": "pass1234"}).json().get("access_token")
-        if tok:
-            resp = client.post(
-                PERSONA_URL,
-                json={"name": "SharedName"},
-                headers={"Authorization": f"Bearer {tok}"},
-            )
-            # Both customers can have "SharedName" — must not 409
-            assert resp.status_code == 201

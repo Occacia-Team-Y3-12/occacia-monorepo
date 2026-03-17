@@ -80,7 +80,7 @@ export default function RegisterPage() {
         {/* Left Section - Form */}
         <div className="flex-1 p-8">
           <div className="flex items-center gap-3 mb-6">
-            <img src="/images/customer/logo.png" alt="Occacia" className="h-10 w-auto" />
+            <img src="/images/customer/logo.png" alt="Occacia" className="h-12 w-auto" />
             <span className="text-2xl font-bold" style={{ color: '#1562CC' }}>OCCACIA</span>
           </div>
 
