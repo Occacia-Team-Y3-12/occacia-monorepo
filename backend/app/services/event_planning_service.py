@@ -18,6 +18,7 @@ from app.models.event_chat_message import EventChatMessage
 from app.models.event_persona import EventPersona
 from app.models.persona import Persona
 from app.models.task import Task
+from app.models.package_execution_request import PackageExecutionRequest
 from app.services.google_calendar_service import google_calendar_service
 
 _RRULE_PART_RE = re.compile(r"^(?P<key>[A-Z]+)=(?P<value>.+)$")
@@ -464,6 +465,44 @@ class EventPlanningService:
                 "capabilities": {"recurrence": True, "reminders": True, "directLinkSync": True},
             },
         ]
+
+    def list_package_orders(
+        self,
+        db: Session,
+        *,
+        customer_id: str,
+        event_id: str,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[PackageExecutionRequest], str | None]:
+        self.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
+        query = db.query(PackageExecutionRequest).filter(PackageExecutionRequest.event_id == event_id)
+        if cursor:
+            cursor_order = (
+                db.query(PackageExecutionRequest)
+                .filter(
+                    PackageExecutionRequest.event_id == event_id,
+                    PackageExecutionRequest.execution_request_id == cursor,
+                )
+                .first()
+            )
+            if cursor_order:
+                query = query.filter(
+                    or_(
+                        PackageExecutionRequest.created_at < cursor_order.created_at,
+                        and_(
+                            PackageExecutionRequest.created_at == cursor_order.created_at,
+                            PackageExecutionRequest.id > cursor_order.id,
+                        ),
+                    )
+                )
+
+        items = query.order_by(PackageExecutionRequest.created_at.desc(), PackageExecutionRequest.id.asc()).limit(limit + 1).all()
+        next_cursor = None
+        if len(items) > limit:
+            next_cursor = items[limit].execution_request_id
+            items = items[:limit]
+        return items, next_cursor
 
     def start_calendar_connect(
         self,

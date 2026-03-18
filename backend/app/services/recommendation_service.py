@@ -161,6 +161,33 @@ class RecommendationService:
             raise HTTPException(status_code=404, detail="Recommendation packages not found")
         return self._build_package_list_response(db, event_id=event_id, packages=packages)
 
+    def get_package_by_id(
+        self,
+        db: Session,
+        *,
+        customer_id: str,
+        event_id: str,
+        package_id: str,
+    ) -> RecommendationPackageResponse:
+        event_planning_service.get_event_for_customer(
+            db,
+            customer_id=customer_id,
+            event_id=event_id,
+        )
+        package = (
+            db.query(RecommendationPackage)
+            .filter(
+                RecommendationPackage.event_id == event_id,
+                RecommendationPackage.package_id == package_id,
+            )
+            .first()
+        )
+        if not package:
+            raise HTTPException(status_code=404, detail=f"Recommendation package {package_id} not found")
+
+        package_list_response = self._build_package_list_response(db, event_id=event_id, packages=[package])
+        return package_list_response.packages[0]
+
     def _build_package_list_response(
         self,
         db: Session,
@@ -242,6 +269,7 @@ class RecommendationService:
                         quantity=item.quantity,
                         offeringId=item.offering_id,
                         offeringName=offering.name if offering else item.offering_id,
+                        offeringCategory=offering.category if offering else "Unknown",
                         vendorId=offering.vendor_id if offering else "",
                         vendorName=vendor.display_name or vendor.business_name if vendor else None,
                         unitPrice=item.unit_price,

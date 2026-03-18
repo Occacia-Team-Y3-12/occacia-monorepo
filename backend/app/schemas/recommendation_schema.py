@@ -11,6 +11,7 @@ class RecommendationPackageItemResponse(BaseModel):
     quantity: int
     offering_id: str = Field(alias="offeringId")
     offering_name: str = Field(alias="offeringName")
+    offering_category: str = Field(alias="offeringCategory")
     vendor_id: str = Field(alias="vendorId")
     vendor_name: str | None = Field(default=None, alias="vendorName")
     unit_price: float = Field(alias="unitPrice")
