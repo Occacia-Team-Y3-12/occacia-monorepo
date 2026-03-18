@@ -176,7 +176,7 @@ jobs:
             cd ~/occacia-app
 
             # Write .env file
-            cat <<'EOF' > .env
+            cat <<EOF > .env
             LANGFLOW_URL=${LANGFLOW_URL}
             LANGFLOW_ORG_ID=${LANGFLOW_ORG_ID}
             LANGFLOW_TOKEN=${LANGFLOW_TOKEN}
