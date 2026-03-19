@@ -288,6 +288,7 @@ class PlanningService:
         ai_svc,
         chat_svc,
         vendor_svc,
+        event_context: dict = None,
     ) -> PlanResponse:
 
         r           = _get_redis()
@@ -447,6 +448,20 @@ class PlanningService:
             enriched_query = user_query
             if fact_parts:
                 enriched_query += f"\n[SYSTEM EXTRACTED FACTS: {', '.join(fact_parts)}]"
+            if event_context:
+                ctx_parts = []
+                if event_context.get("title"):
+                    ctx_parts.append(f"Event title: {event_context['title']}")
+                if event_context.get("event_type"):
+                    ctx_parts.append(f"Event type: {event_context['event_type']}")
+                if event_context.get("start_at"):
+                    ctx_parts.append(f"Scheduled date: {event_context['start_at']}")
+                if event_context.get("location_text"):
+                    ctx_parts.append(f"Location: {event_context['location_text']}")
+                if event_context.get("existing_tasks"):
+                    ctx_parts.append(f"Tasks already added: {', '.join(event_context['existing_tasks'])}")
+                if ctx_parts:
+                    enriched_query += f"\n[EVENT CONTEXT: {'; '.join(ctx_parts)}]"
             if availability_block:
                 enriched_query += availability_block
 

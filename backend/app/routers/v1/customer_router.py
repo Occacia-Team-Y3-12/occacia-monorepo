@@ -80,19 +80,17 @@ except ImportError:
 _bearer = HTTPBearer(auto_error=False)
 
 
-async def get_authenticated_user(
+def get_authenticated_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
 ):
     """
     Accept any valid JWT — customer or vendor — for metadata endpoints.
-    Uses get_current_customer for customer tokens (full signature verification).
-    Falls back to stdlib base64 JWT payload decode for vendor token lookup.
+    Uses app.core.security.decode_token (PyJWT) for signature verification,
+    then looks up Customer first, Vendor second.
     """
-    import base64
-    import json as _json
     from fastapi import HTTPException as _HTTPEx
-    from app.core.dependencies import get_current_customer as _gcc
+    from app.core.security import decode_token as _decode
     from app.models.vendor import Vendor as _Vendor
 
     if credentials is None:
@@ -100,33 +98,27 @@ async def get_authenticated_user(
 
     token = credentials.credentials
 
-    # ── Try customer path (full signature verification via app's own dependency) ──
+    # Full signature verification via the app's own decode_token (PyJWT)
     try:
-        import inspect as _inspect
-        result = _gcc(token=token, db=db)
-        if _inspect.isawaitable(result):
-            result = await result
-        return result
-    except Exception:
-        pass
-
-    # ── Vendor fallback: decode JWT payload with stdlib (no external deps) ──
-    try:
-        parts = token.split(".")
-        if len(parts) != 3:
-            raise ValueError("Not a JWT")
-        padded = parts[1] + "=" * (4 - len(parts[1]) % 4)
-        payload = _json.loads(base64.urlsafe_b64decode(padded))
+        payload = _decode(token)
         email: str | None = payload.get("sub")
-        if not email:
-            raise ValueError("No sub claim")
-        vendor = db.query(_Vendor).filter(_Vendor.email == email).first()
-        if vendor:
-            return vendor
     except Exception:
-        pass
+        raise _HTTPEx(status_code=401, detail="Invalid or expired token")
 
-    raise _HTTPEx(status_code=401, detail="Invalid or expired token")
+    if not email:
+        raise _HTTPEx(status_code=401, detail="Invalid token payload")
+
+    # Customer first
+    customer = db.query(Customer).filter(Customer.email == email).first()
+    if customer:
+        return customer
+
+    # Vendor fallback
+    vendor = db.query(_Vendor).filter(_Vendor.email == email).first()
+    if vendor:
+        return vendor
+
+    raise _HTTPEx(status_code=401, detail="User not found")
 
 
 logger = logging.getLogger(__name__)
@@ -456,6 +448,26 @@ async def send_event_chat_message(
         content=body.content,
     )
 
+    # ── Build event context for AI ────────────────────────────────────────────
+    # Fetch the event so the AI knows what it's planning for (title, type, date, etc.)
+    try:
+        _event = event_planning_service.get_event_for_customer(
+            db, customer_id=str(current_customer.customer_id), event_id=event_id
+        )
+        from app.services.event_planning_service import EventPlanningService as _EPS
+        _tasks = event_planning_service.list_tasks(
+            db, customer_id=str(current_customer.customer_id), event_id=event_id
+        )
+        _event_context = {
+            "title":          _event.title,
+            "event_type":     _event.event_type,
+            "start_at":       _event.start_at.date().isoformat() if _event.start_at else None,
+            "location_text":  _event.location_text,
+            "existing_tasks": [t.name for t in _tasks] if _tasks else [],
+        }
+    except Exception:
+        _event_context = None
+
     # ── Step 2: AI planning service (persona flow + vendor matching) ──────────
     # session_id == event_id (confirmed architecture decision)
     plan: PlanResponse | None = None
@@ -469,6 +481,7 @@ async def send_event_chat_message(
             ai_svc=ai_service,
             chat_svc=chat_service,
             vendor_svc=_vendor_service,
+            event_context=_event_context,
         )
     except Exception as exc:
         logger.warning(
