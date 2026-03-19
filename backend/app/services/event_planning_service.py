@@ -31,6 +31,8 @@ _TIMEZONE_ALIASES = {
     "gmt": "UTC",
     "slst": "Asia/Colombo",
     "ist": "Asia/Kolkata",
+    "asia/colombo": "Asia/Colombo",
+    "asia/kolkata": "Asia/Kolkata",
 }
 
 _TASK_TEMPLATES = {
@@ -307,7 +309,7 @@ class EventPlanningService:
         payload: dict[str, object],
     ) -> Event:
         event = self.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
-        self._validate_timezone(payload["timezone"])
+        timezone_name = self._validate_timezone(payload["timezone"])
         start_at = self._ensure_aware_datetime(payload["start_at"])
         end_at = self._ensure_aware_datetime(payload.get("end_at"))
         if end_at and end_at < start_at:
@@ -328,7 +330,7 @@ class EventPlanningService:
 
         event.start_at = start_at
         event.end_at = end_at
-        event.timezone = payload["timezone"]
+        event.timezone = timezone_name
         event.is_all_day = payload["is_all_day"]
         event.recurrence_rule = recurrence_rule
         event.recurrence_until = recurrence_until or (parsed_rrule.get("UNTIL") if parsed_rrule else None)
@@ -994,11 +996,17 @@ class EventPlanningService:
             raise HTTPException(status_code=404, detail="Customer not found")
         return customer
 
-    def _validate_timezone(self, timezone_name: str) -> None:
+    def _validate_timezone(self, timezone_name: str) -> str:
+        candidate = str(timezone_name).strip()
+        candidate_key = candidate.lower()
+        normalized = _TIMEZONE_ALIASES.get(candidate_key, candidate)
+        if candidate_key in _TIMEZONE_ALIASES:
+            return normalized
         try:
-            ZoneInfo(timezone_name)
+            ZoneInfo(normalized)
         except ZoneInfoNotFoundError as exc:
             raise HTTPException(status_code=400, detail="Invalid timezone") from exc
+        return normalized
 
     def _ensure_aware_datetime(self, value: datetime | None) -> datetime | None:
         if value is None:
