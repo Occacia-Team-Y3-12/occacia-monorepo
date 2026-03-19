@@ -25,7 +25,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { label: 'Vendors', href: '/admin/vendors', icon: Store },
   { label: 'Organizations', href: '/admin/organizations', icon: Building2 },
   { label: 'Admins', href: '/admin/admins', icon: Shield },
@@ -33,7 +33,7 @@ const navItems: NavItem[] = [
   { label: 'Inquiries', href: '/admin/inquiries', icon: HelpCircle },
   { 
     label: 'Pending Requests', 
-    href: '/admin/pending-requests', 
+    href: '/admin/vendors/pending', 
     icon: ClipboardList,
     badge: 12 // This would be dynamic from API
   },
