@@ -1,8 +1,8 @@
 """
-tests/test_auth.py  —  UPDATED for singular path spec
-Paths changed: /auth/customers/ → /auth/customer/  and  /auth/vendors/ → /auth/vendor/
+tests/Integration/test_auth.py
 """
 from uuid import uuid4
+import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,15 +13,23 @@ from app.core.database import get_db, SessionLocal
 from app.models.customer import Customer
 
 
-# ── Fixture ──────────────────────────────────────────────────────────────────
-
 @pytest.fixture
 def client():
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
 
 
-# ── Customer registration ─────────────────────────────────────────────────────
+def _activate_customer(email: str) -> None:
+    db = SessionLocal()
+    try:
+        customer = db.query(Customer).filter(Customer.email == email).first()
+        assert customer is not None
+        customer.email_verified = True
+        customer.status = "ACTIVE"
+        db.commit()
+    finally:
+        db.close()
+
 
 def test_customer_register_success(client):
     email = f"user-{uuid4().hex[:8]}@test.com"
@@ -41,8 +49,6 @@ def test_customer_register_duplicate_email(client):
     r = client.post("/api/v1/auth/customer/register", json=payload)
     assert r.status_code == 400
 
-
-# ── Vendor registration ───────────────────────────────────────────────────────
 
 def test_vendor_register_success(client):
     r = client.post("/api/v1/auth/vendor/register", json={
@@ -67,8 +73,6 @@ def test_vendor_register_duplicate_email(client):
     assert r.status_code == 400
 
 
-# ── Email verification ────────────────────────────────────────────────────────
-
 def test_customer_verify_email_success(client):
     email = f"user-{uuid4().hex[:8]}@test.com"
     client.post("/api/v1/auth/customer/register", json={
@@ -77,11 +81,11 @@ def test_customer_verify_email_success(client):
     db = SessionLocal()
     customer = db.query(Customer).filter(Customer.email == email).first()
     if customer is None:
-        pytest.skip("Customer not created — likely email sending failed in test env")
+        pytest.skip("Customer not created")
     token = getattr(customer, "verification_token", None)
     db.close()
     if not token:
-        pytest.skip("No verification_token on Customer model — token stored differently")
+        pytest.skip("No verification_token")
     r = client.get("/api/v1/auth/customer/verify-email",
                    params={"token": token},
                    headers={"Accept": "application/json"})
@@ -95,33 +99,24 @@ def test_customer_verify_email_invalid_token(client):
     assert r.status_code == 400
 
 
-# ── Login ─────────────────────────────────────────────────────────────────────
-
-def _activate_customer(email: str) -> None:
-    db = SessionLocal()
-    try:
-        customer = db.query(Customer).filter(Customer.email == email).first()
-        assert customer is not None
-        customer.email_verified = True
-        customer.status = "ACTIVE"
-        db.commit()
-    finally:
-        db.close()
-
-def test_customer_login_success(client):
+def test_customer_login_success(client, monkeypatch):
     email = f"user-{uuid4().hex[:8]}@test.com"
     client.post("/api/v1/auth/customer/register", json={
         "full_name": "Jane", "email": email, "password": "Pass123!"
     })
     _activate_customer(email)
-    import os
-    os.environ["SKIP_EMAIL_VERIFICATION"] = "true"
+    
+    monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
+    
+    # 💥 THE FIX: data= instead of json=
     r = client.post("/api/v1/auth/customer/login",
-                    json={"email": email, "password": "Pass123!"})
+                    data={"username": email, "password": "Pass123!"})
+    
     assert r.status_code == 200
-    assert "accessToken" in r.json()
-    assert "refreshToken" in r.json()
-    assert r.json()["user"]["email"] == email
+    data = r.json()
+    assert "accessToken" in data
+    assert "refreshToken" in data
+    assert data["user"]["email"] == email
 
 
 def test_customer_login_wrong_password(client):
@@ -130,24 +125,32 @@ def test_customer_login_wrong_password(client):
         "full_name": "Jane", "email": email, "password": "Pass123!"
     })
     _activate_customer(email)
+    
+    # 💥 THE FIX: data= instead of json=
     r = client.post("/api/v1/auth/customer/login",
-                    json={"email": email, "password": "WrongPass!"})
+                    data={"username": email, "password": "WrongPass!"})
+    
     assert r.status_code == 401
 
 
-def test_customer_refresh_token_success(client):
+def test_customer_refresh_token_success(client, monkeypatch):
     email = f"user-{uuid4().hex[:8]}@test.com"
     client.post("/api/v1/auth/customer/register", json={
         "full_name": "Jane", "email": email, "password": "Pass123!"
     })
     _activate_customer(email)
-    import os
-    os.environ["SKIP_EMAIL_VERIFICATION"] = "true"
+    
+    monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
+    
+    # 💥 THE FIX: data= instead of json=
     login = client.post(
         "/api/v1/auth/customer/login",
-        json={"email": email, "password": "Pass123!"},
+        data={"username": email, "password": "Pass123!"},
     )
-    refresh_token = login.json()["refreshToken"]
+    
+    data = login.json()
+    assert "refreshToken" in data, f"Login failed: {data}"
+    refresh_token = data["refreshToken"]
 
     r = client.post(
         "/api/v1/auth/customer/token/refresh",
@@ -156,18 +159,18 @@ def test_customer_refresh_token_success(client):
 
     assert r.status_code == 200
     assert "accessToken" in r.json()
-    assert "refreshToken" in r.json()
 
 
-def test_vendor_login_success(client):
+def test_vendor_login_success(client, monkeypatch):
     email = f"vendor-{uuid4().hex[:8]}@test.com"
     client.post("/api/v1/auth/vendor/register", json={
         "business_name": f"Biz {uuid4().hex[:6]}",
         "email": email,
         "password": "Pass123!",
     })
-    import os
-    os.environ["SKIP_EMAIL_VERIFICATION"] = "true"
+    
+    monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
+    
     r = client.post("/api/v1/auth/vendor/login",
                     data={"username": email, "password": "Pass123!"})
     assert r.status_code == 200
@@ -185,8 +188,6 @@ def test_vendor_login_wrong_password(client):
                     data={"username": email, "password": "WrongPass!"})
     assert r.status_code == 401
 
-
-# ── Password reset ────────────────────────────────────────────────────────────
 
 def test_customer_forgot_password(client):
     email = f"user-{uuid4().hex[:8]}@test.com"

@@ -99,6 +99,7 @@ export default function VendorDashboard() {
   const router = useRouter();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -129,11 +130,23 @@ export default function VendorDashboard() {
         <aside
           className={`fixed inset-y-0 left-0 z-40 flex w-[250px] shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-2 transform transition-transform duration-300 lg:static lg:min-h-screen lg:translate-x-0 ${
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
+          } ${isDesktopSidebarCollapsed ? 'lg:hidden' : 'lg:flex lg:relative'}`}
         >
           <div className="mb-2 flex items-center gap-2 py-1">
           <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="ml-[-8px] h-[59px] w-[59px] shrink-0" priority />
           <span className="text-[22px] font-extrabold tracking-tight text-[#1562CC]">OCCACIA</span>
+          <button
+            type="button"
+            onClick={() => setIsDesktopSidebarCollapsed(true)}
+            className="ml-auto hidden h-10 w-10 items-center justify-center rounded-xl border border-[#E2E5EC] bg-white text-[#5B6478] lg:inline-flex"
+            aria-label="Close sidebar"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+              <path d="M9 4.5v15" />
+              <path d="M16 9.5 13 12l3 2.5" />
+            </svg>
+          </button>
           </div>
 
           <nav className="mt-6 space-y-1">
@@ -157,14 +170,6 @@ export default function VendorDashboard() {
             ))}
           </nav>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="mt-auto flex items-center gap-3 rounded-xl px-3 py-3 text-base font-medium text-slate-600 hover:bg-slate-100 xl:text-[18px]"
-          >
-            <Image src="/icons/vendor/dashboard/logout.svg" alt="" aria-hidden="true" width={20} height={20} className="h-5 w-5" />
-            Logout
-          </button>
         </aside>
 
         {isSidebarOpen && (
@@ -180,6 +185,26 @@ export default function VendorDashboard() {
         <header className="w-full border-b border-[#ECECF0] bg-[#F7F7FA] px-4 py-3 sm:px-6 sm:py-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:gap-5 lg:w-auto">
+            {isDesktopSidebarCollapsed && (
+              <div className="group relative hidden lg:block">
+                <button
+                  type="button"
+                  onClick={() => setIsDesktopSidebarCollapsed(false)}
+                  className="relative h-14 w-14 overflow-hidden rounded-xl"
+                  aria-label="Open sidebar"
+                >
+                  <Image src="/icons/logo.svg" alt="Occacia" width={56} height={56} className="h-14 w-14" />
+                  <span className="absolute inset-0 inline-flex items-center justify-center bg-white/85 text-[#5B6478] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+                      <path d="M9 4.5v15" />
+                      <path d="M13 9.5 16 12l-3 2.5" />
+                    </svg>
+                  </span>
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => setIsSidebarOpen((prev) => !prev)}

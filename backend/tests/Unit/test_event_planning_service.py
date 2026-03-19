@@ -99,3 +99,51 @@ def test_whenCustomerConfirmsWithoutTasks_confirmTasks_failsWithException():
 
     assert exc.value.status_code == 400
     assert exc.value.detail == "Add at least 1 task"
+
+
+def test_list_package_orders_success():
+    service = EventPlanningService()
+    db = MagicMock()
+    customer_id = "CUS-001"
+    event_id = "EVT-001"
+    
+    event = SimpleNamespace(event_id=event_id, customer_id=customer_id)
+    service.get_event_for_customer = MagicMock(return_value=event)
+    
+    order1 = SimpleNamespace(execution_request_id="EXE-001", created_at=datetime(2026, 1, 1, tzinfo=timezone.utc), id=1)
+    order2 = SimpleNamespace(execution_request_id="EXE-002", created_at=datetime(2026, 1, 2, tzinfo=timezone.utc), id=2)
+    
+    query = db.query.return_value
+    filter_query = query.filter.return_value
+    order_by_query = filter_query.order_by.return_value
+    limit_query = order_by_query.limit.return_value
+    limit_query.all.return_value = [order2, order1]
+    
+    items, next_cursor = service.list_package_orders(db, customer_id=customer_id, event_id=event_id, limit=2, cursor=None)
+    
+    assert len(items) == 2
+    assert items[0].execution_request_id == "EXE-002"
+    assert items[1].execution_request_id == "EXE-001"
+    assert next_cursor is None
+    service.get_event_for_customer.assert_called_once_with(db, customer_id=customer_id, event_id=event_id)
+
+
+def test_list_package_orders_empty():
+    service = EventPlanningService()
+    db = MagicMock()
+    customer_id = "CUS-001"
+    event_id = "EVT-001"
+    
+    event = SimpleNamespace(event_id=event_id, customer_id=customer_id)
+    service.get_event_for_customer = MagicMock(return_value=event)
+    
+    query = db.query.return_value
+    filter_query = query.filter.return_value
+    order_by_query = filter_query.order_by.return_value
+    limit_query = order_by_query.limit.return_value
+    limit_query.all.return_value = []
+    
+    items, next_cursor = service.list_package_orders(db, customer_id=customer_id, event_id=event_id, limit=10, cursor=None)
+    
+    assert items == []
+    assert next_cursor is None

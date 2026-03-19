@@ -18,6 +18,7 @@ from app.models.event_chat_message import EventChatMessage
 from app.models.event_persona import EventPersona
 from app.models.persona import Persona
 from app.models.task import Task
+from app.models.package_execution_request import PackageExecutionRequest
 from app.services.google_calendar_service import google_calendar_service
 
 _RRULE_PART_RE = re.compile(r"^(?P<key>[A-Z]+)=(?P<value>.+)$")
@@ -30,6 +31,8 @@ _TIMEZONE_ALIASES = {
     "gmt": "UTC",
     "slst": "Asia/Colombo",
     "ist": "Asia/Kolkata",
+    "asia/colombo": "Asia/Colombo",
+    "asia/kolkata": "Asia/Kolkata",
 }
 
 _TASK_TEMPLATES = {
@@ -306,7 +309,7 @@ class EventPlanningService:
         payload: dict[str, object],
     ) -> Event:
         event = self.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
-        self._validate_timezone(payload["timezone"])
+        timezone_name = self._validate_timezone(payload["timezone"])
         start_at = self._ensure_aware_datetime(payload["start_at"])
         end_at = self._ensure_aware_datetime(payload.get("end_at"))
         if end_at and end_at < start_at:
@@ -327,7 +330,7 @@ class EventPlanningService:
 
         event.start_at = start_at
         event.end_at = end_at
-        event.timezone = payload["timezone"]
+        event.timezone = timezone_name
         event.is_all_day = payload["is_all_day"]
         event.recurrence_rule = recurrence_rule
         event.recurrence_until = recurrence_until or (parsed_rrule.get("UNTIL") if parsed_rrule else None)
@@ -464,6 +467,44 @@ class EventPlanningService:
                 "capabilities": {"recurrence": True, "reminders": True, "directLinkSync": True},
             },
         ]
+
+    def list_package_orders(
+        self,
+        db: Session,
+        *,
+        customer_id: str,
+        event_id: str,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[PackageExecutionRequest], str | None]:
+        self.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
+        query = db.query(PackageExecutionRequest).filter(PackageExecutionRequest.event_id == event_id)
+        if cursor:
+            cursor_order = (
+                db.query(PackageExecutionRequest)
+                .filter(
+                    PackageExecutionRequest.event_id == event_id,
+                    PackageExecutionRequest.execution_request_id == cursor,
+                )
+                .first()
+            )
+            if cursor_order:
+                query = query.filter(
+                    or_(
+                        PackageExecutionRequest.created_at < cursor_order.created_at,
+                        and_(
+                            PackageExecutionRequest.created_at == cursor_order.created_at,
+                            PackageExecutionRequest.id > cursor_order.id,
+                        ),
+                    )
+                )
+
+        items = query.order_by(PackageExecutionRequest.created_at.desc(), PackageExecutionRequest.id.asc()).limit(limit + 1).all()
+        next_cursor = None
+        if len(items) > limit:
+            next_cursor = items[limit].execution_request_id
+            items = items[:limit]
+        return items, next_cursor
 
     def start_calendar_connect(
         self,
@@ -955,11 +996,17 @@ class EventPlanningService:
             raise HTTPException(status_code=404, detail="Customer not found")
         return customer
 
-    def _validate_timezone(self, timezone_name: str) -> None:
+    def _validate_timezone(self, timezone_name: str) -> str:
+        candidate = str(timezone_name).strip()
+        candidate_key = candidate.lower()
+        normalized = _TIMEZONE_ALIASES.get(candidate_key, candidate)
+        if candidate_key in _TIMEZONE_ALIASES:
+            return normalized
         try:
-            ZoneInfo(timezone_name)
+            ZoneInfo(normalized)
         except ZoneInfoNotFoundError as exc:
             raise HTTPException(status_code=400, detail="Invalid timezone") from exc
+        return normalized
 
     def _ensure_aware_datetime(self, value: datetime | None) -> datetime | None:
         if value is None:

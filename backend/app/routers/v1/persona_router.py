@@ -2,6 +2,20 @@
 app/routers/v1/persona_router.py
 
 Full REST API for Persona management.
+
+Spec-compliant routes  (OpenAPI contract)
+-----------------------------------------
+  GET    /customers/personas/
+  POST   /customers/personas/
+  GET    /customers/personas/{persona_id}
+  PUT    /customers/personas/{persona_id}
+  DELETE /customers/personas/{persona_id}
+
+Extension routes  (not in OpenAPI spec — kept for internal use)
+---------------------------------------------------------------
+  GET    /customers/personas/confirmed        – confirmed personas only
+  POST   /customers/personas/{id}/confirm     – mark persona as confirmed
+  DELETE /customers/personas/{id}/confirm     – unmark confirmed state
 """
 import logging
 from typing import List
@@ -18,11 +32,11 @@ from app.services.persona_service import persona_service
 from app.schemas.persona_schema import PersonaCreate, PersonaUpdate, PersonaResponse
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/personas", tags=["Personas"])
+router = APIRouter(prefix="/customers/personas", tags=["Personas"])
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@router.get("/confirmed", response_model=List[PersonaResponse])
+@router.get("/confirmed", response_model=List[PersonaResponse])  # EXTENSION — not in OpenAPI spec
 def list_confirmed_personas(
     db: Session = Depends(get_db),
     current_customer: Customer = Depends(get_current_customer),
@@ -95,7 +109,7 @@ def delete_persona(
     return None
 
 
-@router.post("/{persona_id}/confirm", response_model=PersonaResponse)
+@router.post("/{persona_id}/confirm", response_model=PersonaResponse)  # EXTENSION — not in OpenAPI spec
 def confirm_persona(
     persona_id: str,
     db: Session = Depends(get_db),
@@ -105,7 +119,7 @@ def confirm_persona(
     return persona_service.confirm_persona(db, persona_id, str(current_customer.customer_id))
 
 
-@router.delete("/{persona_id}/confirm", response_model=PersonaResponse)
+@router.delete("/{persona_id}/confirm", response_model=PersonaResponse)  # EXTENSION — not in OpenAPI spec
 def unconfirm_persona(
     persona_id: str,
     db: Session = Depends(get_db),

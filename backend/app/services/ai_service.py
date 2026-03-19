@@ -1,3 +1,11 @@
+"""
+app/services/ai_service.py
+
+Key change: the SAVED PROFILES INSTRUCTIONS block now tells the AI
+it is already mid-conversation (persona was selected upstream by the
+planning service state machine), so it should USE the profile silently
+rather than re-asking.  The AI only asks about saving NEW people.
+"""
 import re
 import hashlib
 import json
@@ -13,7 +21,6 @@ from app.services.chat_service import chat_service
 logger = logging.getLogger(__name__)
 
 # --- Persona preference to package tag mapping ---
-# Maps freeform preference keywords to known vendor package tags.
 _PREFERENCE_TO_TAGS: dict[str, list[str]] = {
     "fine dining":    ["fine-dining", "luxury"],
     "fine-dining":    ["fine-dining", "luxury"],
@@ -67,33 +74,32 @@ def _build_structured_persona_context(personas: list) -> str:
     if not personas:
         return ""
 
+    def _to_list(val) -> list[str]:
+        if not val:
+            return []
+        if isinstance(val, list):
+            return [str(v).strip().lower() for v in val if v]
+        return [s.strip().lower() for s in str(val).split(",") if s.strip()]
+
     blocks = []
     all_bias_tags: list[str] = []
 
     for persona in personas:
-        name = getattr(persona, "name", "Unknown") or "Unknown"
+        name         = getattr(persona, "name",         "Unknown") or "Unknown"
         relationship = getattr(persona, "relationship", "") or ""
-        personality = getattr(persona, "personality", "") or ""
-
-        def _to_list(val) -> list[str]:
-            if not val:
-                return []
-            if isinstance(val, list):
-                return [str(v).strip().lower() for v in val if v]
-            return [s.strip().lower() for s in str(val).split(",") if s.strip()]
+        personality  = getattr(persona, "personality",  "") or ""
 
         food   = _to_list(getattr(persona, "food_preferences",  None))
         colors = _to_list(getattr(persona, "color_preferences", None))
         music  = _to_list(getattr(persona, "music_preferences", None))
         ptags  = _to_list(getattr(persona, "personality_tags",  None))
 
-        # Legacy fallback support
+        # Legacy fallback
         if not any([food, colors, music, ptags]):
             legacy = getattr(persona, "preferences_json", None) or []
             if isinstance(legacy, str):
-                import json as _j
                 try:
-                    legacy = _j.loads(legacy)
+                    legacy = json.loads(legacy)
                 except Exception:
                     legacy = [s.strip() for s in legacy.split(",") if s.strip()]
             ptags = [str(v).strip().lower() for v in legacy if v]
@@ -155,7 +161,7 @@ def _get_redis():
         client = redis.from_url(
             getattr(settings, "REDIS_URL", "redis://redis:6379"),
             decode_responses=True,
-            socket_connect_timeout=2
+            socket_connect_timeout=2,
         )
         client.ping()
         return client
@@ -166,8 +172,8 @@ def _get_redis():
 class AIService:
     def __init__(self):
         self.base_url = settings.LANGFLOW_URL
-        self.token = settings.LANGFLOW_TOKEN
-        self.org_id = settings.LANGFLOW_ORG_ID
+        self.token    = settings.LANGFLOW_TOKEN
+        self.org_id   = settings.LANGFLOW_ORG_ID
 
         if not self.token or not self.base_url or not self.org_id:
             logger.warning(
@@ -212,9 +218,9 @@ class AIService:
 
         payload = {
             "input_value": prompt,
-            "inputType": "chat",
-            "outputType": "chat",
-            "tweaks": {},
+            "inputType":   "chat",
+            "outputType":  "chat",
+            "tweaks":      {},
         }
 
         try:
@@ -222,32 +228,32 @@ class AIService:
                 response = client.post(self.base_url, json=payload, headers=headers)
                 response.raise_for_status()
             data = response.json()
-            raw = data["outputs"][0]["outputs"][0]["results"]["message"]["text"]
+            raw  = data["outputs"][0]["outputs"][0]["results"]["message"]["text"]
             clean = raw.replace("```json", "").replace("```", "").strip()
             if not clean.startswith("{"):
                 match = re.search(r"\{.*\}", clean, re.DOTALL)
                 if match:
                     clean = match.group(0)
-            parsed = json.loads(clean)
+            parsed     = json.loads(clean)
             ordered_ids = parsed.get("recommended_offering_ids") or []
-            valid_ids = {offering["offering_id"] for offering in offerings}
+            valid_ids   = {o["offering_id"] for o in offerings}
             shortlist: list[str] = []
             seen: set[str] = set()
-            for offering_id in ordered_ids:
-                if offering_id in valid_ids and offering_id not in seen:
-                    shortlist.append(offering_id)
-                    seen.add(offering_id)
+            for oid in ordered_ids:
+                if oid in valid_ids and oid not in seen:
+                    shortlist.append(oid)
+                    seen.add(oid)
                 if len(shortlist) == limit:
                     break
             return shortlist or None
         except Exception as exc:
-            logger.warning("AI offering recommendation failed, using fallback ranking: %s", exc)
+            logger.warning("AI offering recommendation failed: %s", exc)
             return None
 
     @retry(
         stop=stop_after_attempt(2),
         wait=wait_exponential(multiplier=1, min=2, max=5),
-        retry=retry_if_exception_type(httpx.HTTPStatusError)
+        retry=retry_if_exception_type(httpx.HTTPStatusError),
     )
     async def generate_date_plan(
         self,
@@ -259,13 +265,14 @@ class AIService:
     ):
         if not self.base_url or not self.token or not self.org_id:
             raise RuntimeError(
-                "Langflow is not configured. Set LANGFLOW_URL, LANGFLOW_TOKEN, and LANGFLOW_ORG_ID."
+                "Langflow is not configured. "
+                "Set LANGFLOW_URL, LANGFLOW_TOKEN, and LANGFLOW_ORG_ID."
             )
 
         headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json",
-            "X-DataStax-Current-Org": self.org_id
+            "Authorization":          f"Bearer {self.token}",
+            "Content-Type":           "application/json",
+            "X-DataStax-Current-Org": self.org_id,
         }
 
         context_string = ""
@@ -302,33 +309,74 @@ class AIService:
             )
             logger.info(f"Missing info injected: {missing_info}")
 
-        system_prefix = "SYSTEM: You are a stateful event and gift planning assistant."
+        system_prefix = (
+            "SYSTEM: You are Occi, a stateful event and date planning assistant for Occacia — "
+            "a premium event planning platform based in Sri Lanka.\n"
+            "CONTEXT: You help customers in Sri Lanka plan events, dates, and gifts. "
+            "All prices are in Sri Lankan Rupees (LKR). "
+            "Popular locations include Colombo, Kandy, Galle, Ella, Negombo, Nuwara Eliya, "
+            "Mirissa, Trincomalee, and Bentota. "
+            "Common events include birthdays, anniversaries, weddings, proposals, "
+            "corporate retreats, and romantic dates. "
+            "Always suggest venues and packages available on Occacia. "
+            "When a user mentions a budget, treat it as LKR unless they specify otherwise.\n"
+            "You MUST always respond with a single JSON object and nothing else.\n"
+            "Required fields in every response:\n"
+            "  intent          : one of 'chat' | 'planning' | 'date' | 'gift' | 'multi'\n"
+            "  chat_response   : string — your conversational reply to the user\n"
+            "  venue_tags      : list[str] — tags from AVAILABLE_VENUE_TAGS only, empty if unknown\n"
+            "  missing_info    : list[str] — fields still needed before planning, empty if none\n"
+            "  event_type      : string | null\n"
+            "  location        : string | null\n"
+            "  budget_per_head : number | null\n"
+            "  guest_count     : number | null\n"
+            "  gift_suggestion : string | null\n"
+            "  reasoning       : string | null — brief internal note on your decision\n"
+            "  save_persona    : object | null — only when new recipient details are available\n"
+            "  ask_save_persona: boolean — true only when save_persona is set\n"
+            "  use_persona_name: string | null — name of saved profile to activate\n"
+            "Example minimal response: "
+            '{{"intent":"chat","chat_response":"Tell me more!","venue_tags":[],'
+            '"missing_info":[],"event_type":null,"location":null,"budget_per_head":null,'
+            '"guest_count":null,"gift_suggestion":null,"reasoning":null,'
+            '"save_persona":null,"ask_save_persona":false,"use_persona_name":null}}'
+        )
         parts = [system_prefix]
 
         if persona_context:
             parts.append(persona_context)
             parts.append(
-                "SAVED PROFILES INSTRUCTIONS:\n"
-                "1. At the START of a planning conversation, check if a saved profile "
-                "matches who the user is planning for. If yes, ask: "
-                "'I have [Name]'s profile saved — would you like me to use it?' "
-                "Set use_persona_name to that name in your JSON response.\n"
-                "2. If the user says YES to using a saved profile, set use_persona_name "
-                "to the persona name and use their preferences for all suggestions.\n"
-                "3. If NO saved profiles match, do NOT mention profiles at all.\n"
-                "4. If the user shares new info about a person (name, preferences, age, "
-                "relationship), set save_persona in your JSON response with all known fields "
-                "and set ask_save_persona=true."
+                # KEY FIX: The planning service already handled the
+                # 'which persona?' conversation.  By the time generate_date_plan
+                # is called, the correct profile is already in the `personas`
+                # list.  Tell the AI to USE it silently — not ask again.
+                "ACTIVE RECIPIENT PROFILE INSTRUCTIONS:\n"
+                "The recipient profile above has already been confirmed by the user "
+                "in this session. Do NOT ask 'would you like to use this profile?' — "
+                "that step is done.\n"
+                "1. Silently apply the preferences above when choosing venue_tags and "
+                "gift_suggestion.\n"
+                "2. Do NOT mention the profile unless the user asks.\n"
+                "3. If the user introduces a DIFFERENT person (different name), extract "
+                "their details and set save_persona in your JSON with fields: "
+                "name, relationship, age, food_preferences, music_preferences, "
+                "personality_tags, color_preferences. Also set ask_save_persona=true.\n"
+                "4. Never expose the profile data back to the user verbatim."
             )
         else:
             parts.append(
-                "PERSONA DETECTION INSTRUCTIONS:\n"
+                # No saved profile — watch for a new recipient being described
+                "NEW RECIPIENT DETECTION:\n"
                 "If the user mentions a specific person they are planning for "
-                "(e.g. 'my girlfriend Sarah', 'my wife', 'my mom') along with ANY "
-                "preferences (food, music, personality, age), extract those details "
-                "and set save_persona in your JSON response with fields: "
-                "name, relationship, age, food_preferences, music_preferences, personality_tags. "
-                "Also set ask_save_persona=true to prompt the user to confirm saving."
+                "(e.g. 'my girlfriend Sarah', 'my wife', 'my mum') along with ANY "
+                "preferences (food, music, personality, age, relationship), extract "
+                "those details and set save_persona in your JSON response with fields: "
+                "name, relationship, age, food_preferences, music_preferences, "
+                "personality_tags, color_preferences.\n"
+                "Also set ask_save_persona=true so the system can prompt the user "
+                "to confirm saving — do NOT ask the user yourself.\n"
+                "Only extract details when the user has actually provided them. "
+                "Do not invent or assume preferences."
             )
 
         if tag_block:
@@ -344,27 +392,35 @@ class AIService:
         if not persona_context and not context_string and not tag_block and not missing_block:
             full_input = raw_query
 
-        cache_seed = full_input + (tag_block or "")
-        cache_key = f"ai_cache:{hashlib.md5(cache_seed.encode(), usedforsecurity=False).hexdigest()}"
+        # Cache key excludes persona_context so that persona updates are
+        # reflected immediately without waiting for the 2-hour TTL to expire.
+        # Only the stable, non-user-specific parts are included.
+        cache_seed = raw_query + (tag_block or "") + (missing_block or "")
+        cache_key  = (
+            f"ai_cache:"
+            f"{hashlib.md5(cache_seed.encode(), usedforsecurity=False).hexdigest()}"
+        )
         r = _get_redis()
-        
+
         if r:
             try:
                 cached = r.get(cache_key)
                 if cached:
-                    logger.info("Cache hit - returning cached AI response.")
+                    logger.info("Cache hit — returning cached AI response.")
                     return json.loads(cached)
             except Exception:
                 pass
 
         payload = {
             "input_value": full_input,
-            "inputType": "chat",
-            "outputType": "chat",
-            "tweaks": {}
+            "inputType":   "chat",
+            "outputType":  "chat",
+            "tweaks":      {},
         }
 
-        logger.info(f"Outgoing request to Langflow | Payload length: {len(full_input)} chars")
+        logger.info(
+            f"Outgoing request to Langflow | Payload length: {len(full_input)} chars"
+        )
 
         async with httpx.AsyncClient(timeout=25.0) as client:
             try:
@@ -373,104 +429,110 @@ class AIService:
                 )
                 response.raise_for_status()
             except httpx.TimeoutException:
-                logger.warning("Langflow timeout - returning immediate fallback after 25s.")
+                logger.warning("Langflow timeout — returning fallback after 25s.")
                 return {
-                    "intent": "chat",
-                    "reasoning": "Langflow did not respond within 25 seconds.",
+                    "intent":            "chat",
+                    "reasoning":         "Langflow did not respond within 25 seconds.",
                     "personality_profile": None,
                     "chat_response": (
                         "I'm having a little trouble reaching my planning brain right now. "
                         "Could you try again in a moment? In the meantime, tell me more about "
                         "what you're celebrating!"
                     ),
-                    "gift_suggestion": None,
-                    "event_type": None,
-                    "location": None,
-                    "budget_per_head": None,
-                    "guest_count": None,
-                    "venue_tags": [],
-                    "missing_info": [],
+                    "gift_suggestion":  None,
+                    "event_type":       None,
+                    "location":         None,
+                    "budget_per_head":  None,
+                    "guest_count":      None,
+                    "venue_tags":       [],
+                    "missing_info":     [],
+                    "save_persona":     None,
+                    "ask_save_persona": False,
                 }
             except Exception as e:
                 logger.error(f"Langflow connection error: {type(e).__name__}: {repr(e)}")
                 raise
 
-            data = response.json()
-            outputs = ""
-            try:
-                outputs = data["outputs"][0]["outputs"][0]["results"]["message"]["text"]
-                clean = outputs.replace("```json", "").replace("```", "").strip()
+        data    = response.json()
+        outputs = ""
+        try:
+            outputs = data["outputs"][0]["outputs"][0]["results"]["message"]["text"]
+            clean   = outputs.replace("```json", "").replace("```", "").strip()
 
-                if not clean.startswith("{"):
-                    match = re.search(r'\{.*\}', clean, re.DOTALL)
-                    if match:
-                        clean = match.group(0)
-                        logger.warning("JSON buried in text - extracted successfully.")
+            if not clean.startswith("{"):
+                match = re.search(r'\{.*\}', clean, re.DOTALL)
+                if match:
+                    clean = match.group(0)
+                    logger.warning("JSON buried in text — extracted successfully.")
 
-                parsed_data = json.loads(clean)
+            parsed_data = json.loads(clean)
 
-                if "intent" not in parsed_data:
-                    raise ValueError("Missing intent field in parsed JSON")
+            if "intent" not in parsed_data:
+                raise ValueError("Missing intent field in parsed JSON")
 
-                if available_tags and parsed_data.get("venue_tags"):
-                    valid = set(available_tags)
-                    original = parsed_data["venue_tags"]
-                    filtered = [t for t in original if t in valid]
-                    if filtered != original:
-                        logger.warning(
-                            f"Tag validation: AI returned invalid tags {set(original) - valid}. "
-                            f"Stripped to {filtered}."
-                        )
-                    parsed_data["venue_tags"] = filtered
+            if available_tags and parsed_data.get("venue_tags"):
+                valid    = set(available_tags)
+                original = parsed_data["venue_tags"]
+                filtered = [t for t in original if t in valid]
+                if filtered != original:
+                    logger.warning(
+                        f"Tag validation: AI returned invalid tags "
+                        f"{set(original) - valid}. Stripped to {filtered}."
+                    )
+                parsed_data["venue_tags"] = filtered
 
-                if r:
-                    try:
-                        r.setex(cache_key, 7200, json.dumps(parsed_data))
-                        logger.info("AI response cached for 2 hours.")
-                    except Exception:
-                        pass
+            if r:
+                try:
+                    r.setex(cache_key, 7200, json.dumps(parsed_data))
+                    logger.info("AI response cached for 2 hours.")
+                except Exception:
+                    pass
 
-                logger.info(
-                    f"Success: intent={parsed_data.get('intent')} | "
-                    f"tags={parsed_data.get('venue_tags')} | "
-                    f"missing={parsed_data.get('missing_info')}"
-                )
-                return parsed_data
+            logger.info(
+                f"Success: intent={parsed_data.get('intent')} | "
+                f"tags={parsed_data.get('venue_tags')} | "
+                f"missing={parsed_data.get('missing_info')}"
+            )
+            return parsed_data
 
-            except Exception as e:
-                logger.warning(f"Parse failed: {str(e)} | Raw output snippet: {outputs[:200]}")
+        except Exception as e:
+            logger.warning(
+                f"Parse failed: {str(e)} | Raw output snippet: {outputs[:200]}"
+            )
 
-                raw_lower = outputs.lower()
-                PLANNING_VERBS = [
-                    "plan", "book", "arrange", "find", "need", "want",
-                    "looking for", "help me", "suggest", "recommend"
-                ]
-                PLANNING_NOUNS = [
-                    "venue", "event", "party", "dinner", "wedding",
-                    "birthday", "celebration", "anniversary", "retreat", "proposal"
-                ]
-                has_verb = any(v in raw_lower for v in PLANNING_VERBS)
-                has_noun = any(n in raw_lower for n in PLANNING_NOUNS)
-                is_planning = has_verb and has_noun
+            raw_lower = outputs.lower()
+            PLANNING_VERBS = [
+                "plan", "book", "arrange", "find", "need", "want",
+                "looking for", "help me", "suggest", "recommend",
+            ]
+            PLANNING_NOUNS = [
+                "venue", "event", "party", "dinner", "wedding",
+                "birthday", "celebration", "anniversary", "retreat", "proposal",
+            ]
+            has_verb   = any(v in raw_lower for v in PLANNING_VERBS)
+            has_noun   = any(n in raw_lower for n in PLANNING_NOUNS)
+            is_planning = has_verb and has_noun
 
-                return {
-                    "intent": "planning" if is_planning else "chat",
-                    "reasoning": "Fallback: AI response was not valid JSON.",
-                    "personality_profile": None,
-                    "chat_response": (
-                        "I'd love to help you plan something special! "
-                        "Could you tell me what you're celebrating and how many guests?"
-                    ) if is_planning else (
-                        "My memory is a bit foggy right now — could you try again?"
-                    ),
-                    "gift_suggestion": None,
-                    "event_type": None,
-                    "location": None,
-                    "budget_per_head": None,
-                    "guest_count": None,
-                    "venue_tags": [],
-                    "missing_info": ["location", "budget", "guest_count", "event_date"]
-                }
+            return {
+                "intent":   "planning" if is_planning else "chat",
+                "reasoning": "Fallback: AI response was not valid JSON.",
+                "personality_profile": None,
+                "chat_response": (
+                    "I'd love to help you plan something special! "
+                    "Could you tell me what you're celebrating and how many guests?"
+                ) if is_planning else (
+                    "My memory is a bit foggy right now — could you try again?"
+                ),
+                "gift_suggestion":  None,
+                "event_type":       None,
+                "location":         None,
+                "budget_per_head":  None,
+                "guest_count":      None,
+                "venue_tags":       [],
+                "missing_info":     ["location", "budget", "guest_count", "event_date"],
+                "save_persona":     None,
+                "ask_save_persona": False,
+            }
 
 
 ai_service = AIService()

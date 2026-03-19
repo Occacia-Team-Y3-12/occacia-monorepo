@@ -157,10 +157,14 @@ class AuthService:
 
         return {"message": "Verification email sent", "email": str(payload.email)}
 
-    def login_customer(self, db: Session, payload: LoginRequest) -> AuthResponse:
-        customer = customer_service.get_customer_by_email(db, email=str(payload.email))
+    def login_customer(self, db: Session, payload: LoginRequest | OAuth2PasswordRequestForm) -> dict:
+        # 🚨 DEVSECOPS FIX: Dynamically grab email whether from JSON (.email) or Swagger Form (.username)
+        email = getattr(payload, "email", None) or getattr(payload, "username", None)
+        password = payload.password
+
+        customer = customer_service.get_customer_by_email(db, email=str(email))
         
-        if not customer or not customer.password_hash or not verify_password(payload.password, customer.password_hash):
+        if not customer or not customer.password_hash or not verify_password(password, customer.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password",
@@ -182,18 +186,21 @@ class AuthService:
             expires_delta=timedelta(days=7)
         )
         
-        return AuthResponse(
-            accessToken=access_token,
-            refreshToken=refresh_token,
-            user={
+        # 🚨 DEVSECOPS FIX: Return a "Dual-Compatibility" Dictionary
+        return {
+            "access_token": access_token,      # Required for Swagger UI Padlock
+            "token_type": "bearer",            # Required for Swagger UI Padlock
+            "accessToken": access_token,       # Kept for Next.js backwards compatibility
+            "refreshToken": refresh_token,     # Kept for Next.js backwards compatibility
+            "user": {
                 "userId": customer.customer_id,
                 "email": customer.email,
                 "role": "CUSTOMER",
                 "status": customer.status,
             }
-        )
+        }
 
-    def refresh_customer_token(self, db: Session, payload: RefreshTokenRequest) -> AuthResponse:
+    def refresh_customer_token(self, db: Session, payload: RefreshTokenRequest) -> dict:
         exc = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token.")
         try:
             claims = decode_token(payload.refresh_token)
@@ -223,16 +230,18 @@ class AuthService:
             expires_delta=timedelta(days=7)
         )
         
-        return AuthResponse(
-            accessToken=access_token,
-            refreshToken=refresh_token,
-            user={
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "accessToken": access_token,
+            "refreshToken": refresh_token,
+            "user": {
                 "userId": customer.customer_id,
                 "email": customer.email,
                 "role": "CUSTOMER",
                 "status": customer.status,
             }
-        )
+        }
 
     def verify_customer_email(self, db: Session, token: str) -> dict[str, str]:
         claims = self._decode_verification_token(token, expected_type="verify_customer_email")
@@ -268,22 +277,46 @@ class AuthService:
         subject, body = _build_vendor_verification_email(email, verification_token)
         _send_email(email, subject, body)
 
-    def login_vendor(self, db: Session, form_data: OAuth2PasswordRequestForm) -> dict:
-        vendor = vendor_service.get_vendor_by_email(db, email=form_data.username)
+    def login_vendor(self, db: Session, payload: LoginRequest | OAuth2PasswordRequestForm) -> dict:
+        # 🚨 DEVSECOPS FIX: Dynamically grab email whether from JSON (.email) or Swagger Form (.username)
+        email = getattr(payload, "email", None) or getattr(payload, "username", None)
+        password = payload.password
+        
+        vendor = vendor_service.get_vendor_by_email(db, email=str(email))
         
         if not vendor:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password", headers={"WWW-Authenticate": "Bearer"})
             
-        password = getattr(vendor, 'password_hash', None) or getattr(vendor, 'hashed_password', None)
-        if not password or not verify_password(form_data.password, password):
+        vendor_password = getattr(vendor, 'password_hash', None) or getattr(vendor, 'hashed_password', None)
+        if not vendor_password or not verify_password(password, vendor_password):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password", headers={"WWW-Authenticate": "Bearer"})
             
         if os.getenv("SKIP_EMAIL_VERIFICATION") != "true":
             if not getattr(vendor, 'email_verified', True) and not getattr(vendor, 'is_verified', True):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified.")
 
-        token = create_access_token(data={"sub": vendor.email}, expires_delta=timedelta(minutes=60))
-        return {"access_token": token, "token_type": "bearer"}
+        access_token = create_access_token(
+            data={"sub": vendor.email, "role": "VENDOR"}, 
+            expires_delta=timedelta(minutes=60)
+        )
+        refresh_token = create_refresh_token(
+            data={"sub": vendor.email, "role": "VENDOR"}, 
+            expires_delta=timedelta(days=7)
+        )
+
+        # 🚨 DEVSECOPS FIX: Return a "Dual-Compatibility" Dictionary
+        return {
+            "access_token": access_token,      # Swagger UI
+            "token_type": "bearer",            # Swagger UI
+            "accessToken": access_token,       # Next.js
+            "refreshToken": refresh_token,     # Next.js
+            "user": {
+                "userId": getattr(vendor, "vendor_id", str(getattr(vendor, "id", ""))),
+                "email": vendor.email,
+                "role": "VENDOR",
+                "status": getattr(vendor, "status", "ACTIVE"),
+            }
+        }
 
     def verify_vendor_email(self, db: Session, token: str) -> dict[str, str]:
         claims = self._decode_verification_token(token, expected_type="verify_vendor_email")

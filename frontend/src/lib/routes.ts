@@ -10,6 +10,7 @@ export const ROUTES = {
     EVENT_RECOMMENDATIONS: (eventId: string) => `/customer/events/${eventId}/recommendations`,
     EVENT_PACKAGES: (eventId: string) => `/customer/events/${eventId}/packages`,
     EVENT_PACKAGE_DETAIL: (eventId: string, packageId: string) => `/customer/events/${eventId}/packages/${packageId}`,
+    EVENT_PACKAGE_CUSTOMIZE: (eventId: string, packageId: string) => `/customer/events/${eventId}/packages/${packageId}/customize`,
     PRODUCTS: '/customer/products',
     CART: '/customer/cart',
     ORDERS: '/customer/orders',
