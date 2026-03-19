@@ -493,6 +493,13 @@ async def send_event_chat_message(
     # ── Merge: AI reply wins; fallback to rule-based if AI failed ────────────
     final_reply = (plan.chat_response or rule_reply) if plan else rule_reply
 
+    # FIX #4: save the real AI reply to EventChatMessage so
+    # GET /customers/events/{eventId}/messages shows it, not the rule-based fallback.
+    try:
+        event_planning_service.save_ai_reply(db, event_id=event_id, content=final_reply)
+    except Exception as _save_err:
+        logger.warning("save_ai_reply failed: %s", _save_err)
+
     return ChatSendResponse(
         # ── Spec fields ──────────────────────────────────────
         reply=final_reply,

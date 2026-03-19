@@ -224,16 +224,9 @@ class TestAITagInjection:
                 svc.generate_date_plan("Plan a luxury dinner", available_tags=allowed)
             )
 
-        # The ai_service injects only allowed tags into the prompt (constraint injection).
-        # Post-response filtering of invented tags is not yet implemented in ai_service —
-        # that is a separate enhancement. This test verifies the prompt constraint injection
-        # works (tested in test_planning_prompt_contains_only_db_tags) not response filtering.
-        # If ai_service adds response filtering in future, this assertion can be tightened.
         venue_tags = result.get("venue_tags") or result.get("venueTags") or []
-        # At minimum, real tags should be present when AI was given them
         if venue_tags:
             real_tags = [t for t in venue_tags if t in allowed]
-            # At least verify the call completed without error
             assert isinstance(venue_tags, list), "venueTags must be a list"
 
     def test_cache_key_changes_when_tags_change(self):
@@ -269,7 +262,8 @@ class TestAITagInjection:
         captured: dict = {}
 
         async def capture_gen(raw_query, history=None, personas=None,
-                               available_tags=None, missing_info=None):
+                               available_tags=None, missing_info=None,
+                               session_id=None):  # FIX: added session_id=None
             captured["tags"] = available_tags
             return _fake_ai()
 
@@ -289,7 +283,8 @@ class TestAITagInjection:
         captured: dict = {}
 
         async def capture_gen(raw_query, history=None, personas=None,
-                               available_tags=None, missing_info=None):
+                               available_tags=None, missing_info=None,
+                               session_id=None):  # FIX: added session_id=None
             captured["tags"] = list(available_tags or [])
             return _fake_ai()
 
@@ -372,7 +367,7 @@ class TestGiftIntentRouting:
         mock_persona = MagicMock(spec=Persona)
         mock_persona.name              = "Alex"
         mock_persona.preferences_json  = ["hiking", "camping"]
-        mock_persona.food_preferences  = []   # explicit empty lists so _safe_list works
+        mock_persona.food_preferences  = []
         mock_persona.personality_tags  = []
 
         captured: dict = {}
@@ -596,16 +591,17 @@ class TestMissingInfoPersistence:
 
     def test_missing_info_carried_across_turns(self, auth_client, vendor_with_packages):
         """Turn 1 sets missing=['budget']; turn 2 must forward it to AI."""
-        session_id = f"sess-{_uid()}"
         captured: dict = {}
 
         async def turn1(raw_query, history=None, personas=None,
-                        available_tags=None, missing_info=None):
+                        available_tags=None, missing_info=None,
+                        session_id=None):  # FIX: added session_id=None
             return _fake_ai(tags=[], missing=["budget"],
                             chat_response="What is your budget?")
 
         async def turn2(raw_query, history=None, personas=None,
-                        available_tags=None, missing_info=None):
+                        available_tags=None, missing_info=None,
+                        session_id=None):  # FIX: added session_id=None
             captured["missing"] = missing_info
             return _fake_ai(missing=[])
 
@@ -623,7 +619,6 @@ class TestMissingInfoPersistence:
             r1 = _chat(auth_client, event_id, "Plan a date")
         assert r1.status_code == 200, r1.text
 
-        # Turn 2: get_last_missing_info returns ["budget"] to simulate carry-forward
         with patch("app.services.ai_service.ai_service.generate_date_plan",
                    side_effect=turn2), \
              patch("app.routers.v1.customer_router.chat_service.get_session_history", return_value=[]), \
@@ -688,7 +683,6 @@ class TestPlanningEndpointIntegration:
         ).status_code in (401, 403)
 
     def test_invalid_session_id_rejected(self, auth_client):
-        # session_id is now event_id from URL path — invalid event returns 404
         resp = auth_client.post(
             "/api/v1/customers/events/EVT-invalid-does-not-exist/chat",
             json={"content": "Hi"},
@@ -765,10 +759,9 @@ class TestVendorService:
         from app.core.database import SessionLocal
         db = SessionLocal()
         try:
-            results = vs.find_gift_matches(db, ["romantic"], budget=None)
+            assert len(vs.find_gift_matches(db, ["romantic"], budget=None)) >= 1
         finally:
             db.close()
-        assert len(results) >= 1
 
     def test_find_gift_matches_multiple_tags(self, vendor_with_packages, vs):
         from app.core.database import SessionLocal

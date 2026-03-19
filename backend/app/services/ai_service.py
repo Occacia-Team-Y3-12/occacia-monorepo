@@ -1,10 +1,16 @@
 """
 app/services/ai_service.py
 
-Key change: the SAVED PROFILES INSTRUCTIONS block now tells the AI
-it is already mid-conversation (persona was selected upstream by the
-planning service state machine), so it should USE the profile silently
-rather than re-asking.  The AI only asks about saving NEW people.
+Fixes applied
+─────────────
+#1  Cache key now includes session_id + turn count — prevents stale cached
+    replies being returned mid-conversation.
+#2  event_date added to AI schema — Langflow now returns it and the planning
+    service uses it directly instead of relying solely on regex.
+#3  task_type field injected into every Langflow payload so the flow can
+    route 'planning' vs 'offering_rank' tasks internally.
+#5  personality_profile added to the required AI response schema.
+#6  recommend_offerings_for_task made fully async (httpx.AsyncClient).
 """
 import re
 import hashlib
@@ -20,7 +26,7 @@ from app.services.chat_service import chat_service
 
 logger = logging.getLogger(__name__)
 
-# --- Persona preference to package tag mapping ---
+# --- Persona preference → package tag mapping ---
 _PREFERENCE_TO_TAGS: dict[str, list[str]] = {
     "fine dining":    ["fine-dining", "luxury"],
     "fine-dining":    ["fine-dining", "luxury"],
@@ -67,10 +73,7 @@ _PREFERENCE_TO_TAGS: dict[str, list[str]] = {
 
 
 def _build_structured_persona_context(personas: list) -> str:
-    """
-    Converts persona objects into a structured AI prompt block.
-    Reads structured preference fields and falls back to legacy JSON preferences.
-    """
+    """Convert persona objects into a structured AI prompt block."""
     if not personas:
         return ""
 
@@ -181,7 +184,8 @@ class AIService:
                 "AI endpoints will fail until these are set."
             )
 
-    def recommend_offerings_for_task(
+    # ── FIX #6: fully async — no longer blocks the event loop ─────────────────
+    async def recommend_offerings_for_task(
         self,
         *,
         event_context: dict[str, Any],
@@ -216,16 +220,17 @@ class AIService:
             f"CANDIDATE_OFFERINGS: {json.dumps(offerings, ensure_ascii=True)}"
         )
 
+        # FIX #3: task_type tells Langflow which routing branch to use
         payload = {
             "input_value": prompt,
             "inputType":   "chat",
             "outputType":  "chat",
-            "tweaks":      {},
+            "tweaks":      {"task_type": "offering_rank"},
         }
 
         try:
-            with httpx.Client(timeout=8.0) as client:
-                response = client.post(self.base_url, json=payload, headers=headers)
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                response = await client.post(self.base_url, json=payload, headers=headers)
                 response.raise_for_status()
             data = response.json()
             raw  = data["outputs"][0]["outputs"][0]["results"]["message"]["text"]
@@ -234,7 +239,7 @@ class AIService:
                 match = re.search(r"\{.*\}", clean, re.DOTALL)
                 if match:
                     clean = match.group(0)
-            parsed     = json.loads(clean)
+            parsed      = json.loads(clean)
             ordered_ids = parsed.get("recommended_offering_ids") or []
             valid_ids   = {o["offering_id"] for o in offerings}
             shortlist: list[str] = []
@@ -262,6 +267,7 @@ class AIService:
         personas: List = None,
         available_tags: List[str] = None,
         missing_info: List[str] = None,
+        session_id: str = "",       # FIX #1: needed for correct cache key
     ):
         if not self.base_url or not self.token or not self.org_id:
             raise RuntimeError(
@@ -309,6 +315,7 @@ class AIService:
             )
             logger.info(f"Missing info injected: {missing_info}")
 
+        # ── FIX #2 + #5: event_date and personality_profile added to schema ───
         system_prefix = (
             "SYSTEM: You are Occi, a stateful event and date planning assistant for Occacia — "
             "a premium event planning platform based in Sri Lanka.\n"
@@ -322,23 +329,27 @@ class AIService:
             "When a user mentions a budget, treat it as LKR unless they specify otherwise.\n"
             "You MUST always respond with a single JSON object and nothing else.\n"
             "Required fields in every response:\n"
-            "  intent          : one of 'chat' | 'planning' | 'date' | 'gift' | 'multi'\n"
-            "  chat_response   : string — your conversational reply to the user\n"
-            "  venue_tags      : list[str] — tags from AVAILABLE_VENUE_TAGS only, empty if unknown\n"
-            "  missing_info    : list[str] — fields still needed before planning, empty if none\n"
-            "  event_type      : string | null\n"
-            "  location        : string | null\n"
-            "  budget_per_head : number | null\n"
-            "  guest_count     : number | null\n"
-            "  gift_suggestion : string | null\n"
-            "  reasoning       : string | null — brief internal note on your decision\n"
-            "  save_persona    : object | null — only when new recipient details are available\n"
-            "  ask_save_persona: boolean — true only when save_persona is set\n"
-            "  use_persona_name: string | null — name of saved profile to activate\n"
+            "  intent             : one of 'chat' | 'planning' | 'date' | 'gift' | 'multi'\n"
+            "  chat_response      : string — your conversational reply to the user\n"
+            "  venue_tags         : list[str] — tags from AVAILABLE_VENUE_TAGS only, empty if unknown\n"
+            "  missing_info       : list[str] — fields still needed before planning, empty if none\n"
+            "  event_type         : string | null\n"
+            "  event_date         : string | null — ISO date YYYY-MM-DD if mentioned, else null\n"
+            "  location           : string | null\n"
+            "  budget_per_head    : number | null\n"
+            "  guest_count        : number | null\n"
+            "  gift_suggestion    : string | null\n"
+            "  personality_profile: string | null — a short summary of the recipient's personality "
+            "and preferences inferred from this conversation, or null if unknown\n"
+            "  reasoning          : string | null — brief internal note on your decision\n"
+            "  save_persona       : object | null — only when new recipient details are available\n"
+            "  ask_save_persona   : boolean — true only when save_persona is set\n"
+            "  use_persona_name   : string | null — name of saved profile to activate\n"
             "Example minimal response: "
             '{{"intent":"chat","chat_response":"Tell me more!","venue_tags":[],'
-            '"missing_info":[],"event_type":null,"location":null,"budget_per_head":null,'
-            '"guest_count":null,"gift_suggestion":null,"reasoning":null,'
+            '"missing_info":[],"event_type":null,"event_date":null,"location":null,'
+            '"budget_per_head":null,"guest_count":null,"gift_suggestion":null,'
+            '"personality_profile":null,"reasoning":null,'
             '"save_persona":null,"ask_save_persona":false,"use_persona_name":null}}'
         )
         parts = [system_prefix]
@@ -346,10 +357,6 @@ class AIService:
         if persona_context:
             parts.append(persona_context)
             parts.append(
-                # KEY FIX: The planning service already handled the
-                # 'which persona?' conversation.  By the time generate_date_plan
-                # is called, the correct profile is already in the `personas`
-                # list.  Tell the AI to USE it silently — not ask again.
                 "ACTIVE RECIPIENT PROFILE INSTRUCTIONS:\n"
                 "The recipient profile above has already been confirmed by the user "
                 "in this session. Do NOT ask 'would you like to use this profile?' — "
@@ -365,7 +372,6 @@ class AIService:
             )
         else:
             parts.append(
-                # No saved profile — watch for a new recipient being described
                 "NEW RECIPIENT DETECTION:\n"
                 "If the user mentions a specific person they are planning for "
                 "(e.g. 'my girlfriend Sarah', 'my wife', 'my mum') along with ANY "
@@ -392,11 +398,15 @@ class AIService:
         if not persona_context and not context_string and not tag_block and not missing_block:
             full_input = raw_query
 
-        # Cache key excludes persona_context so that persona updates are
-        # reflected immediately without waiting for the 2-hour TTL to expire.
-        # Only the stable, non-user-specific parts are included.
-        cache_seed = raw_query + (tag_block or "") + (missing_block or "")
-        cache_key  = (
+        # ── FIX #1: cache key includes session + turn count ───────────────────
+        # Two different turns in the same session for the same question must
+        # get different cache entries because the conversation context differs.
+        turn_count = len(history) if history else 0
+        cache_seed = (
+            f"{session_id}:{turn_count}:{raw_query}"
+            f"{tag_block or ''}{missing_block or ''}"
+        )
+        cache_key = (
             f"ai_cache:"
             f"{hashlib.md5(cache_seed.encode(), usedforsecurity=False).hexdigest()}"
         )
@@ -411,15 +421,17 @@ class AIService:
             except Exception:
                 pass
 
+        # ── FIX #3: task_type tells Langflow this is a planning call ─────────
         payload = {
             "input_value": full_input,
             "inputType":   "chat",
             "outputType":  "chat",
-            "tweaks":      {},
+            "tweaks":      {"task_type": "planning"},
         }
 
         logger.info(
-            f"Outgoing request to Langflow | Payload length: {len(full_input)} chars"
+            f"Outgoing request to Langflow | session={session_id} turn={turn_count} "
+            f"payload_length={len(full_input)} chars"
         )
 
         async with httpx.AsyncClient(timeout=25.0) as client:
@@ -431,8 +443,8 @@ class AIService:
             except httpx.TimeoutException:
                 logger.warning("Langflow timeout — returning fallback after 25s.")
                 return {
-                    "intent":            "chat",
-                    "reasoning":         "Langflow did not respond within 25 seconds.",
+                    "intent":              "chat",
+                    "reasoning":           "Langflow did not respond within 25 seconds.",
                     "personality_profile": None,
                     "chat_response": (
                         "I'm having a little trouble reaching my planning brain right now. "
@@ -441,6 +453,7 @@ class AIService:
                     ),
                     "gift_suggestion":  None,
                     "event_type":       None,
+                    "event_date":       None,
                     "location":         None,
                     "budget_per_head":  None,
                     "guest_count":      None,
@@ -490,6 +503,7 @@ class AIService:
 
             logger.info(
                 f"Success: intent={parsed_data.get('intent')} | "
+                f"event_date={parsed_data.get('event_date')} | "
                 f"tags={parsed_data.get('venue_tags')} | "
                 f"missing={parsed_data.get('missing_info')}"
             )
@@ -509,13 +523,13 @@ class AIService:
                 "venue", "event", "party", "dinner", "wedding",
                 "birthday", "celebration", "anniversary", "retreat", "proposal",
             ]
-            has_verb   = any(v in raw_lower for v in PLANNING_VERBS)
-            has_noun   = any(n in raw_lower for n in PLANNING_NOUNS)
+            has_verb    = any(v in raw_lower for v in PLANNING_VERBS)
+            has_noun    = any(n in raw_lower for n in PLANNING_NOUNS)
             is_planning = has_verb and has_noun
 
             return {
-                "intent":   "planning" if is_planning else "chat",
-                "reasoning": "Fallback: AI response was not valid JSON.",
+                "intent":              "planning" if is_planning else "chat",
+                "reasoning":           "Fallback: AI response was not valid JSON.",
                 "personality_profile": None,
                 "chat_response": (
                     "I'd love to help you plan something special! "
@@ -525,6 +539,7 @@ class AIService:
                 ),
                 "gift_suggestion":  None,
                 "event_type":       None,
+                "event_date":       None,
                 "location":         None,
                 "budget_per_head":  None,
                 "guest_count":      None,
