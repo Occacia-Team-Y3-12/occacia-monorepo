@@ -43,3 +43,38 @@ class InquiryStatus(str, Enum):
     IN_PROGRESS = "IN_PROGRESS"
     RESOLVED = "RESOLVED"
     REJECTED = "REJECTED"
+
+
+class TaskStatus(str, Enum):
+    DRAFT = "DRAFT"
+    PENDING = "PENDING"
+    ASSIGNED = "ASSIGNED"
+    IN_PROGRESS = "IN_PROGRESS"
+    DONE = "DONE"
+    REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
+
+
+class PackageOrderStatus(str, Enum):
+    CREATED = "CREATED"
+    PENDING = "PENDING"
+    PAID = "PAID"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+    REFUNDED = "REFUNDED"
+
+
+class FulfillmentRequestStatus(str, Enum):
+    SENT = "SENT"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
+    CANCELLED = "CANCELLED"
+
+
+class EventStatus(str, Enum):
+    DRAFT = "DRAFT"
+    ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"

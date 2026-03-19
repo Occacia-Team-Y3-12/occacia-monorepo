@@ -10,6 +10,7 @@ from app.models.event import Event
 from app.models.event_chat_message import EventChatMessage
 from app.models.event_persona import EventPersona
 from app.models.offering import Offering
+from app.models.organization import Organization
 from app.models.package import Package
 from app.models.package_execution_request import PackageExecutionRequest
 from app.models.package_item import PackageItem
@@ -29,6 +30,7 @@ __all__ = [
     "EventChatMessage",
     "EventPersona",
     "Offering",
+    "Organization",
     "Package",
     "PackageExecutionRequest",
     "PackageItem",

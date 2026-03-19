@@ -5,16 +5,16 @@ import logging
 from datetime import date, timedelta
 from typing import List, Optional
 
+from fastapi import HTTPException, status
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.user import User
-from app.models.vendor import Vendor
 from app.common.enums import UserRole
-from app.schemas.vendor_schema import VendorRegisterRequest as VendorCreate
-from app.models.package import Package
-from fastapi import HTTPException, status
-from app.core.security import get_password_hash
 from app.common.utils import generate_prefixed_id
+from app.models.package import Package
+from app.models.vendor import Vendor
+from app.models.user import User
+from app.schemas.vendor_schema import VendorRegisterRequest as VendorCreate
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +186,11 @@ class VendorService:
         vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
         if vendor:
             vendor.approval_status = status
+            # Keep is_verified in sync: approved vendors are verified
+            if status == "APPROVED":
+                vendor.is_verified = True
+            elif status in ("REJECTED", "SUSPENDED"):
+                vendor.is_verified = False
             db.commit()
             db.refresh(vendor)
         return vendor
@@ -330,15 +335,15 @@ class VendorService:
             return []
 
         canonical_loc = _normalise_city(location)
-        verified_vendor_ids = {v.id for v in db.query(
-            Vendor).filter(Vendor.is_verified == True).all()}
+        # Use APPROVED vendors (admin-approved) OR is_verified (manually verified)
+        # A vendor is visible in matches when admin has approved their application
+        active_vendor_ids = {
+            v.id for v in db.query(Vendor).filter(
+                or_(Vendor.approval_status == "APPROVED", Vendor.is_verified == True)
+            ).all()
+        }
         pkg_query = db.query(Package).options(joinedload(Package.vendor))
-
-        if verified_vendor_ids:
-            all_pkgs = [p for p in pkg_query.all(
-            ) if p.vendor_id in verified_vendor_ids]
-        else:
-            all_pkgs = []
+        all_pkgs = [p for p in pkg_query.all() if p.vendor_id in active_vendor_ids]
 
         def _get_tags(p):
             t = p.tags or []
@@ -440,6 +445,65 @@ class VendorService:
             if alias in lower:
                 return _CITY_ALIASES[alias]
         return None
+
+
+class AdminVendorService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def list_vendors(
+        self,
+        approval_status: str | None = None,
+        status: str | None = None,
+    ) -> list[Vendor]:
+        query = self.db.query(Vendor)
+
+        if approval_status:
+            query = query.filter(Vendor.approval_status == approval_status.upper())
+        if status and hasattr(Vendor, "status"):
+            query = query.filter(Vendor.status == status.upper())
+
+        return query.order_by(Vendor.id.desc()).all()
+
+    def get_vendor(self, vendor_id: int) -> Vendor:
+        vendor = self.db.query(Vendor).filter(Vendor.id == vendor_id).first()
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Vendor not found.")
+        return vendor
+
+    def update_vendor_status(
+        self,
+        vendor_id: int,
+        new_status: str,
+        admin_email: str,
+    ) -> Vendor:
+        if not new_status or new_status.upper() not in ("ACTIVE", "SUSPENDED", "DISABLED"):
+            raise HTTPException(status_code=400, detail="status must be ACTIVE, SUSPENDED, or DISABLED")
+
+        vendor = self.get_vendor(vendor_id)
+        if hasattr(vendor, "status"):
+            vendor.status = new_status.upper()
+        else:
+            logger.warning("Vendor model has no .status column yet. Skipping admin status write.")
+
+        # Keep is_verified in sync with approval_status
+        if hasattr(vendor, "is_verified"):
+            vendor.is_verified = (new_status.upper() == "APPROVED")
+        self.db.commit()
+        self.db.refresh(vendor)
+        logger.info("Admin %s set vendor %s status to %s", admin_email, vendor_id, new_status)
+        return vendor
+
+    def get_pending_counts(self) -> dict:
+        vendor_pending = self.db.query(Vendor).filter(
+            Vendor.approval_status == "PENDING"
+        ).count()
+
+        return {
+            "vendors_pending": vendor_pending,
+            "organizations_pending": 0,
+            "total_pending": vendor_pending,
+        }
 
 
 vendor_service = VendorService()

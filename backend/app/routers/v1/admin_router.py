@@ -4,12 +4,12 @@ app/routers/v1/admin_router.py
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, status, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
+from app.core.dependencies import get_current_admin
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.admin import Admin
@@ -17,7 +17,6 @@ from app.models.vendor import Vendor
 from app.schemas.admin_schema import (
     AdminRegister, AdminResponse, VendorAdminView, VendorRejectRequest
 )
-from app.core.dependencies import get_current_admin 
 from app.services.admin_service import admin_service 
 from app.services.auth_service import _send_email
 
@@ -65,43 +64,6 @@ def admin_login(
     """Admin login."""
     return admin_service.login_admin(db, form_data.username, form_data.password)
 
-# --- Admin Vendor Routes ---
-
-@router.get("/vendors", response_model=list[VendorAdminView])
-def list_vendors(
-    approval_status: Optional[str] = Query(default=None),
-    status: Optional[str] = Query(default=None),
-    db: Session = Depends(get_db),
-    _: Admin = Depends(get_current_admin),
-):
-    """List all vendors."""
-    return admin_service.list_vendors(db, approval_status=approval_status, status=status)
-
-@router.get("/vendors/{vendor_id}", response_model=VendorAdminView)
-def get_vendor_detail(
-    vendor_id: int,
-    db: Session = Depends(get_db),
-    _: Admin = Depends(get_current_admin),
-):
-    """Get vendor detail."""
-    return admin_service.get_vendor(db, vendor_id=vendor_id)
-
-@router.put("/vendors/{vendor_id}/status", response_model=VendorAdminView)
-def update_vendor_status(
-    vendor_id: int,
-    body: dict,
-    db: Session = Depends(get_db),
-    current_admin: Admin = Depends(get_current_admin),
-):
-    """Update vendor account status."""
-    status_val = body.get("status") or ""
-    return admin_service.update_vendor_status(
-        db, 
-        vendor_id=vendor_id, 
-        new_status=status_val, 
-        admin_email=current_admin.email
-    )
-
 @router.post("/vendors/{vendor_id}/approve", response_model=VendorAdminView)
 def approve_vendor(
     vendor_id: int,
@@ -110,6 +72,12 @@ def approve_vendor(
 ):
     """Approve vendor registration."""
     vendor = admin_service.approve_vendor(db, vendor_id=vendor_id, admin_email=current_admin.email)
+    # Sync is_verified so approved vendors appear in AI venue matching
+    if hasattr(vendor, "is_verified") and not vendor.is_verified:
+        vendor.is_verified = True
+        db.add(vendor)
+        db.commit()
+        db.refresh(vendor)
     _send_approval_email(vendor)
     return vendor
 

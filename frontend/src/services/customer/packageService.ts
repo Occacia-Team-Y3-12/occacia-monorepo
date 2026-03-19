@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { RecommendationPackage } from '@/types/customer/package';
+import type { RecommendationPackage, ShortlistedOffering } from '@/types/customer/package';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
@@ -20,4 +20,10 @@ export const packageService = {
 
   generatePackages: (eventId: string) =>
     api.post<RecommendationPackage[]>(`/customers/events/${eventId}/recommendations`).then(r => r.data),
+
+  getTaskRecommendations: (eventId: string, taskId: string) =>
+    api.get<ShortlistedOffering[]>(`/customers/events/${eventId}/tasks/${taskId}/recommendations`).then(r => r.data),
+
+  updatePackage: (eventId: string, packageId: string, items: { taskId: string; offeringId: string }[]) =>
+    api.put<RecommendationPackage>(`/customers/events/${eventId}/packages/${packageId}`, { items }).then(r => r.data),
 };

@@ -39,6 +39,8 @@ backend/.mypy_cache/
 backend/.coverage
 backend/coverage.xml
 backend/htmlcov/
+backend/*.db
+backend/*.db-*
 
 __pycache__/
 *.py[cod]

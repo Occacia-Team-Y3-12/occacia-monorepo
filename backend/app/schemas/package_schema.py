@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, ConfigDict
 
@@ -40,3 +41,22 @@ class PackageResponse(BaseModel):
     location_coverage: Optional[str]
     blocked_dates: Optional[List[str]]
     model_config = ConfigDict(from_attributes=True)
+
+
+class PackageOrderResponse(BaseModel):
+    packageOrderId: str
+    eventId: str
+    packageId: str
+    packageOrderTotalPrice: float
+    currency: str
+    status: str
+    createdAt: datetime
+    statusUpdatedAt: datetime
+    notes: Optional[str] = None
+    idempotencyKey: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedPackageOrdersResponse(BaseModel):
+    items: List[PackageOrderResponse]
+    nextCursor: Optional[str] = None

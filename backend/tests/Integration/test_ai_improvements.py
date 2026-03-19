@@ -20,7 +20,7 @@ import httpx
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-PLAN_URL = "/api/v1/planning/generate"
+PLAN_URL = "/api/v1/planning/generate"  # retired — use _chat() helper instead
 AUTH_URL = "/api/v1/auth/customers"
 
 
@@ -29,7 +29,24 @@ def _uid():
     return uuid4().hex[:8]
 
 
+def _create_event(auth_client, title="AI Test Event") -> str:
+    r = auth_client.post(
+        "/api/v1/customers/events",
+        json={"eventType": "Birthday", "title": title},
+    )
+    assert r.status_code == 201, r.text
+    return r.json()["eventId"]
+
+
+def _chat(auth_client, event_id: str, message="Plan a romantic dinner"):
+    return auth_client.post(
+        f"/api/v1/customers/events/{event_id}/chat",
+        json={"content": message},
+    )
+
+
 def _plan_payload(message="Plan a romantic dinner", session_id=None):
+    """Kept for reference only — use _chat() for actual requests."""
     return {
         "session_id": session_id or f"sess-{_uid()}",
         "user_query": message,
@@ -722,10 +739,8 @@ class TestMultiIntentHandling:
                    return_value=_fake_ai(intent="planning", tags=["romantic"])), \
              patch.object(vs, "find_perfect_matches", side_effect=fake_venues), \
              patch.object(vs, "find_gift_matches",    side_effect=fake_gifts):
-            resp = auth_client.post(
-                PLAN_URL,
-                json=_plan_payload("I want a romantic dinner AND a gift for my wife"),
-            )
+            event_id = _create_event(auth_client)
+            resp = _chat(auth_client, event_id, "I want a romantic dinner AND a gift for my wife")
 
         assert resp.status_code == 200, resp.text
         assert captured["venues"], "find_perfect_matches must be called for multi-intent"
@@ -751,14 +766,12 @@ class TestMultiIntentHandling:
                    return_value=_fake_ai(intent="planning", tags=["romantic"])), \
              patch.object(vs, "find_perfect_matches", return_value=[pkg]), \
              patch.object(vs, "find_gift_matches",    return_value=[]):
-            resp = auth_client.post(
-                PLAN_URL,
-                json=_plan_payload("I want a romantic dinner AND a gift for my wife"),
-            )
+            event_id = _create_event(auth_client)
+            resp = _chat(auth_client, event_id, "I want a romantic dinner AND a gift for my wife")
 
         assert resp.status_code == 200, resp.text
-        assert len(resp.json().get("matched_venues", [])) > 0, \
-            "matched_venues must be populated in a multi-intent response"
+        assert len(resp.json().get("matchedVenues", [])) > 0, \
+            "matchedVenues must be populated in a multi-intent response"
 
     # ── Integration: gift_suggestion populated ────────────────────────────────
 
@@ -780,14 +793,12 @@ class TestMultiIntentHandling:
                    return_value=_fake_ai(intent="planning", tags=["romantic"], gift=None)), \
              patch.object(vs, "find_perfect_matches", return_value=[]), \
              patch.object(vs, "find_gift_matches",    return_value=[pkg]):
-            resp = auth_client.post(
-                PLAN_URL,
-                json=_plan_payload("I want a romantic dinner AND a gift for my wife"),
-            )
+            event_id = _create_event(auth_client)
+            resp = _chat(auth_client, event_id, "I want a romantic dinner AND a gift for my wife")
 
         assert resp.status_code == 200, resp.text
-        assert resp.json().get("gift_suggestion") is not None, \
-            "gift_suggestion must be populated in a multi-intent response"
+        assert resp.json().get("giftSuggestion") is not None, \
+            "giftSuggestion must be populated in a multi-intent response"
 
     # ── Integration: pure planning does NOT populate gift_suggestion ──────────
 
@@ -798,14 +809,12 @@ class TestMultiIntentHandling:
                    return_value=_fake_ai(intent="planning", tags=["romantic"], gift=None)), \
              patch.object(vs, "find_perfect_matches", return_value=[]), \
              patch.object(vs, "find_gift_matches",    return_value=[]) as mock_gift:
-            resp = auth_client.post(
-                PLAN_URL,
-                json=_plan_payload("I want a romantic dinner in Colombo"),
-            )
+            event_id = _create_event(auth_client)
+            resp = _chat(auth_client, event_id, "I want a romantic dinner in Colombo")
 
         assert resp.status_code == 200, resp.text
-        assert resp.json().get("gift_suggestion") is None, \
-            "Pure planning message must not produce a gift_suggestion"
+        assert resp.json().get("giftSuggestion") is None, \
+            "Pure planning message must not produce a giftSuggestion"
         mock_gift.assert_not_called()
 
     # ── Integration: pure gift does NOT run venue matching ────────────────────
@@ -817,10 +826,8 @@ class TestMultiIntentHandling:
                    return_value=_fake_ai(intent="gift", tags=["nature"])), \
              patch.object(vs, "find_perfect_matches", return_value=[]) as mock_venues, \
              patch.object(vs, "find_gift_matches",    return_value=[]):
-            resp = auth_client.post(
-                PLAN_URL,
-                json=_plan_payload("Buy a gift for a nature lover"),
-            )
+            event_id = _create_event(auth_client)
+            resp = _chat(auth_client, event_id, "Buy a gift for a nature lover")
 
         assert resp.status_code == 200, resp.text
         mock_venues.assert_not_called()
@@ -1071,21 +1078,19 @@ class TestConfidenceScore:
              patch.object(vs, "find_perfect_matches", return_value=[pkg]), \
              patch.object(vs, "get_all_tags", return_value=["romantic"]), \
              patch.object(vs, "get_availability_block", return_value=""):
-            resp = auth_client.post(
-                PLAN_URL,
-                json=_plan_payload("Plan a romantic dinner in Colombo"),
-            )
+            event_id = _create_event(auth_client)
+            resp = _chat(auth_client, event_id, "Plan a romantic dinner in Colombo")
 
         assert resp.status_code == 200, resp.text
-        venues = resp.json().get("matched_venues", [])
+        venues = resp.json().get("matchedVenues", [])
         assert len(venues) > 0, "Expected at least one matched venue"
         first = venues[0]
-        assert "match_score_label" in first, \
+        assert "matchScoreLabel" in first or "match_score_label" in first, \
             "match_score_label must be present in each matched venue"
-        assert "match_score" in first, \
-            "match_score must be present in each matched venue"
-        assert "match_score_max" in first, \
-            "match_score_max must be present in each matched venue"
+        assert "matchScore" in first or "match_score" in first, \
+            "matchScore must be present in each matched venue"
+        assert "matchScoreMax" in first or "match_score_max" in first, \
+            "matchScoreMax must be present in each matched venue"
 
     # ── 7. Better match has higher score than worse match ────────────────────
 
