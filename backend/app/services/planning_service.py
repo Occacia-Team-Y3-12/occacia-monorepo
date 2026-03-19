@@ -1,6 +1,13 @@
 """
 app/services/planning_service.py
 
+Fixes applied
+─────────────
+#7  Natural language date parsing — handles "next Friday", "June 15th",
+    "tomorrow", "in 3 weeks", etc. in addition to ISO format.
+    Also consumes event_date returned directly by the AI (Issue #2 dependency).
+    session_id is now passed to generate_date_plan so the cache key is correct.
+
 Persona flow — two complementary paths:
 
 PATH A  (interactive, Redis-backed):
@@ -12,15 +19,11 @@ PATH A  (interactive, Redis-backed):
 PATH B  (single-turn, no extra Redis step required):
   AI returns save_persona + ask_save_persona in the SAME response.
   If the user's current message already contains a yes-word, save immediately.
-  This handles test cases and real users who say yes in the same message.
-
-Both paths are active simultaneously. Path A adds the multi-turn UX layer
-on top; Path B ensures correctness even in single-turn scenarios.
 """
 import json
 import logging
 import re
-from datetime import date
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -31,85 +34,144 @@ from app.schemas.planning_schema import PlanResponse
 logger = logging.getLogger(__name__)
 
 _BUDGET_RE = re.compile(
-    r'(?:budget|spend|spending|cost|costs|afford|price)[^\d]{0,10}(\d[\d,]*)',
+    r'(?:budget|spend|spending|cost|costs|afford|price)[^\d]{0,10}(\d[\d,]*)'
+    r'|(?:lkr|rs\.?)\s*(\d[\d,]*)'           # "LKR 5000" / "Rs. 5000"
+    r'|(\d[\d,]*)(?:\s*k)\b',                 # "50k"
     re.IGNORECASE,
 )
-_GUEST_RE  = re.compile(r'(\d+)\s*(?:people|guests?|persons?|pax)', re.IGNORECASE)
-_DATE_RE   = re.compile(r'(\d{4}-\d{2}-\d{2})')
+_GUEST_RE = re.compile(r'(\d+)\s*(?:people|guests?|persons?|pax)', re.IGNORECASE)
+_DATE_ISO_RE = re.compile(r'(\d{4}-\d{2}-\d{2})')
 
-_YES_WORDS = {"yes", "sure", "ok", "okay", "save", "please", "yep", "yeah",
-              "do it", "go ahead"}
-_NO_WORDS  = {"no", "nope", "skip", "don't", "dont", "not now",
-              "never mind", "cancel"}
-
-# Redis key templates
-_STEP_KEY    = "pflow:step:{sid}"
-_CHOSEN_KEY  = "pflow:chosen:{sid}"
-_PENDING_KEY = "pflow:pending:{sid}"
-
-
-# ── Redis helpers ──────────────────────────────────────────────────────────────
-
-def _get_redis():
-    try:
-        import redis as _redis
-        import os
-        r = _redis.from_url(
-            os.getenv("REDIS_URL", "redis://localhost:6379/0"),
-            decode_responses=True,
-            socket_connect_timeout=2,
-        )
-        r.ping()
-        return r
-    except Exception:
-        return None
-
-
-def _rget(r, key, default=None):
-    if r is None:
-        return default
-    try:
-        v = r.get(key)
-        return v if v is not None else default
-    except Exception:
-        return default
+# FIX #7 — natural language date helpers
+_MONTH_MAP: dict[str, int] = {
+    "january": 1,  "jan": 1,
+    "february": 2, "feb": 2,
+    "march": 3,    "mar": 3,
+    "april": 4,    "apr": 4,
+    "may": 5,
+    "june": 6,     "jun": 6,
+    "july": 7,     "jul": 7,
+    "august": 8,   "aug": 8,
+    "september": 9,"sep": 9, "sept": 9,
+    "october": 10, "oct": 10,
+    "november": 11,"nov": 11,
+    "december": 12,"dec": 12,
+}
+_WEEKDAY_MAP: dict[str, int] = {
+    "monday": 0,   "mon": 0,
+    "tuesday": 1,  "tue": 1,
+    "wednesday": 2,"wed": 2,
+    "thursday": 3, "thu": 3,
+    "friday": 4,   "fri": 4,
+    "saturday": 5, "sat": 5,
+    "sunday": 6,   "sun": 6,
+}
+_MONTH_PATTERN = "(?:" + "|".join(_MONTH_MAP.keys()) + ")"
+_WEEKDAY_PATTERN = "(?:" + "|".join(_WEEKDAY_MAP.keys()) + ")"
 
 
-def _rset(r, key, value, ttl=3600):
-    if r is None:
-        return
-    try:
-        r.setex(key, ttl, str(value))
-    except Exception:
-        pass
+def _extract_date_nlp(text: str) -> Optional[str]:
+    """
+    Extract a date from natural language text.
+    Returns ISO 8601 date string (YYYY-MM-DD) or None.
 
+    Priority order:
+      1. ISO format  2025-06-15
+      2. today / tonight
+      3. tomorrow
+      4. next/this [weekday]
+      5. [Month] [day] / [day] [Month]   (June 15th, 15 June)
+      6. in X days / weeks
+    """
+    today = date.today()
+    lower = text.lower()
 
-def _rdel(r, *keys):
-    if r is None:
-        return
-    try:
-        r.delete(*keys)
-    except Exception:
-        pass
+    # 1. ISO format
+    m = _DATE_ISO_RE.search(text)
+    if m:
+        try:
+            date.fromisoformat(m.group(1))
+            return m.group(1)
+        except ValueError:
+            pass
 
+    # 2. today / tonight
+    if re.search(r'\btoday\b|\btonight\b', lower):
+        return today.isoformat()
 
-# ── Text helpers ───────────────────────────────────────────────────────────────
+    # 3. tomorrow
+    if re.search(r'\btomorrow\b', lower):
+        return (today + timedelta(days=1)).isoformat()
 
-def _user_said_yes(text: str) -> bool:
-    lower = text.lower().strip()
-    return any(w in lower for w in _YES_WORDS)
+    # 4. next/this [weekday]
+    wm = re.search(
+        r'\b(next|this)?\s*(' + _WEEKDAY_PATTERN + r')\b',
+        lower,
+    )
+    if wm:
+        qualifier  = wm.group(1) or ""
+        target_wd  = _WEEKDAY_MAP[wm.group(2)]
+        current_wd = today.weekday()
+        days_ahead = (target_wd - current_wd) % 7
+        # "next X" or the same weekday → push to next week if days_ahead == 0
+        if qualifier == "next" or days_ahead == 0:
+            days_ahead = days_ahead if days_ahead > 0 else 7
+        return (today + timedelta(days=days_ahead)).isoformat()
 
+    # 5a. "[Month] [day]"  →  "June 15" / "june 15th"
+    mm = re.search(
+        r'\b(' + _MONTH_PATTERN + r')\s+(\d{1,2})(?:st|nd|rd|th)?\b',
+        lower,
+    )
+    if mm:
+        month = _MONTH_MAP[mm.group(1)]
+        day   = int(mm.group(2))
+        try:
+            candidate = date(today.year, month, day)
+            year = today.year if candidate >= today else today.year + 1
+            return date(year, month, day).isoformat()
+        except ValueError:
+            pass
 
-def _user_said_no(text: str) -> bool:
-    lower = text.lower().strip()
-    return any(w in lower for w in _NO_WORDS)
+    # 5b. "[day] [Month]"  →  "15 June" / "15th June"
+    dm = re.search(
+        r'\b(\d{1,2})(?:st|nd|rd|th)?\s+(' + _MONTH_PATTERN + r')\b',
+        lower,
+    )
+    if dm:
+        day   = int(dm.group(1))
+        month = _MONTH_MAP[dm.group(2)]
+        try:
+            candidate = date(today.year, month, day)
+            year = today.year if candidate >= today else today.year + 1
+            return date(year, month, day).isoformat()
+        except ValueError:
+            pass
+
+    # 6. "in X days/weeks"
+    rm = re.search(r'\bin\s+(\d+)\s+(day|days|week|weeks)\b', lower)
+    if rm:
+        amount = int(rm.group(1))
+        if "week" in rm.group(2):
+            amount *= 7
+        return (today + timedelta(days=amount)).isoformat()
+
+    return None
 
 
 def _extract_budget(text: str) -> Optional[float]:
     m = _BUDGET_RE.search(text)
     if m:
+        # Group 1: budget/spend/... pattern
+        # Group 2: LKR/Rs pattern
+        # Group 3: Nk pattern
+        raw = m.group(1) or m.group(2) or m.group(3) or ""
         try:
-            return float(m.group(1).replace(",", ""))
+            val = float(raw.replace(",", ""))
+            # Handle "50k" → 50000
+            if m.group(3) and "k" in text[m.end():m.end()+1].lower():
+                val *= 1000
+            return val
         except ValueError:
             pass
     return None
@@ -120,17 +182,6 @@ def _extract_guests(text: str) -> Optional[int]:
     if m:
         try:
             return int(m.group(1))
-        except ValueError:
-            pass
-    return None
-
-
-def _extract_date(text: str) -> Optional[str]:
-    m = _DATE_RE.search(text)
-    if m:
-        try:
-            date.fromisoformat(m.group(1))
-            return m.group(1)
         except ValueError:
             pass
     return None
@@ -200,7 +251,73 @@ def _package_to_dict(pkg, requested_tags: list = None) -> dict:
     }
 
 
-# ── Persona flow helpers ───────────────────────────────────────────────────────
+# ── Redis helpers ──────────────────────────────────────────────────────────────
+
+def _get_redis():
+    try:
+        import redis as _redis
+        import os
+        r = _redis.from_url(
+            os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+            decode_responses=True,
+            socket_connect_timeout=2,
+        )
+        r.ping()
+        return r
+    except Exception:
+        return None
+
+
+def _rget(r, key, default=None):
+    if r is None:
+        return default
+    try:
+        v = r.get(key)
+        return v if v is not None else default
+    except Exception:
+        return default
+
+
+def _rset(r, key, value, ttl=3600):
+    if r is None:
+        return
+    try:
+        r.setex(key, ttl, str(value))
+    except Exception:
+        pass
+
+
+def _rdel(r, *keys):
+    if r is None:
+        return
+    try:
+        r.delete(*keys)
+    except Exception:
+        pass
+
+
+# ── Text helpers ───────────────────────────────────────────────────────────────
+
+_YES_WORDS = {"yes", "sure", "ok", "okay", "save", "please", "yep", "yeah",
+              "do it", "go ahead"}
+_NO_WORDS  = {"no", "nope", "skip", "don't", "dont", "not now",
+              "never mind", "cancel"}
+
+# Redis key templates
+_STEP_KEY    = "pflow:step:{sid}"
+_CHOSEN_KEY  = "pflow:chosen:{sid}"
+_PENDING_KEY = "pflow:pending:{sid}"
+
+
+def _user_said_yes(text: str) -> bool:
+    lower = text.lower().strip()
+    return any(w in lower for w in _YES_WORDS)
+
+
+def _user_said_no(text: str) -> bool:
+    lower = text.lower().strip()
+    return any(w in lower for w in _NO_WORDS)
+
 
 def _build_persona_choice_message(personas: list) -> str:
     lines = [
@@ -236,7 +353,6 @@ def _try_save_persona(db, persona_svc, customer_id, save_data, existing_personas
     """
     Create and auto-confirm a persona from save_data dict.
     Returns (saved: bool, updated_personas: list).
-    Skips silently if name is blank or already exists.
     """
     if not isinstance(save_data, dict):
         return False, existing_personas
@@ -300,10 +416,8 @@ class PlanningService:
 
         current_step = int(_rget(r, step_key, "0"))
 
-        # Fetch all customer personas (scoped to this customer by persona_svc)
         personas = persona_svc.get_personas(db, customer_id)
 
-        # Resolve chosen persona from Redis
         chosen_persona = None
         chosen_id = _rget(r, chosen_key, "")
         if chosen_id:
@@ -313,16 +427,10 @@ class PlanningService:
 
         history      = chat_svc.get_session_history(db, session_id)
         prev_missing = chat_svc.get_last_missing_info(db, session_id)
-        # Guard: prev_missing may arrive as dict from older storage format
         if isinstance(prev_missing, dict):
             prev_missing = prev_missing.get("items", [])
 
-        # ══════════════════════════════════════════════════════════════════════
-        # STEP 0 — very first message + saved personas → show list
-        # Only runs when Redis is reachable (r is not None).
-        # When Redis is unavailable (tests, no Redis env) we skip the
-        # interactive flow entirely and go straight to the AI loop.
-        # ══════════════════════════════════════════════════════════════════════
+        # ── STEP 0: very first message + saved personas → show list ───────────
         if r is not None and current_step == 0 and not history and personas:
             msg = _build_persona_choice_message(personas)
             chat_svc.save_message(
@@ -340,9 +448,7 @@ class PlanningService:
                 ask_save_persona=False, persona_saved=False, persona_confirmed=False,
             )
 
-        # ══════════════════════════════════════════════════════════════════════
-        # STEP 1 — user replied to persona-selection prompt
-        # ══════════════════════════════════════════════════════════════════════
+        # ── STEP 1: user replied to persona-selection prompt ──────────────────
         if r is not None and current_step == 1 and personas:
             matched = _match_persona_from_reply(user_query, personas)
             if matched:
@@ -378,9 +484,7 @@ class PlanningService:
             else:
                 _rset(r, step_key, "2")
 
-        # ══════════════════════════════════════════════════════════════════════
-        # STEP 4 — user replied to "save this person?" prompt
-        # ══════════════════════════════════════════════════════════════════════
+        # ── STEP 4: user replied to "save this person?" prompt ────────────────
         if r is not None and current_step == 4:
             pending_json = _rget(r, pending_key, "")
             save_data    = json.loads(pending_json) if pending_json else {}
@@ -415,19 +519,20 @@ class PlanningService:
                 persona_confirmed=False,
             )
 
-        # ══════════════════════════════════════════════════════════════════════
-        # STEP 2 / default — normal AI planning loop
-        # ══════════════════════════════════════════════════════════════════════
+        # ── STEP 2 / default: normal AI planning loop ─────────────────────────
         _rset(r, step_key, "2")
 
         all_text = (
             user_query + " "
             + " ".join((m.user_message or "") for m in history[-5:])
         )
+
+        # FIX #7: use NLP date parser first, fall back to regex
         extracted_budget   = _extract_budget(all_text)
         extracted_guests   = _extract_guests(all_text)
         extracted_location = vendor_svc.extract_location_from_text(all_text)
-        extracted_date     = _extract_date(all_text)
+        extracted_date     = _extract_date_nlp(all_text)   # now handles natural language
+
         active_missing     = list(prev_missing or [])
         available_tags     = vendor_svc.get_all_tags(db)
         availability_block = (
@@ -435,7 +540,6 @@ class PlanningService:
             if available_tags else ""
         )
 
-        # Personas for AI: chosen persona if set, else all
         personas_for_ai = [chosen_persona] if chosen_persona else personas
 
         try:
@@ -471,6 +575,7 @@ class PlanningService:
                 personas       = personas_for_ai if personas_for_ai else None,
                 available_tags = available_tags if available_tags else None,
                 missing_info   = active_missing if active_missing else None,
+                session_id     = session_id,   # FIX #1: pass session_id for correct cache key
             )
         except Exception as exc:
             logger.error(f"AI call failed: {exc}")
@@ -493,9 +598,9 @@ class PlanningService:
         budget_for_filter = ai_result.get("budget_per_head") or extracted_budget
         location_filter   = ai_result.get("location") or extracted_location
 
-        # ── use_persona_name: AI suggests an existing saved persona ───────────
-        # Restored to fix test_persona_confirmed_flag_when_ai_suggests and
-        # test_suggested_persona_confirmed_in_db.
+        # FIX #2: prefer AI-returned event_date, fall back to regex extraction
+        extracted_date = ai_result.get("event_date") or extracted_date
+
         use_persona_name  = (ai_result.get("use_persona_name") or "").strip()
         persona_confirmed = False
 
@@ -514,26 +619,20 @@ class PlanningService:
                     chosen_persona = matched_p
                 persona_confirmed = True
 
-        # Also confirmed if we already had a chosen persona from Redis
         if chosen_persona:
             persona_confirmed = True
 
         # ── PATH B: single-turn persona save ──────────────────────────────────
-        # If the AI returned save_persona AND this message contains a yes-word,
-        # save immediately without a second turn.
-        # If ask_save_persona is True but no yes-word, queue for step 4.
         save_persona_data = ai_result.get("save_persona")
         ask_save_persona  = bool(ai_result.get("ask_save_persona", False))
         persona_saved     = False
 
         if save_persona_data and isinstance(save_persona_data, dict):
             if _user_said_yes(user_query):
-                # Single-turn save (covers all test_persona_saved_when_user_says_* tests)
                 persona_saved, personas = _try_save_persona(
                     db, persona_svc, customer_id, save_persona_data, personas
                 )
             elif ask_save_persona:
-                # Queue for next turn (PATH A multi-turn UX)
                 name = (save_persona_data.get("name") or "").strip()
                 already = (
                     any(p.name.lower() == name.lower() for p in personas)
@@ -559,9 +658,7 @@ class PlanningService:
         # ── Venue / gift matching ─────────────────────────────────────────────
         matched_venues   = []
         venue_match_tier = None
-
-        # For gift enrichment, use chosen persona first, then fall back to all
-        enrich_personas = personas_for_ai if personas_for_ai else personas
+        enrich_personas  = personas_for_ai if personas_for_ai else personas
 
         if intent == "multi" and venue_tags:
             pkgs = vendor_svc.find_perfect_matches(
