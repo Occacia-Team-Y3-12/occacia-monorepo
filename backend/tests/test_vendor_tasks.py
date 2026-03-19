@@ -8,7 +8,8 @@ from app.models.task import Task
 from app.models.vendor import Vendor
 from app.core.security import create_access_token
 
-pytestmark = pytest.mark.skip(reason="Vendor task tests require async DB fixture wiring")
+# TODO: Replace module-level skip once async fixture wiring is finalized for vendor task integration tests.
+pytestmark = pytest.mark.skip(reason="Pending async DB fixture wiring for vendor task integration tests")
 
 @pytest.fixture
 async def approved_vendor(db: AsyncSession):
