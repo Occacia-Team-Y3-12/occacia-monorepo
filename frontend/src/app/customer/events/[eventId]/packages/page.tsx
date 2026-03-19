@@ -29,10 +29,10 @@ const MOCK_PACKAGES: RecommendationPackage[] = [
     currency: 'USD',
     expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     items: [
-      { taskId: 't1', taskName: 'VENUE BOOKING', offeringTitle: 'Standard Banquet Hall', offeringCategory: 'Venue', vendorName: 'CitySpace Halls', taskPrice: 1500 },
-      { taskId: 't2', taskName: 'CATERING SERVICE', offeringTitle: 'Buffet Package – Classic', offeringCategory: 'Catering', vendorName: 'QuickBite Co.', taskPrice: 1200 },
-      { taskId: 't3', taskName: 'PHOTOGRAPHY', offeringTitle: '4-Hour Coverage', offeringCategory: 'Photography', vendorName: 'SnapShot Studios', taskPrice: 800 },
-      { taskId: 't4', taskName: 'ENTERTAINMENT / DJ', offeringTitle: 'Basic DJ Set', offeringCategory: 'Entertainment', vendorName: 'BeatDrop DJs', taskPrice: 700 },
+      { taskId: 't1', taskName: 'VENUE BOOKING', offeringId: 'b-o1', offeringTitle: 'Standard Banquet Hall', offeringCategory: 'Venue', vendorName: 'CitySpace Halls', taskPrice: 1500 },
+      { taskId: 't2', taskName: 'CATERING SERVICE', offeringId: 'b-o2', offeringTitle: 'Buffet Package – Classic', offeringCategory: 'Catering', vendorName: 'QuickBite Co.', taskPrice: 1200 },
+      { taskId: 't3', taskName: 'PHOTOGRAPHY', offeringId: 'b-o3', offeringTitle: '4-Hour Coverage', offeringCategory: 'Photography', vendorName: 'SnapShot Studios', taskPrice: 800 },
+      { taskId: 't4', taskName: 'ENTERTAINMENT / DJ', offeringId: 'b-o4', offeringTitle: 'Basic DJ Set', offeringCategory: 'Entertainment', vendorName: 'BeatDrop DJs', taskPrice: 700 },
     ],
   },
   {
@@ -42,10 +42,10 @@ const MOCK_PACKAGES: RecommendationPackage[] = [
     currency: 'USD',
     expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     items: [
-      { taskId: 't1', taskName: 'VENUE BOOKING', offeringTitle: 'Premier Ballroom', offeringCategory: 'Venue', vendorName: 'Grand Horizon Hotel', taskPrice: 3000 },
-      { taskId: 't2', taskName: 'CATERING SERVICE', offeringTitle: "Seated Dinner – Chef's Menu", offeringCategory: 'Catering', vendorName: 'Savory & Fine', taskPrice: 2200 },
-      { taskId: 't3', taskName: 'PHOTOGRAPHY', offeringTitle: 'Full-Day + Drone Coverage', offeringCategory: 'Photography', vendorName: 'Lumen Collective', taskPrice: 1500 },
-      { taskId: 't4', taskName: 'ENTERTAINMENT / DJ', offeringTitle: 'DJ + MC Package', offeringCategory: 'Entertainment', vendorName: 'Vibe Nation', taskPrice: 1150 },
+      { taskId: 't1', taskName: 'VENUE BOOKING', offeringId: 'r-o1', offeringTitle: 'Premier Ballroom', offeringCategory: 'Venue', vendorName: 'Grand Horizon Hotel', taskPrice: 3000 },
+      { taskId: 't2', taskName: 'CATERING SERVICE', offeringId: 'r-o2', offeringTitle: "Seated Dinner – Chef's Menu", offeringCategory: 'Catering', vendorName: 'Savory & Fine', taskPrice: 2200 },
+      { taskId: 't3', taskName: 'PHOTOGRAPHY', offeringId: 'r-o3', offeringTitle: 'Full-Day + Drone Coverage', offeringCategory: 'Photography', vendorName: 'Lumen Collective', taskPrice: 1500 },
+      { taskId: 't4', taskName: 'ENTERTAINMENT / DJ', offeringId: 'r-o4', offeringTitle: 'DJ + MC Package', offeringCategory: 'Entertainment', vendorName: 'Vibe Nation', taskPrice: 1150 },
     ],
   },
   {
@@ -55,10 +55,10 @@ const MOCK_PACKAGES: RecommendationPackage[] = [
     currency: 'USD',
     expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     items: [
-      { taskId: 't1', taskName: 'VENUE BOOKING', offeringTitle: 'Exclusive Rooftop Terrace', offeringCategory: 'Venue', vendorName: 'The Ritz Venue', taskPrice: 5500 },
-      { taskId: 't2', taskName: 'CATERING SERVICE', offeringTitle: '7-Course Tasting Menu', offeringCategory: 'Catering', vendorName: 'Étoile Cuisine', taskPrice: 4200 },
-      { taskId: 't3', taskName: 'PHOTOGRAPHY', offeringTitle: 'Cinematic Photo + Video', offeringCategory: 'Photography', vendorName: 'ArtFrame Studios', taskPrice: 2800 },
-      { taskId: 't4', taskName: 'ENTERTAINMENT / DJ', offeringTitle: 'Live Band + DJ Fusion', offeringCategory: 'Entertainment', vendorName: 'Platinum Sounds', taskPrice: 2000 },
+      { taskId: 't1', taskName: 'VENUE BOOKING', offeringId: 'h-o1', offeringTitle: 'Exclusive Rooftop Terrace', offeringCategory: 'Venue', vendorName: 'The Ritz Venue', taskPrice: 5500 },
+      { taskId: 't2', taskName: 'CATERING SERVICE', offeringId: 'h-o2', offeringTitle: '7-Course Tasting Menu', offeringCategory: 'Catering', vendorName: 'Étoile Cuisine', taskPrice: 4200 },
+      { taskId: 't3', taskName: 'PHOTOGRAPHY', offeringId: 'h-o3', offeringTitle: 'Cinematic Photo + Video', offeringCategory: 'Photography', vendorName: 'ArtFrame Studios', taskPrice: 2800 },
+      { taskId: 't4', taskName: 'ENTERTAINMENT / DJ', offeringId: 'h-o4', offeringTitle: 'Live Band + DJ Fusion', offeringCategory: 'Entertainment', vendorName: 'Platinum Sounds', taskPrice: 2000 },
     ],
   },
 ];

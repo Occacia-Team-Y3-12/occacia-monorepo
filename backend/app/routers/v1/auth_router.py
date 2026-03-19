@@ -11,7 +11,6 @@ from app.schemas.auth_schema import (
     AuthResponse,
     CustomerRegister,
     ForgotPasswordRequest,
-    LoginRequest,
     RefreshTokenRequest,
     RegisterResponse,
     ResetPasswordRequest,
@@ -38,7 +37,10 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
     return vendor
 
 @router.post("/vendor/login", tags=["Authentication"])
-def login_vendor(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login_vendor(
+    form_data: OAuth2PasswordRequestForm = Depends(), # 🚨 FIX: Allow Swagger UI Form Data
+    db: Session = Depends(get_db)
+):
     return auth_service.login_vendor(db, form_data)
 
 @router.get("/vendor/verify-email")
@@ -52,9 +54,14 @@ def verify_vendor_email(token: str = Query(...), db: Session = Depends(get_db)):
 def register_customer(payload: CustomerRegister, db: Session = Depends(get_db)):
     return auth_service.register_customer(db, payload)
 
-@router.post("/customer/login", response_model=AuthResponse, response_model_by_alias=True, tags=["Authentication"])
-def login_customer(payload: LoginRequest, db: Session = Depends(get_db)):
-    return auth_service.login_customer(db, payload)
+
+@router.post("/customer/login", tags=["Authentication"])
+def login_customer(
+    form_data: OAuth2PasswordRequestForm = Depends(), # 🚨 FIX: Allow Swagger UI Form Data
+    db: Session = Depends(get_db)
+):
+    return auth_service.login_customer(db, form_data)
+
 
 @router.post(
     "/customer/token/refresh",

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.customer import Customer
 from app.models.task import Task
+from app.models.package_execution_request import PackageExecutionRequest
 from app.core.dependencies import get_current_customer
 from app.schemas.customer_schema import (
     CustomerProfileResponse,
@@ -53,7 +54,14 @@ from app.schemas.event_planning_schema import (
     TaskResponse,
     TaskUpdateRequest,
 )
-from app.schemas.recommendation_schema import RecommendationPackageListResponse
+from app.schemas.recommendation_schema import (
+    RecommendationPackageListResponse,
+    RecommendationPackageResponse,
+)
+from app.schemas.package_schema import (
+    PackageOrderResponse,
+    PaginatedPackageOrdersResponse,
+)
 from app.services.customer_service import customer_service
 from app.services.event_planning_service import event_planning_service
 from app.services.recommendation_service import recommendation_service
@@ -154,6 +162,20 @@ def _reminders_response(event) -> EventRemindersResponse:
             channels=event.reminder_channels or [],
             offsets=event.reminder_offsets or [],
         )
+    )
+
+def _package_order_response(order: PackageExecutionRequest) -> PackageOrderResponse:
+    return PackageOrderResponse(
+        packageOrderId=order.execution_request_id,
+        eventId=order.event_id,
+        packageId=order.package_id,
+        packageOrderTotalPrice=order.package_total_price,
+        currency=order.currency,
+        status=order.status,
+        createdAt=order.created_at,
+        statusUpdatedAt=order.status_updated_at,
+        notes=order.notes,
+        idempotencyKey=order.idempotency_key,
     )
 
 def _calendar_status_response(customer: Customer) -> CalendarConnectionStatusResponse:
@@ -519,6 +541,48 @@ def list_event_recommendation_packages(
         db,
         customer_id=current_customer.customer_id,
         event_id=event_id,
+    )
+
+@router.get(
+    "/customers/events/{event_id}/packages/{package_id}",
+    response_model=RecommendationPackageResponse,
+    response_model_by_alias=True,
+)
+def get_event_recommendation_package(
+    event_id: str,
+    package_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.get_package_by_id(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+        package_id=package_id,
+    )
+
+@router.get(
+    "/customers/events/{event_id}/package-orders",
+    response_model=PaginatedPackageOrdersResponse,
+    response_model_by_alias=True,
+)
+def list_event_package_orders(
+    event_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    items, next_cursor = event_planning_service.list_package_orders(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+        limit=limit,
+        cursor=cursor,
+    )
+    return PaginatedPackageOrdersResponse(
+        items=[_package_order_response(item) for item in items],
+        nextCursor=next_cursor,
     )
 
 
