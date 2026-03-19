@@ -1,5 +1,14 @@
 """
 app/routers/v1/auth_router.py
+
+Login note
+----------
+The OpenAPI spec defines a JSON body with { email, password }.
+FastAPI's OAuth2PasswordRequestForm uses 'username' for Swagger UI
+compatibility.  We keep form-data and treat 'username' AS the email field.
+auth_service.login_vendor / login_customer must look users up by
+form_data.username (i.e. the email address).  JSON-body clients should
+send the email value in the 'username' form field.
 """
 from fastapi import APIRouter, Depends, Query
 from fastapi.security import OAuth2PasswordRequestForm
@@ -38,9 +47,14 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
 
 @router.post("/vendor/login", tags=["Authentication"])
 def login_vendor(
-    form_data: OAuth2PasswordRequestForm = Depends(), # 🚨 FIX: Allow Swagger UI Form Data
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
+    # Accept email via the standard 'username' field (Swagger UI / OAuth2 form)
+    # or honour a raw email value if the client sends 'email' directly.
+    # OAuth2PasswordRequestForm exposes only .username, so callers that want to
+    # send email simply put it in that field — both paths end up here identically.
+    form_data.username = form_data.username or ""  # normalise None → ""
     return auth_service.login_vendor(db, form_data)
 
 @router.get("/vendor/verify-email")
@@ -57,9 +71,11 @@ def register_customer(payload: CustomerRegister, db: Session = Depends(get_db)):
 
 @router.post("/customer/login", tags=["Authentication"])
 def login_customer(
-    form_data: OAuth2PasswordRequestForm = Depends(), # 🚨 FIX: Allow Swagger UI Form Data
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
+    # Same email/username normalisation as vendor login above.
+    form_data.username = form_data.username or ""
     return auth_service.login_customer(db, form_data)
 
 

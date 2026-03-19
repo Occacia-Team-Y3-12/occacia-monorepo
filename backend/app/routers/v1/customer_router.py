@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -16,6 +16,7 @@ from app.models.customer import Customer
 from app.models.task import Task
 from app.models.package_execution_request import PackageExecutionRequest
 from app.core.dependencies import get_current_customer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.schemas.customer_schema import (
     CustomerProfileResponse,
     CustomerProfileUpdateRequest,
@@ -65,6 +66,60 @@ from app.schemas.package_schema import (
 from app.services.customer_service import customer_service
 from app.services.event_planning_service import event_planning_service
 from app.services.recommendation_service import recommendation_service
+from app.services.planning_service import planning_service
+from app.services.ai_service import ai_service
+from app.services.chat_service import chat_service
+from app.services.vendor_service import vendor_service as _vendor_service
+from app.schemas.planning_schema import PlanResponse
+
+try:
+    from app.services.persona_service import persona_service as _persona_service
+except ImportError:
+    _persona_service = None
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+def get_authenticated_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
+):
+    """
+    Accept any valid JWT — customer or vendor — for metadata endpoints.
+    Uses app.core.security.decode_token (PyJWT) for signature verification,
+    then looks up Customer first, Vendor second.
+    """
+    from fastapi import HTTPException as _HTTPEx
+    from app.core.security import decode_token as _decode
+    from app.models.vendor import Vendor as _Vendor
+
+    if credentials is None:
+        raise _HTTPEx(status_code=401, detail="Not authenticated")
+
+    token = credentials.credentials
+
+    # Full signature verification via the app's own decode_token (PyJWT)
+    try:
+        payload = _decode(token)
+        email: str | None = payload.get("sub")
+    except Exception:
+        raise _HTTPEx(status_code=401, detail="Invalid or expired token")
+
+    if not email:
+        raise _HTTPEx(status_code=401, detail="Invalid token payload")
+
+    # Customer first
+    customer = db.query(Customer).filter(Customer.email == email).first()
+    if customer:
+        return customer
+
+    # Vendor fallback
+    vendor = db.query(_Vendor).filter(_Vendor.email == email).first()
+    if vendor:
+        return vendor
+
+    raise _HTTPEx(status_code=401, detail="User not found")
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Customer"])
@@ -339,11 +394,11 @@ def delete_customer_event(
 # --- Event Metadata Routes ---
 
 @router.get("/event-types", response_model=StringListResponse)
-def list_event_types(_: Customer = Depends(get_current_customer)):
+def list_event_types(_=Depends(get_authenticated_user)):
     return StringListResponse(items=customer_service.list_event_types())
 
 @router.get("/event-templates", response_model=StringListResponse)
-def list_event_templates(_: Customer = Depends(get_current_customer)):
+def list_event_templates(_=Depends(get_authenticated_user)):
     return StringListResponse(items=customer_service.list_event_templates())
 
 
@@ -354,19 +409,113 @@ def list_event_templates(_: Customer = Depends(get_current_customer)):
     response_model=ChatSendResponse,
     response_model_by_alias=True,
 )
-def send_event_chat_message(
+async def send_event_chat_message(
     event_id: str,
     body: ChatSendRequest,
     db: Session = Depends(get_db),
     current_customer: Customer = Depends(get_current_customer),
 ):
-    reply, suggested_tasks = event_planning_service.send_chat_message(
+    """
+    Unified event chat endpoint (UC-13).
+
+    Two services run in sequence:
+
+    1. event_planning_service.send_chat_message()
+       - Validates the event belongs to this customer
+       - Extracts schedule / timezone / reminders / recurrence from the
+         message text and writes them to the Event row
+       - Builds template-based suggested tasks
+       - Saves both sides of the message to EventChatMessage
+       - Returns a rule-based fallback reply
+
+    2. planning_service.process_plan()  [session_id = event_id]
+       - Runs the multi-turn persona flow (Redis-backed)
+       - Calls the AI for a rich conversational reply
+       - Extracts budget / guests / location / date
+       - Matches vendor packages (matchedVenues)
+       - Manages persona save / confirm flow
+       - Returns PlanResponse with 15+ fields
+
+    The AI reply from step 2 wins; the rule-based reply from step 1
+    is used only if step 2 fails entirely.  suggestedTasks always
+    comes from step 1 (template-driven, event-type aware).
+    """
+    # ── Step 1: rule-based service (DB writes + message persistence) ─────────
+    rule_reply, suggested_tasks = event_planning_service.send_chat_message(
         db,
-        customer_id=current_customer.customer_id,
+        customer_id=str(current_customer.customer_id),
         event_id=event_id,
         content=body.content,
     )
-    return ChatSendResponse(reply=reply, suggestedTasks=suggested_tasks)
+
+    # ── Build event context for AI ────────────────────────────────────────────
+    # Fetch the event so the AI knows what it's planning for (title, type, date, etc.)
+    try:
+        _event = event_planning_service.get_event_for_customer(
+            db, customer_id=str(current_customer.customer_id), event_id=event_id
+        )
+        from app.services.event_planning_service import EventPlanningService as _EPS
+        _tasks = event_planning_service.list_tasks(
+            db, customer_id=str(current_customer.customer_id), event_id=event_id
+        )
+        _event_context = {
+            "title":          _event.title,
+            "event_type":     _event.event_type,
+            "start_at":       _event.start_at.date().isoformat() if _event.start_at else None,
+            "location_text":  _event.location_text,
+            "existing_tasks": [t.name for t in _tasks] if _tasks else [],
+        }
+    except Exception:
+        _event_context = None
+
+    # ── Step 2: AI planning service (persona flow + vendor matching) ──────────
+    # session_id == event_id (confirmed architecture decision)
+    plan: PlanResponse | None = None
+    try:
+        plan = await planning_service.process_plan(
+            db=db,
+            customer=current_customer,
+            session_id=event_id,          # event_id IS the session_id
+            user_query=body.content,
+            persona_svc=_persona_service,
+            ai_svc=ai_service,
+            chat_svc=chat_service,
+            vendor_svc=_vendor_service,
+            event_context=_event_context,
+        )
+    except Exception as exc:
+        logger.warning(
+            "planning_service.process_plan failed for event %s: %s — "
+            "falling back to rule-based reply",
+            event_id, exc,
+        )
+
+    # ── Merge: AI reply wins; fallback to rule-based if AI failed ────────────
+    final_reply = (plan.chat_response or rule_reply) if plan else rule_reply
+
+    return ChatSendResponse(
+        # ── Spec fields ──────────────────────────────────────
+        reply=final_reply,
+        suggestedTasks=suggested_tasks,
+        # ── Planning engine fields (all optional / default-safe) ──────────────
+        intent=plan.intent if plan else None,
+        reasoning=plan.reasoning if plan else None,
+        personalityProfile=plan.personality_profile if plan else None,
+        giftSuggestion=plan.gift_suggestion if plan else None,
+        eventType=plan.event_type if plan else None,
+        eventDate=plan.event_date if plan else None,
+        location=plan.location if plan else None,
+        budgetPerHead=plan.budget_per_head if plan else None,
+        guestCount=plan.guest_count if plan else None,
+        venueTags=plan.venue_tags if plan else [],
+        missingInfo=plan.missing_info if plan else [],
+        matchedVenues=plan.matched_venues if plan else [],
+        venueMatchTier=plan.venue_match_tier if plan else None,
+        # ── Persona flow flags ────────────────────────────────
+        askSavePersona=plan.ask_save_persona if plan else False,
+        personaSaved=plan.persona_saved if plan else False,
+        personaConfirmed=plan.persona_confirmed if plan else False,
+    )
 
 @router.post(
     "/customers/events/{event_id}/summarize",
