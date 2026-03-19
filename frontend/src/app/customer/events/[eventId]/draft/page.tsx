@@ -226,7 +226,7 @@ export default function CustomerEventDraftPage() {
         </div>
       </div>
 
-      <footer className="sticky bottom-0 mt-10 border-t border-[#D6DEEC] bg-white/95 backdrop-blur">
+       <footer className="fixed inset-x-0 bottom-0 border-t border-[#D6DEEC] bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1060px] items-center justify-between gap-3 px-0 py-4">
           <button
             type="button"
