@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vendorTaskApi } from '@/services/vendorTaskApi';
 import { TaskCard } from '@/components/vendor/TaskCard';
@@ -22,6 +23,7 @@ export default function VendorActivitiesPage() {
 }
 
 function VendorActivitiesContent() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TaskStatus>('pending_response');
   const [filters, setFilters] = useState<{ search?: string; priority?: TaskPriority }>({
     search: undefined,
@@ -107,7 +109,7 @@ function VendorActivitiesContent() {
               <TaskCard 
                 key={task.id} 
                 task={task}
-                onClick={() => window.location.href = `/vendors/activities/${task.id}`}
+                onClick={() => router.push(`/vendor/activities/${task.id}`)}
               />
             ))}
           </div>
