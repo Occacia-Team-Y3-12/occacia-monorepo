@@ -456,12 +456,7 @@ export default function CustomerEventChatPage() {
                     Likes: Nature, Minimalist design
                   </p>
                   <p className="flex items-center gap-3 leading-none">
-                    <svg viewBox="0 0 24 24" className="h-5 w-4 text-[#0E4FB5]" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M4 20h16" />
-                      <path d="M6 20v-4h12v4" />
-                      <path d="M8 16v-3h8v3" />
-                      <path d="M10 13v-3h4v3" />
-                    </svg>
+                    <img src="/icons/customer/chat/cake.svg" alt="birthday" className="h-5 w-4 shrink-0" />
                     Age: Turning 28
                   </p>
                 </div>
@@ -554,26 +549,6 @@ export default function CustomerEventChatPage() {
               </form>
             </section>
 
-            <section>
-              <h3 className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#8E9BB4]">Contextual Files</h3>
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <div className="flex h-40 items-center justify-center rounded-[16px] border border-[#C8D4E6] bg-[#DCE5F1]">
-                  <svg viewBox="0 0 24 24" className="h-8 w-8 text-[#8F9EB6]" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="5" width="18" height="14" rx="2" />
-                    <circle cx="9" cy="10" r="1.3" />
-                    <path d="M4 17l5-5 4 4 3-3 4 4" />
-                  </svg>
-                </div>
-                <div className="flex h-40 items-center justify-center rounded-[16px] border border-[#C8D4E6] bg-[#DCE5F1]">
-                  <svg viewBox="0 0 24 24" className="h-8 w-8 text-[#8F9EB6]" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                    <path d="M14 3v6h6" />
-                    <path d="M8 14h8" />
-                    <path d="M8 18h6" />
-                  </svg>
-                </div>
-              </div>
-            </section>
           </div>
 
           <div className="mt-auto border-t border-[#DDE5F2] bg-[#F4F7FC] px-6 py-6">

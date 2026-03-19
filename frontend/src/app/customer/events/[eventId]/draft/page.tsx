@@ -113,7 +113,7 @@ export default function CustomerEventDraftPage() {
   };
 
   return (
-    <section className="relative -mx-4 -my-6 min-h-[calc(100vh-96px)] bg-[#F3F5F9] px-4 pb-28 pt-10 sm:px-6 lg:-mx-8 lg:px-10">
+    <section className="relative min-h-[calc(100vh-96px)] bg-[#F3F5F9] pb-28 pt-10">
       {(error || warning || success) && (
         <div className="mx-auto mb-4 max-w-[1120px] space-y-2 text-sm">
           {error && <p className="rounded-md border border-[#F4CDCD] bg-[#FFF3F3] px-3 py-2 text-[#B23C3C]">{error}</p>}
@@ -226,8 +226,8 @@ export default function CustomerEventDraftPage() {
         </div>
       </div>
 
-      <footer className="fixed bottom-0 left-0 right-0 border-t border-[#D6DEEC] bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1060px] items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-0">
+      <footer className="sticky bottom-0 mt-10 border-t border-[#D6DEEC] bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-[1060px] items-center justify-between gap-3 px-0 py-4">
           <button
             type="button"
             onClick={() => router.push(ROUTES.CUSTOMER.EVENT_CHAT(eventId || ''))}
