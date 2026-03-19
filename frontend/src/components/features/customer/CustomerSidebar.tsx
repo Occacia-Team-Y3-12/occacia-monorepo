@@ -6,9 +6,11 @@ import { usePathname } from 'next/navigation';
 
 type CustomerSidebarProps = {
   isOpen: boolean;
+  isDesktopCollapsed: boolean;
+  onToggleDesktopSidebar: () => void;
 };
 
-const CustomerSidebar = ({ isOpen }: CustomerSidebarProps) => {
+const CustomerSidebar = ({ isOpen, isDesktopCollapsed, onToggleDesktopSidebar }: CustomerSidebarProps) => {
   const pathname = usePathname();
 
   const isActivePath = (href: string): boolean => {
@@ -30,11 +32,23 @@ const CustomerSidebar = ({ isOpen }: CustomerSidebarProps) => {
     <aside
       className={`fixed left-0 top-0 z-40 flex h-screen w-[240px] max-w-[85vw] flex-col overflow-y-auto border-r border-[#ECECF0] bg-[#FFFFFF] px-4 py-5 transition-transform duration-300 ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
-      } lg:translate-x-0`}
+      } ${isDesktopCollapsed ? 'lg:-translate-x-full' : 'lg:translate-x-0'}`}
     >
       <div className="mb-8 flex items-center gap-2">
         <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="ml-[-8px] h-[59px] w-[59px] shrink-0" />
         <span className="text-[22px] font-extrabold tracking-tight text-[#1562CC]">OCCACIA</span>
+        <button
+          type="button"
+          onClick={onToggleDesktopSidebar}
+          className="ml-auto hidden h-10 w-10 items-center justify-center rounded-xl border border-[#E2E5EC] bg-white text-[#5B6478] lg:inline-flex"
+          aria-label="Close sidebar"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+            <path d="M9 4.5v15" />
+            <path d="M16 9.5 13 12l3 2.5" />
+          </svg>
+        </button>
       </div>
 
       <nav className="space-y-2">
@@ -73,17 +87,6 @@ const CustomerSidebar = ({ isOpen }: CustomerSidebarProps) => {
         </div>
       </div>
 
-      <button
-        type="button"
-        className="mt-5 inline-flex items-center gap-2.5 px-1 text-[14px] font-medium text-[#556987] transition-colors hover:text-[#334966]"
-      >
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M10 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" />
-          <path d="M17 16l5-4-5-4" />
-          <path d="M22 12H9" />
-        </svg>
-        Logout
-      </button>
     </aside>
   );
 };

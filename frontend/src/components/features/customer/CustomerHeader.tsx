@@ -6,10 +6,12 @@ import { usePathname } from 'next/navigation';
 
 type CustomerHeaderProps = {
   isSidebarOpen: boolean;
+  isDesktopSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
+  onToggleDesktopSidebar: () => void;
 };
 
-const CustomerHeader = ({ isSidebarOpen, onToggleSidebar }: CustomerHeaderProps) => {
+const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSidebar, onToggleDesktopSidebar }: CustomerHeaderProps) => {
   const pathname = usePathname();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [savedEventTitle, setSavedEventTitle] = useState("Sister's Birthday");
@@ -43,13 +45,35 @@ const CustomerHeader = ({ isSidebarOpen, onToggleSidebar }: CustomerHeaderProps)
 
   return (
     <header
-      className={`flex border-b border-[#ECECF0] bg-[#FFFFFF] px-4 transition-all duration-300 sm:px-6 lg:ml-[240px] ${
+      className={`flex border-b border-[#ECECF0] bg-[#FFFFFF] px-4 transition-all duration-300 sm:px-6 ${
+        isDesktopSidebarCollapsed ? 'lg:ml-0' : 'lg:ml-[240px]'
+      } ${
         isEventFlow
           ? 'min-h-[92px] items-center justify-between py-0'
           : 'min-h-[88px] flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:py-0'
       }`}
     >
       <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-5">
+        {isDesktopSidebarCollapsed && (
+          <div className="group relative hidden lg:block">
+            <button
+              type="button"
+              onClick={onToggleDesktopSidebar}
+              className="relative h-14 w-14 overflow-hidden rounded-xl"
+              aria-label="Open sidebar"
+            >
+              <Image src="/icons/logo.svg" alt="Occacia" width={56} height={56} className="h-14 w-14" />
+              <span className="absolute inset-0 inline-flex items-center justify-center bg-white/85 text-[#5B6478] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+                  <path d="M9 4.5v15" />
+                  <path d="M13 9.5 16 12l-3 2.5" />
+                </svg>
+              </span>
+            </button>
+          </div>
+        )}
+
         {isSidebarOpen ? (
           <button
             onClick={onToggleSidebar}
