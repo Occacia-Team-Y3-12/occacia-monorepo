@@ -20,8 +20,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-PERSONA_URL  = "/api/v1/personas/"
-PLANNING_URL = "/api/v1/planning/generate"
+PERSONA_URL  = "/api/v1/customers/personas/"   # fixed: was /api/v1/personas/
+PLANNING_URL = "/api/v1/planning/generate"     # retired route — kept for legacy AI flow tests only
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -73,21 +73,52 @@ def _fake_ai(**overrides) -> dict:
     return base
 
 
+_event_cache: dict = {}  # session_id -> event_id mapping for multi-turn tests
+
+
+@pytest.fixture(autouse=True)
+def _clear_event_cache():
+    """Clear the session->event_id cache between tests so each test gets fresh events."""
+    _event_cache.clear()
+    yield
+    _event_cache.clear()
+
+
 def _plan(auth_client, user_query: str, session_id: str = None):
-    return auth_client.post(PLANNING_URL, json={
-        "session_id": session_id or f"sess-{_uid()}",
-        "user_query":  user_query,
-    })
+    """Post to the event chat endpoint. Creates an event on first call per session_id."""
+    sid = session_id or f"sess-{_uid()}"
+    if sid not in _event_cache:
+        r = auth_client.post(
+            "/api/v1/customers/events",
+            json={"eventType": "Birthday", "title": f"Plan Test {sid[:8]}"},
+        )
+        assert r.status_code == 201, r.text
+        _event_cache[sid] = r.json()["eventId"]
+    event_id = _event_cache[sid]
+    return auth_client.post(
+        f"/api/v1/customers/events/{event_id}/chat",
+        json={"content": user_query},
+    )
 
 
 def _mock_plan(auth_client, user_query: str, ai_result: dict, session_id: str = None):
-    """POST /planning/generate with generate_date_plan mocked."""
+    """POST to event chat with generate_date_plan mocked."""
     with patch(
         "app.services.ai_service.ai_service.generate_date_plan",
         new_callable=AsyncMock,
         return_value=ai_result,
     ):
         return _plan(auth_client, user_query, session_id)
+
+
+def _create_one_event(auth_client) -> str:
+    """Create a single event and return its ID (no cache)."""
+    r = auth_client.post(
+        "/api/v1/customers/events",
+        json={"eventType": "Birthday", "title": "Persona AI Test"},
+    )
+    assert r.status_code == 201, r.text
+    return r.json()["eventId"]
 
 
 def _persona_names(auth_client) -> list:
@@ -706,7 +737,7 @@ class TestPersonaSaveFromChat:
                 chat_response="Should I save Sarah's profile?",
             ))
         assert resp.status_code == 200
-        assert resp.json()["ask_save_persona"] is True
+        assert resp.json()["askSavePersona"] is True
 
     # ── Parametrized yes-word variants ───────────────────────────────────────
     # Replaces 7 identical test bodies with a single parametrized test.
@@ -735,7 +766,7 @@ class TestPersonaSaveFromChat:
             ),
         )
         assert resp.status_code == 200
-        assert resp.json()["persona_saved"] is True, \
+        assert resp.json()["personaSaved"] is True, \
             f"persona_saved must be True for yes_word={yes_word!r}"
         assert name in _persona_names(auth_client), \
             f"Persona '{name}' not in list after yes_word={yes_word!r}"
@@ -839,7 +870,7 @@ class TestPersonaSaveFromChat:
 
     def test_persona_saved_false_when_no_save_data(self, auth_client):
         resp = _mock_plan(auth_client, "yes", _fake_ai())
-        assert resp.json()["persona_saved"] is False
+        assert resp.json()["personaSaved"] is False
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -856,7 +887,7 @@ class TestPersonaLoadFromChat:
             _fake_ai(use_persona_name=name,
                      chat_response=f"I have {name}'s profile — use it?"))
         assert resp.status_code == 200
-        assert resp.json()["persona_confirmed"] is True
+        assert resp.json()["personaConfirmed"] is True
 
     def test_suggested_persona_confirmed_in_db(self, auth_client):
         """After AI suggestion, persona.is_confirmed becomes True in the DB."""
@@ -883,11 +914,11 @@ class TestPersonaLoadFromChat:
     def test_persona_confirmed_false_when_use_persona_name_empty(self, auth_client):
         resp = _mock_plan(auth_client, "plan something",
             _fake_ai(use_persona_name="", chat_response="Sure!"))
-        assert resp.json()["persona_confirmed"] is False
+        assert resp.json()["personaConfirmed"] is False
 
     def test_persona_confirmed_false_when_no_use_persona_name(self, auth_client):
         resp = _mock_plan(auth_client, "plan something", _fake_ai())
-        assert resp.json()["persona_confirmed"] is False
+        assert resp.json()["personaConfirmed"] is False
 
     def test_multiple_personas_can_be_confirmed_in_session(self, auth_client):
         _, pid1 = _create(auth_client, name=f"Alice-{_uid()}")
@@ -913,7 +944,7 @@ class TestPersonaLoadFromChat:
             _fake_ai(intent="planning", venue_tags=["romantic", "fine-dining"],
                      chat_response="Found venues!"))
         assert resp.status_code == 200
-        assert "romantic" in resp.json()["venue_tags"]
+        assert "romantic" in resp.json()["venueTags"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -924,15 +955,15 @@ class TestPlanResponsePersonaFlags:
 
     def test_response_always_has_all_three_flags(self, auth_client):
         data = _mock_plan(auth_client, "Hello", _fake_ai(chat_response="Hi!")).json()
-        assert "ask_save_persona"  in data
-        assert "persona_saved"     in data
-        assert "persona_confirmed" in data
+        assert "askSavePersona"  in data
+        assert "personaSaved"     in data
+        assert "personaConfirmed" in data
 
     def test_all_flags_false_by_default(self, auth_client):
         data = _mock_plan(auth_client, "Hello", _fake_ai()).json()
-        assert data["ask_save_persona"]  is False
-        assert data["persona_saved"]     is False
-        assert data["persona_confirmed"] is False
+        assert data["askSavePersona"]  is False
+        assert data["personaSaved"]     is False
+        assert data["personaConfirmed"] is False
 
     def test_planning_works_with_zero_personas(self, auth_client):
         resp = _mock_plan(auth_client, "Plan something nice",
@@ -944,7 +975,7 @@ class TestPlanResponsePersonaFlags:
     def test_ask_save_false_for_generic_query(self, auth_client):
         resp = _mock_plan(auth_client, "I want to plan something",
             _fake_ai(chat_response="Tell me more!"))
-        assert resp.json()["ask_save_persona"] is False
+        assert resp.json()["askSavePersona"] is False
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -954,30 +985,43 @@ class TestPlanResponsePersonaFlags:
 class TestPlanningEndpointValidation:
 
     def test_invalid_session_id_returns_400(self, auth_client):
-        resp = auth_client.post(PLANNING_URL, json={
-            "session_id": "invalid session id with spaces!!!",
-            "user_query":  "plan something",
-        })
-        assert resp.status_code == 400
+        # session_id is now the event_id from the URL path — invalid format returns 404
+        resp = auth_client.post(
+            "/api/v1/customers/events/EVT-does-not-exist/chat",
+            json={"content": "plan something"},
+        )
+        assert resp.status_code in (400, 404)
 
     def test_missing_session_id_returns_422(self, auth_client):
-        assert auth_client.post(PLANNING_URL, json={"user_query": "plan something"}).status_code == 422
+        # No session_id concept — missing content returns 422
+        event_id = _plan(auth_client, "init").url.split("/events/")[1].split("/")[0] \
+            if False else _create_one_event(auth_client)
+        assert auth_client.post(
+            f"/api/v1/customers/events/{event_id}/chat",
+            json={},
+        ).status_code == 422
 
     def test_missing_user_query_returns_422(self, auth_client):
-        assert auth_client.post(PLANNING_URL, json={"session_id": "sess-abc"}).status_code == 422
+        event_id = _create_one_event(auth_client)
+        assert auth_client.post(
+            f"/api/v1/customers/events/{event_id}/chat",
+            json={},
+        ).status_code == 422
 
     def test_unauthenticated_planning_returns_401(self, client):
-        resp = client.post(PLANNING_URL, json={"session_id": "sess-abc", "user_query": "plan something"})
+        resp = client.post(
+            "/api/v1/customers/events/EVT-fake/chat",
+            json={"content": "plan something"},
+        )
         assert resp.status_code in (401, 403)
 
     def test_rate_limit_triggers_429(self, auth_client):
         """Exceed rate limit → 429. Fails open if Redis not available (all 200s — acceptable)."""
-        session = f"ratelimit-{_uid()}"
         responses = []
         with patch("app.services.ai_service.ai_service.generate_date_plan",
                    new_callable=AsyncMock, return_value=_fake_ai(chat_response="ok")):
             for _ in range(15):
-                responses.append(_plan(auth_client, "plan", session_id=session).status_code)
+                responses.append(_plan(auth_client, "plan").status_code)
         assert all(s in (200, 429) for s in responses)
 
 

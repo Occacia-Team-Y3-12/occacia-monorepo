@@ -72,6 +72,12 @@ def approve_vendor(
 ):
     """Approve vendor registration."""
     vendor = admin_service.approve_vendor(db, vendor_id=vendor_id, admin_email=current_admin.email)
+    # Sync is_verified so approved vendors appear in AI venue matching
+    if hasattr(vendor, "is_verified") and not vendor.is_verified:
+        vendor.is_verified = True
+        db.add(vendor)
+        db.commit()
+        db.refresh(vendor)
     _send_approval_email(vendor)
     return vendor
 

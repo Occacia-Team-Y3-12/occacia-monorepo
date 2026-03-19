@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -46,9 +47,68 @@ class SuggestedTaskDraftResponse(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class VenueDisplay(BaseModel):
+    """Vendor package/offering matched by the AI planning engine."""
+    id: int | None = None
+    name: str
+    description: str | None = None
+    price_per_head: float | None = Field(default=None, alias="pricePerHead")
+    tags: list[str] = Field(default_factory=list)
+    total_estimated_price: float | None = Field(default=None, alias="totalEstimatedPrice")
+    match_score: int | None = Field(default=None, alias="matchScore")
+    match_score_max: int | None = Field(default=None, alias="matchScoreMax")
+    match_score_label: str | None = Field(default=None, alias="matchScoreLabel")
+    vendor_name: str | None = Field(default=None, alias="vendorName")
+    vendor_phone: str | None = Field(default=None, alias="vendorPhone")
+    vendor_location: str | None = Field(default=None, alias="vendorLocation")
+    vendor_email: str | None = Field(default=None, alias="vendorEmail")
+    is_verified: bool = Field(default=False, alias="isVerified")
+
+    model_config = {"populate_by_name": True, "from_attributes": True, "extra": "ignore"}
+
+
 class ChatSendResponse(BaseModel):
+    """
+    Response for POST /customers/events/{eventId}/chat  (UC-13).
+
+    Spec-required fields
+    --------------------
+    reply           — the AI/system reply text to display in chat
+    suggestedTasks  — template-based task drafts for the customer to review
+
+    Extended fields  (additive — not in OpenAPI spec)
+    -------------------------------------------------
+    These carry the AI planning engine's full output so the frontend
+    can update persona state, show vendor matches, and track missing
+    planning info without a second request.
+    Clients that only consume reply + suggestedTasks are unaffected.
+    """
+
+    # ── Spec fields ───────────────────────────────────────────────────────────
     reply: str
-    suggested_tasks: list[SuggestedTaskDraftResponse] = Field(default_factory=list, alias="suggestedTasks")
+    suggested_tasks: list[SuggestedTaskDraftResponse] = Field(
+        default_factory=list, alias="suggestedTasks"
+    )
+
+    # ── Planning engine — conversation state ──────────────────────────────────
+    intent: str | None = None
+    reasoning: str | None = None
+    personality_profile: str | None = Field(default=None, alias="personalityProfile")
+    gift_suggestion: str | None = Field(default=None, alias="giftSuggestion")
+    event_type: str | None = Field(default=None, alias="eventType")
+    event_date: str | None = Field(default=None, alias="eventDate")
+    location: str | None = None
+    budget_per_head: float | None = Field(default=None, alias="budgetPerHead")
+    guest_count: int | None = Field(default=None, alias="guestCount")
+    venue_tags: list[str] = Field(default_factory=list, alias="venueTags")
+    missing_info: list[str] = Field(default_factory=list, alias="missingInfo")
+    matched_venues: list[VenueDisplay] = Field(default_factory=list, alias="matchedVenues")
+    venue_match_tier: int | None = Field(default=None, alias="venueMatchTier")
+
+    # ── Persona flow flags ────────────────────────────────────────────────────
+    ask_save_persona: bool = Field(default=False, alias="askSavePersona")
+    persona_saved: bool = Field(default=False, alias="personaSaved")
+    persona_confirmed: bool = Field(default=False, alias="personaConfirmed")
 
     model_config = {"populate_by_name": True}
 
@@ -303,6 +363,5 @@ class EventCalendarSyncUpsertRequest(BaseModel):
 
 
 from app.schemas.customer_schema import EventResponse
-
 
 ConfirmTasksResponse.model_rebuild()
