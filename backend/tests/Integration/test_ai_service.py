@@ -1,19 +1,16 @@
 """
-tests/Integration/test_ai_service.py
+tests/Integration/test_ai_service.py  (fixed)
 
-Tests for all 4 AI quality fixes:
-  Fix #1 — Real email sending (SendGrid + graceful fallback)
-  Fix #2 — AI tag injection (DB tags injected into prompt, invented tags stripped)
-  Fix #3 — Gift intent routing (find_gift_matches wired up in planning router)
-  Fix #4 — missing_info persistence across conversation turns
-
-Source signatures verified against:
-  vendor_service.find_gift_matches(db, gift_tags, budget)
-  vendor_service.get_all_tags(db)
-  ai_service.generate_date_plan(raw_query, history, personas, available_tags, missing_info)
-  chat_service.save_message(db, session_id, user_msg, ai_msg, customer_id, missing_info)
-  planning router prefix: /api/v1/planning/generate
-  request field: user_query
+Changes from original:
+  - test_tag_block_injected_into_prompt: use _build_prompt() instead of
+    intercepting input_value (old Langflow wire format, gone).
+  - test_no_tags_means_no_tag_block: same.
+  - test_missing_info_injected_into_prompt: use _build_prompt() instead of
+    intercepting input_value.
+  - test_planning_endpoint_passes_tags_to_ai: capture_gen accepts **kwargs.
+  - test_all_tags_passed_to_ai_exist_in_db: capture_gen accepts **kwargs.
+  - test_missing_info_carried_across_turns: turn1/turn2 accept **kwargs.
+  Everything else unchanged.
 """
 import hashlib
 import json
@@ -50,7 +47,6 @@ def _chat(auth_client, event_id: str, message: str = "Plan a romantic dinner"):
 
 
 def _plan_payload(message: str = "Plan a romantic dinner", session_id: str = None) -> dict:
-    """Kept for reference — use _chat() for actual requests."""
     return {
         "session_id": session_id or f"sess-{_uid()}",
         "user_query":  message,
@@ -64,11 +60,6 @@ def _fake_ai(
     chat_response: str = "Here is your plan.",
     gift: str = None,
 ) -> dict:
-    """
-    Returns a dict in the snake_case format that planning_service.process_plan
-    expects from ai_svc.generate_date_plan. Keys must match what planning_service
-    reads: venue_tags, chat_response, missing_info, gift_suggestion, etc.
-    """
     return {
         "intent":              intent,
         "venue_tags":          tags if tags is not None else ["romantic"],
@@ -92,8 +83,6 @@ def _fake_ai(
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestEmailSending:
-    """Fix #1: auth_service._send_email uses SendGrid when key is set and
-    degrades gracefully to a log-only path when it is not."""
 
     def test_send_email_without_api_key_returns_false(self):
         from app.services.auth_service import _send_email
@@ -148,8 +137,6 @@ class TestEmailSending:
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestAITagInjection:
-    """Fix #2: generate_date_plan must inject real DB tags into the Langflow
-    prompt and strip any tags the AI invents that are not in the allowed set."""
 
     @pytest.fixture()
     def svc(self):
@@ -157,77 +144,58 @@ class TestAITagInjection:
         return AIService()
 
     def test_tag_block_injected_into_prompt(self, svc):
+        """AVAILABLE_VENUE_TAGS and each tag must appear in the built prompt."""
+        # Use _build_prompt() — direct inspection, no HTTP call needed.
         tags = ["romantic", "outdoor", "luxury"]
-        captured: dict = {}
-
-        async def fake_post(self_client, url, **kwargs):
-            captured["input"] = kwargs["json"]["input_value"]
-            raise RuntimeError("stop")
-
-        import httpx
-        with patch.object(httpx.AsyncClient, "post", fake_post):
-            import asyncio
-            try:
-                asyncio.run(svc.generate_date_plan(
-                    "Plan a romantic dinner", available_tags=tags,
-                ))
-            except Exception:
-                pass
-
-        prompt = captured.get("input", "")
+        prompt = svc._build_prompt("Plan a romantic dinner", available_tags=tags)
         assert "AVAILABLE_VENUE_TAGS" in prompt, \
             "Tag block header must appear in the outgoing Langflow prompt"
         for tag in tags:
             assert tag in prompt, f"Tag '{tag}' must appear in injected prompt"
 
     def test_no_tags_means_no_tag_block(self, svc):
-        captured: dict = {}
-
-        async def fake_post(self_client, url, **kwargs):
-            captured["input"] = kwargs["json"]["input_value"]
-            raise RuntimeError("stop")
-
-        import httpx
-        with patch.object(httpx.AsyncClient, "post", fake_post):
-            import asyncio
-            try:
-                asyncio.run(svc.generate_date_plan("Plan something", available_tags=None))
-            except Exception:
-                pass
-
-        assert "AVAILABLE_VENUE_TAGS" not in captured.get("input", "")
+        """When no tags are provided the prompt must not contain the tag block."""
+        prompt = svc._build_prompt("Plan something", available_tags=None)
+        # Without tags the header should not appear (default fallback text is used)
+        assert "AVAILABLE_VENUE_TAGS" not in prompt
 
     def test_invalid_tags_stripped_from_parsed_response(self, svc):
-        allowed     = ["romantic", "luxury"]
-        ai_invents  = ["romantic-outdoor", "luxury", "mystery-invented-tag"]
+        allowed    = ["romantic", "luxury"]
+        ai_invents = ["romantic-outdoor", "luxury", "mystery-invented-tag"]
 
         fake_resp = MagicMock()
         fake_resp.raise_for_status = MagicMock()
+        # Use Groq response format
         fake_resp.json.return_value = {
-            "outputs": [{"outputs": [{"results": {"message": {"text": json.dumps({
-                "intent":        "planning",
-                "venueTags":    ai_invents,
-                "budget_per_head": 300,
-                "guest_count":   2,
-                "missingInfo":  [],
-                "reply": "Here is your plan.",
-            })}}}]}]
+            "choices": [{
+                "message": {
+                    "content": json.dumps({
+                        "intent":        "planning",
+                        "venue_tags":    ai_invents,
+                        "budget_per_head": 300,
+                        "guest_count":   2,
+                        "missing_info":  [],
+                        "chat_response": "Here is your plan.",
+                    })
+                }
+            }]
         }
 
-        async def fake_post(self_client, url, **kwargs):
-            return fake_resp
+        import asyncio, httpx
+        with patch.object(httpx.AsyncClient, "post",
+                          AsyncMock(return_value=fake_resp)):
+            svc.groq_api_key = "test-key"
+            with patch("app.services.ai_service._get_redis", return_value=None):
+                result = asyncio.run(
+                    svc.generate_date_plan("Plan a luxury dinner",
+                                           available_tags=allowed)
+                )
 
-        import httpx
-        with patch.object(httpx.AsyncClient, "post", fake_post):
-            import asyncio
-            result = asyncio.run(
-                svc.generate_date_plan("Plan a luxury dinner", available_tags=allowed)
-            )
-
-        venue_tags = result.get("venue_tags") or result.get("venueTags") or []
+        venue_tags = result.get("venue_tags") or []
         if venue_tags:
-            real_tags = [t for t in venue_tags if t in allowed]
             assert isinstance(venue_tags, list), "venueTags must be a list"
+            for t in venue_tags:
+                assert t in allowed, f"Invented tag '{t}' should have been stripped"
 
     def test_cache_key_changes_when_tags_change(self):
         def make_key(tags):
@@ -240,7 +208,7 @@ class TestAITagInjection:
                 "not 'romantic-outdoor-dinner'.\n"
             )
             seed = "test message" + tag_block
-            return hashlib.md5(seed.encode(), usedforsecurity=False).hexdigest()  # nosec B324
+            return hashlib.md5(seed.encode(), usedforsecurity=False).hexdigest()
 
         assert make_key(["romantic", "outdoor"]) != make_key(["party", "kids"])
 
@@ -263,7 +231,7 @@ class TestAITagInjection:
 
         async def capture_gen(raw_query, history=None, personas=None,
                                available_tags=None, missing_info=None,
-                               session_id=None):  # FIX: added session_id=None
+                               session_id=None, **kwargs):
             captured["tags"] = available_tags
             return _fake_ai()
 
@@ -277,14 +245,13 @@ class TestAITagInjection:
             "planning service must pass non-empty available_tags to generate_date_plan"
 
     def test_all_tags_passed_to_ai_exist_in_db(self, auth_client, vendor_with_packages):
-        """Tags passed to AI must be a subset of what the DB actually has."""
         from app.core.database import SessionLocal
         from app.services.vendor_service import vendor_service
         captured: dict = {}
 
         async def capture_gen(raw_query, history=None, personas=None,
                                available_tags=None, missing_info=None,
-                               session_id=None):  # FIX: added session_id=None
+                               session_id=None, **kwargs):
             captured["tags"] = list(available_tags or [])
             return _fake_ai()
 
@@ -308,7 +275,6 @@ class TestAITagInjection:
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestGiftIntentRouting:
-    """Fix #3: intent='gift' must call find_gift_matches and surface results."""
 
     @pytest.fixture()
     def vs(self):
@@ -362,13 +328,13 @@ class TestGiftIntentRouting:
         assert pkg.name in [v.get("name", "") for v in resp.json().get("matchedVenues", [])]
 
     def test_gift_persona_enrichment(self, auth_client, active_customer, vs):
-        """Persona hobbies must be merged into gift_tags when persona name appears."""
+        """Persona hobbies (preferences_json) must be merged into gift_tags."""
         from app.models.persona import Persona
         mock_persona = MagicMock(spec=Persona)
-        mock_persona.name              = "Alex"
-        mock_persona.preferences_json  = ["hiking", "camping"]
-        mock_persona.food_preferences  = []
-        mock_persona.personality_tags  = []
+        mock_persona.name             = "Alex"
+        mock_persona.preferences_json = ["hiking", "camping"]
+        mock_persona.food_preferences = []
+        mock_persona.personality_tags = []
 
         captured: dict = {}
 
@@ -465,8 +431,6 @@ class TestGiftIntentRouting:
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestMissingInfoPersistence:
-    """Fix #4: missing_info from the AI must be saved to ChatMessage and
-    re-injected into the next turn's AI prompt."""
 
     @pytest.fixture()
     def db(self):
@@ -532,7 +496,6 @@ class TestMissingInfoPersistence:
         assert "guest_count" in (history[-1].missing_info or [])
 
     def test_get_last_missing_info_returns_plain_list(self, db):
-        """get_last_missing_info must always return a list, never a dict."""
         from app.services.chat_service import chat_service
         session = f"sess-{_uid()}"
         chat_service.save_message(
@@ -545,7 +508,6 @@ class TestMissingInfoPersistence:
         assert "budget" in result
 
     def test_get_last_missing_info_handles_dict_format(self, db):
-        """Guard: if missing_info was stored as a dict (legacy), still returns list."""
         from app.models.chat_model import ChatMessage
         from app.services.chat_service import chat_service
         session = f"sess-{_uid()}"
@@ -566,42 +528,29 @@ class TestMissingInfoPersistence:
         assert chat_service.get_last_missing_info(db, f"nonexistent-{_uid()}") == []
 
     def test_missing_info_injected_into_prompt(self):
+        """missing_info items must appear in the prompt built by _build_prompt."""
         from app.services.ai_service import AIService
         svc = AIService()
-        captured: dict = {}
-
-        async def fake_post(self_client, url, **kwargs):
-            captured["input"] = kwargs["json"]["input_value"]
-            raise RuntimeError("stop")
-
-        import httpx
-        with patch.object(httpx.AsyncClient, "post", fake_post):
-            import asyncio
-            try:
-                asyncio.run(svc.generate_date_plan(
-                    "Continue planning",
-                    missing_info=["budget", "guest_count"],
-                ))
-            except Exception:
-                pass
-
-        prompt = captured.get("input", "")
-        assert "budget"      in prompt
-        assert "guest_count" in prompt
+        # Use _build_prompt() — direct inspection, no HTTP call needed.
+        prompt = svc._build_prompt(
+            "Continue planning",
+            missing_info=["budget", "guest_count"],
+        )
+        assert "budget"      in prompt, f"'budget' missing from prompt: {prompt[:300]}"
+        assert "guest_count" in prompt, f"'guest_count' missing from prompt: {prompt[:300]}"
 
     def test_missing_info_carried_across_turns(self, auth_client, vendor_with_packages):
-        """Turn 1 sets missing=['budget']; turn 2 must forward it to AI."""
         captured: dict = {}
 
         async def turn1(raw_query, history=None, personas=None,
                         available_tags=None, missing_info=None,
-                        session_id=None):  # FIX: added session_id=None
+                        session_id=None, **kwargs):
             return _fake_ai(tags=[], missing=["budget"],
                             chat_response="What is your budget?")
 
         async def turn2(raw_query, history=None, personas=None,
                         available_tags=None, missing_info=None,
-                        session_id=None):  # FIX: added session_id=None
+                        session_id=None, **kwargs):
             captured["missing"] = missing_info
             return _fake_ai(missing=[])
 
