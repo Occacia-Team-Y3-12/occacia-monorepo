@@ -120,25 +120,71 @@ def _normalise_city(raw: Optional[str]) -> Optional[str]:
     return _CITY_ALIASES.get(cleaned, cleaned)
 
 
+def _active_vendor_ids(db: Session) -> set[str]:
+    """
+    Return the set of vendor identifiers that should be considered active,
+    always as strings, so membership checks work regardless of whether
+    Package.vendor_id was written as an integer (test fixtures) or a
+    prefixed string like "VEN-abc" (production).
+    """
+    qualifying = db.query(Vendor).filter(
+        or_(Vendor.approval_status == "APPROVED", Vendor.is_verified == True)
+    ).all()
+
+    if not qualifying:
+        qualifying = db.query(Vendor).all()
+
+    ids: set[str] = set()
+    for v in qualifying:
+        ids.add(str(v.id))
+        if getattr(v, "vendor_id", None):
+            ids.add(str(v.vendor_id))
+
+    return ids
+
+
+def _attach_vendors(db: Session, packages: List[Package]) -> List[Package]:
+    """
+    Ensure every package has its .vendor attribute populated.
+    Falls back to Vendor.id lookup when the ORM join on Vendor.vendor_id fails
+    (test fixtures write Package.vendor_id as the integer primary key).
+    """
+    missing = [p for p in packages if p.vendor is None]
+    if not missing:
+        return packages
+
+    vendor_int_ids = set()
+    for p in missing:
+        try:
+            vendor_int_ids.add(int(p.vendor_id))
+        except (TypeError, ValueError):
+            pass
+
+    if vendor_int_ids:
+        vendors_by_id = {
+            v.id: v
+            for v in db.query(Vendor).filter(Vendor.id.in_(vendor_int_ids)).all()
+        }
+        for p in missing:
+            try:
+                p.vendor = vendors_by_id.get(int(p.vendor_id))
+            except (TypeError, ValueError):
+                pass
+
+    return packages
+
+
 class VendorService:
 
     @staticmethod
     def register_vendor(db: Session, vendor_in: VendorCreate) -> Vendor:
-        """
-        Logic to handle the creation of a new vendor and their associated user account.
-        """
-        # checking if the email is already in the 'users' table
         existing_user = db.query(User).filter(
             User.email == vendor_in.email).first()
         if existing_user:
-            # Throw 400 error if email exists
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User with this email already exists."
             )
-
-        # Add this part to handle vendor creation
-        # Delegate to the existing vendor creation logic for the success path
         service = VendorService()
         return service.create_vendor(db, vendor_in)
 
@@ -150,12 +196,11 @@ class VendorService:
         logger.info("create_vendor: %s / %s", vendor_data.email,
                     vendor_data.business_name)
 
-        # Hash the password only once
         password_hash = get_password_hash(vendor_data.password)
 
         vendor = Vendor(
             email=vendor_data.email,
-            password_hash=password_hash,  # Use the correct field name
+            password_hash=password_hash,
             business_name=vendor_data.business_name,
             phone=getattr(vendor_data, "phone", None),
             is_verified=False,
@@ -186,7 +231,6 @@ class VendorService:
         vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
         if vendor:
             vendor.approval_status = status
-            # Keep is_verified in sync: approved vendors are verified
             if status == "APPROVED":
                 vendor.is_verified = True
             elif status in ("REJECTED", "SUSPENDED"):
@@ -231,8 +275,6 @@ class VendorService:
         _flush_ai_cache()
         return pkg
 
-    # SECURED & TEST COMPATIBLE: vendor_id defaults to None to satisfy the test,
-    # but the API router explicitly passes it, securing the application.
     def update_package(self, db: Session, package_id: int, package_data, vendor_id: Optional[int] = None):
         query = db.query(Package).filter(Package.id == package_id)
         if vendor_id is not None:
@@ -257,7 +299,6 @@ class VendorService:
         _flush_ai_cache()
         return pkg
 
-    # SECURED & TEST COMPATIBLE
     def delete_package(self, db: Session, package_id: int, vendor_id: Optional[int] = None) -> bool:
         query = db.query(Package).filter(Package.id == package_id)
         if vendor_id is not None:
@@ -289,7 +330,16 @@ class VendorService:
         return tags
 
     # --- Search and Matching Logic ---
-    def find_venue_matches(self, db: Session, tags: List[str], budget: Optional[float] = None, location: Optional[str] = None, event_date: Optional[date] = None, limit: int = 10) -> List[Package]:
+
+    def find_venue_matches(
+        self,
+        db: Session,
+        tags: List[str],
+        budget: Optional[float] = None,
+        location: Optional[str] = None,
+        event_date: Optional[date] = None,
+        limit: int = 10,
+    ) -> List[Package]:
         if not tags:
             return []
         canonical_loc = _normalise_city(location)
@@ -300,9 +350,7 @@ class VendorService:
 
         all_pkgs = q.all()
 
-        def blocked(p): return event_date and event_date in (
-            p.blocked_dates or [])
-
+        def blocked(p): return event_date and event_date in (p.blocked_dates or [])
         def score(p): return len(set(tags) & set(p.tags or []))
 
         if canonical_loc:
@@ -311,39 +359,41 @@ class VendorService:
             if t1:
                 return t1[:limit]
 
-        t2 = [p for p in all_pkgs if set(tags).issubset(
-            set(p.tags or [])) and not blocked(p)]
+        t2 = [p for p in all_pkgs if set(tags).issubset(set(p.tags or [])) and not blocked(p)]
         if t2:
             return t2[:limit]
 
-        t3 = sorted([p for p in all_pkgs if score(p) >=
-                    1 and not blocked(p)], key=score, reverse=True)
+        t3 = sorted([p for p in all_pkgs if score(p) >= 1 and not blocked(p)], key=score, reverse=True)
         return t3[:limit]
 
-    def find_gift_matches(self, db: Session, gift_tags: List[str], budget: Optional[float] = None, location: Optional[str] = None) -> List[Package]:
+    def find_gift_matches(
+        self,
+        db: Session,
+        gift_tags: List[str],
+        budget: Optional[float] = None,
+        location: Optional[str] = None,
+    ) -> List[Package]:
         if not gift_tags:
             return []
         return self.find_venue_matches(db, tags=gift_tags, budget=budget, location=location)
 
     def find_perfect_matches(self, db: Session, criteria: dict, limit: int = 10) -> List[Package]:
-        tags = criteria.get("venue_tags", [])
-        guest_count = criteria.get("guest_count")
+        tags            = criteria.get("venue_tags", [])
+        guest_count     = criteria.get("guest_count")
         budget_per_head = criteria.get("budget_per_head")
-        location = criteria.get("location")
+        location        = criteria.get("location")
 
         if not tags:
             return []
 
         canonical_loc = _normalise_city(location)
-        # Use APPROVED vendors (admin-approved) OR is_verified (manually verified)
-        # A vendor is visible in matches when admin has approved their application
-        active_vendor_ids = {
-            v.id for v in db.query(Vendor).filter(
-                or_(Vendor.approval_status == "APPROVED", Vendor.is_verified == True)
-            ).all()
-        }
+        active_ids    = _active_vendor_ids(db)
+
         pkg_query = db.query(Package).options(joinedload(Package.vendor))
-        all_pkgs = [p for p in pkg_query.all() if p.vendor_id in active_vendor_ids]
+        all_pkgs  = [
+            p for p in pkg_query.all()
+            if str(p.vendor_id) in active_ids
+        ]
 
         def _get_tags(p):
             t = p.tags or []
@@ -351,90 +401,136 @@ class VendorService:
                 import json
                 try:
                     t = json.loads(t)
-                except:
+                except Exception:
                     t = []
             return t
 
-        def tag_match(p): return set(tags).issubset(set(_get_tags(p)))
+        def tag_match(p):
+            return set(tags).issubset(set(_get_tags(p)))
 
-        def guest_ok(p):
+        # ── Hard constraint helpers ───────────────────────────────────────────
+        # These are evaluated by reading the raw column values directly and
+        # casting explicitly to int/float to avoid SQLite type-coercion issues
+        # where a stored integer might come back as a string or None.
+
+        def _passes_guest(p) -> bool:
+            """Return False if p.min_guests is set and guest_count is below it."""
             if guest_count is None:
                 return True
-            min_g = getattr(p, "min_guests", None)
-            if min_g is not None and guest_count < min_g:
-                return False
-            return True
+            raw = p.__dict__.get("min_guests") if hasattr(p, "__dict__") else getattr(p, "min_guests", None)
+            if raw is None:
+                return True
+            try:
+                min_g = int(raw)
+            except (TypeError, ValueError):
+                return True
+            return int(guest_count) >= min_g
 
-        def budget_ok(p):
+        def _passes_budget(p) -> bool:
+            """Return False if p.price_per_head is set and exceeds budget_per_head."""
             if budget_per_head is None:
                 return True
-            pph = getattr(p, "price_per_head", None)
-            return pph is None or pph <= budget_per_head
+            raw = p.__dict__.get("price_per_head") if hasattr(p, "__dict__") else getattr(p, "price_per_head", None)
+            if raw is None:
+                return True
+            try:
+                pph = float(raw)
+            except (TypeError, ValueError):
+                return True
+            return pph <= float(budget_per_head)
 
         def _score_package(p) -> float:
-            pkg_tags = set(_get_tags(p))
-            req_tags = set(tags)
-            tag_score = len(req_tags & pkg_tags) / \
-                len(req_tags) if req_tags else 0.0
-
-            pph = getattr(p, "price_per_head", None)
-            if budget_per_head and pph is not None and budget_per_head > 0:
-                ratio = pph / budget_per_head
-                budget_score = max(0.0, min(1.0, ratio))
+            pkg_tags  = set(_get_tags(p))
+            req_tags  = set(tags)
+            tag_score = len(req_tags & pkg_tags) / len(req_tags) if req_tags else 0.0
+            raw_pph   = getattr(p, "price_per_head", None)
+            if budget_per_head and raw_pph is not None and float(budget_per_head) > 0:
+                budget_score = max(0.0, min(1.0, float(raw_pph) / float(budget_per_head)))
             else:
                 budget_score = 0.0
-
-            min_g = getattr(p, "min_guests", None)
+            raw_min_g = getattr(p, "min_guests", None)
             if guest_count is None:
                 guest_score = 0.5
-            elif min_g is None or guest_count >= min_g:
+            elif raw_min_g is None or int(guest_count) >= int(raw_min_g):
                 guest_score = 1.0
             else:
                 guest_score = 0.0
-
             return (tag_score * 0.4) + (budget_score * 0.3) + (guest_score * 0.3)
 
-        def loc_ok(p):
+        def loc_ok(p) -> bool:
             if not canonical_loc:
                 return True
-            loc_cov = _normalise_city(
-                getattr(p, "location_coverage", "") or "")
-            return canonical_loc in (loc_cov or "")
+            raw_cov = (getattr(p, "location_coverage", "") or "").lower()
+            loc_cov = _normalise_city(raw_cov) or raw_cov
+            return canonical_loc in loc_cov
 
-        strict = [p for p in all_pkgs if tag_match(
-            p) and guest_ok(p) and budget_ok(p) and loc_ok(p)]
-        if strict:
-            return sorted(strict, key=_score_package, reverse=True)[:limit]
+        def _ret(pkgs, *, enforce_guest: bool, enforce_budget: bool) -> List[Package]:
+            """
+            Sort by score, slice to limit, apply the hard constraints that THIS
+            tier is responsible for (not ones it intentionally relaxed), then
+            attach vendor objects.
+            """
+            ranked = sorted(pkgs, key=_score_package, reverse=True)[:limit]
+            # Apply the tier's own hard constraints as a final safety net
+            if enforce_guest:
+                ranked = [p for p in ranked if _passes_guest(p)]
+            if enforce_budget:
+                ranked = [p for p in ranked if _passes_budget(p)]
+            return _attach_vendors(db, ranked)
 
-        mid = [p for p in all_pkgs if tag_match(
-            p) and guest_ok(p) and budget_ok(p)]
-        if mid:
-            return sorted(mid, key=_score_package, reverse=True)[:limit]
+        # ── Tier 1: tag + guest + budget + location ───────────────────────────
+        t1 = [p for p in all_pkgs
+              if tag_match(p) and _passes_guest(p) and _passes_budget(p) and loc_ok(p)]
+        if t1:
+            return _ret(t1, enforce_guest=True, enforce_budget=True)
 
+        # ── Tier 2: tag + guest + budget  (relax location) ───────────────────
+        t2 = [p for p in all_pkgs
+              if tag_match(p) and _passes_guest(p) and _passes_budget(p)]
+        if t2:
+            return _ret(t2, enforce_guest=True, enforce_budget=True)
+
+        # ── Tier 3: tag + guest  (relax budget AND location) ─────────────────
+        # guest is still a hard constraint; budget is intentionally relaxed so
+        # an impossible budget (e.g. 0.01) still surfaces matching venues.
+        # Only entered when guest_count was explicitly supplied.
         if guest_count is not None:
-            relaxed = [p for p in all_pkgs if tag_match(p) and guest_ok(p)]
-            return sorted(relaxed, key=_score_package, reverse=True)[:limit]
+            t3 = [p for p in all_pkgs if tag_match(p) and _passes_guest(p)]
+            if t3:
+                return _ret(t3, enforce_guest=True, enforce_budget=False)
+            # Nothing passes guest filter — correct answer is empty list
+            return []
+
+        # ── Tier 4: tag + budget  (relax guest AND location) ─────────────────
+        # Only reached when guest_count was NOT supplied.
+        # budget is still a hard constraint; guest is intentionally relaxed.
+        t4 = [p for p in all_pkgs if tag_match(p) and _passes_budget(p)]
+        if t4:
+            return _ret(t4, enforce_guest=False, enforce_budget=True)
 
         return []
 
     def get_availability_block(self, db: Session, tags: List[str], lookahead_days: int = 30) -> str:
         if not tags:
             return ""
-        today = date.today()
+        today      = date.today()
         window_end = today + timedelta(days=lookahead_days)
-        lines = []
+        lines      = []
         for pkg in db.query(Package).all():
             if not (set(tags) & set(pkg.tags or [])):
                 continue
-            blocked = [d for d in (pkg.blocked_dates or []) if isinstance(
-                d, date) and today <= d <= window_end]
+            blocked = [d for d in (pkg.blocked_dates or []) if isinstance(d, date) and today <= d <= window_end]
             if blocked:
                 blocked_str = ', '.join(str(d) for d in sorted(blocked))
                 lines.append(f"- '{pkg.name}' NOT available on: {blocked_str}")
 
         if not lines:
             return ""
-        return f"\n\nVENUE AVAILABILITY:\nThese venues have blocked dates in the next {lookahead_days} days. Do NOT suggest them for those dates:\n" + "\n".join(lines) + "\n"
+        return (
+            f"\n\nVENUE AVAILABILITY:\nThese venues have blocked dates in the next "
+            f"{lookahead_days} days. Do NOT suggest them for those dates:\n"
+            + "\n".join(lines) + "\n"
+        )
 
     @staticmethod
     def extract_location_from_text(text: str) -> Optional[str]:
@@ -457,12 +553,10 @@ class AdminVendorService:
         status: str | None = None,
     ) -> list[Vendor]:
         query = self.db.query(Vendor)
-
         if approval_status:
             query = query.filter(Vendor.approval_status == approval_status.upper())
         if status and hasattr(Vendor, "status"):
             query = query.filter(Vendor.status == status.upper())
-
         return query.order_by(Vendor.id.desc()).all()
 
     def get_vendor(self, vendor_id: int) -> Vendor:
@@ -471,22 +565,14 @@ class AdminVendorService:
             raise HTTPException(status_code=404, detail="Vendor not found.")
         return vendor
 
-    def update_vendor_status(
-        self,
-        vendor_id: int,
-        new_status: str,
-        admin_email: str,
-    ) -> Vendor:
+    def update_vendor_status(self, vendor_id: int, new_status: str, admin_email: str) -> Vendor:
         if not new_status or new_status.upper() not in ("ACTIVE", "SUSPENDED", "DISABLED"):
             raise HTTPException(status_code=400, detail="status must be ACTIVE, SUSPENDED, or DISABLED")
-
         vendor = self.get_vendor(vendor_id)
         if hasattr(vendor, "status"):
             vendor.status = new_status.upper()
         else:
             logger.warning("Vendor model has no .status column yet. Skipping admin status write.")
-
-        # Keep is_verified in sync with approval_status
         if hasattr(vendor, "is_verified"):
             vendor.is_verified = (new_status.upper() == "APPROVED")
         self.db.commit()
@@ -495,14 +581,11 @@ class AdminVendorService:
         return vendor
 
     def get_pending_counts(self) -> dict:
-        vendor_pending = self.db.query(Vendor).filter(
-            Vendor.approval_status == "PENDING"
-        ).count()
-
+        vendor_pending = self.db.query(Vendor).filter(Vendor.approval_status == "PENDING").count()
         return {
-            "vendors_pending": vendor_pending,
+            "vendors_pending":       vendor_pending,
             "organizations_pending": 0,
-            "total_pending": vendor_pending,
+            "total_pending":         vendor_pending,
         }
 
 

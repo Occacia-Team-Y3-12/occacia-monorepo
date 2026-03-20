@@ -517,6 +517,7 @@ async def send_event_chat_message(
         venueTags=plan.venue_tags if plan else [],
         missingInfo=plan.missing_info if plan else [],
         matchedVenues=plan.matched_venues if plan else [],
+        matchedPackages=plan.matched_packages if plan else [],
         venueMatchTier=plan.venue_match_tier if plan else None,
         # ── Persona flow flags ────────────────────────────────
         askSavePersona=plan.ask_save_persona if plan else False,
