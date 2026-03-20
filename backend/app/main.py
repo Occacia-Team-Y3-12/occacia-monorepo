@@ -122,3 +122,12 @@ def create_app() -> FastAPI:
     return application
 
 app = create_app()
+from app.routers import vendor_tasks
+app.include_router(vendor_tasks.router)
+from fastapi import FastAPI
+from app.routers import vendor_tasks  # Add this import
+
+app = FastAPI(title="Occacia API")
+
+# Existing routers...
+app.include_router(vendor_tasks.router, prefix="/api/v1")  # Add this line
