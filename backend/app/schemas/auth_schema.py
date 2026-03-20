@@ -1,18 +1,22 @@
 from typing import Annotated, Literal, Optional
+
 from pydantic import BaseModel, EmailStr, Field
 
 # --- Registration Schemas ---
 
 class RegisterBase(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6)
+    password: str = Field(min_length=8)
+
+    model_config = {"populate_by_name": True}
 
 class CustomerRegister(RegisterBase):
     role: Literal["CUSTOMER"] = "CUSTOMER"
-    full_name: str = Field(min_length=2)
+    full_name: str = Field(min_length=2, alias="fullName")
     phone: Optional[str] = None
-    address: Optional[str] = None
     locale: Optional[str] = None
+
+    model_config = {"populate_by_name": True}
 
 class VendorRegister(RegisterBase):
     role: Literal["VENDOR"] = "VENDOR"
@@ -33,11 +37,16 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     """Payload to finalize password reset using a secure token."""
     token: str
-    new_password: str = Field(min_length=6)
+    new_password: str = Field(min_length=8, alias="newPassword")
+
+    model_config = {"populate_by_name": True}
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6)
+    password: str = Field(min_length=8)
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str = Field(alias="refreshToken")
@@ -48,7 +57,6 @@ class RefreshTokenRequest(BaseModel):
 
 class RegisterResponse(BaseModel):
     message: str
-    email: EmailStr
 
 class VerifyEmailResponse(BaseModel):
     message: str

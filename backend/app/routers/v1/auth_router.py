@@ -10,8 +10,10 @@ auth_service.login_vendor / login_customer must look users up by
 form_data.username (i.e. the email address).  JSON-body clients should
 send the email value in the 'username' form field.
 """
+from types import SimpleNamespace
+
 from fastapi import APIRouter, Depends, Query
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -20,8 +22,10 @@ from app.schemas.auth_schema import (
     AuthResponse,
     CustomerRegister,
     ForgotPasswordRequest,
+    LoginRequest,
     RefreshTokenRequest,
     RegisterResponse,
+    ResendVerificationRequest,
     ResetPasswordRequest,
 )
 from app.schemas.vendor_schema import VendorRegisterRequest, VendorResponse
@@ -29,6 +33,24 @@ from app.services.auth_service import auth_service
 from app.services.vendor_service import vendor_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+async def _parse_login_payload(request: Request) -> LoginRequest | SimpleNamespace:
+    content_type = request.headers.get("content-type", "")
+
+    if "application/json" in content_type:
+        body = await request.json()
+        return LoginRequest.model_validate(body)
+
+    form = await request.form()
+    username = form.get("username") or form.get("email")
+    password = form.get("password")
+    if not username or not password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="email/username and password are required.",
+        )
+    return SimpleNamespace(username=str(username), password=str(password))
 
 # --- Vendor Routes ---
 
@@ -46,16 +68,9 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
     return vendor
 
 @router.post("/vendor/login", tags=["Authentication"])
-def login_vendor(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
-    # Accept email via the standard 'username' field (Swagger UI / OAuth2 form)
-    # or honour a raw email value if the client sends 'email' directly.
-    # OAuth2PasswordRequestForm exposes only .username, so callers that want to
-    # send email simply put it in that field — both paths end up here identically.
-    form_data.username = form_data.username or ""  # normalise None → ""
-    return auth_service.login_vendor(db, form_data)
+async def login_vendor(request: Request, db: Session = Depends(get_db)):
+    payload = await _parse_login_payload(request)
+    return auth_service.login_vendor(db, payload)
 
 @router.get("/vendor/verify-email")
 def verify_vendor_email(token: str = Query(...), db: Session = Depends(get_db)):
@@ -70,13 +85,9 @@ def register_customer(payload: CustomerRegister, db: Session = Depends(get_db)):
 
 
 @router.post("/customer/login", tags=["Authentication"])
-def login_customer(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
-    # Same email/username normalisation as vendor login above.
-    form_data.username = form_data.username or ""
-    return auth_service.login_customer(db, form_data)
+async def login_customer(request: Request, db: Session = Depends(get_db)):
+    payload = await _parse_login_payload(request)
+    return auth_service.login_customer(db, payload)
 
 
 @router.post(
@@ -91,6 +102,13 @@ def refresh_customer_token(payload: RefreshTokenRequest, db: Session = Depends(g
 @router.get("/customer/verify-email")
 def verify_customer_email(token: str = Query(...), db: Session = Depends(get_db)):
     return auth_service.verify_customer_email(db, token)
+
+@router.post("/customer/email-verification/resend", response_model=AuthMessageResponse)
+def resend_customer_verification_email(
+    payload: ResendVerificationRequest,
+    db: Session = Depends(get_db),
+):
+    return auth_service.resend_customer_verification_email(db, payload)
 
 @router.post("/customer/password/forgot", response_model=AuthMessageResponse)
 def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):

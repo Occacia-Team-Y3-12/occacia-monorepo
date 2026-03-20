@@ -18,7 +18,7 @@ def test_customer_verification_email_uses_frontend_path():
     token = "test-verification-token"
     _, body = _build_customer_verification_email("user@test.com", token)
 
-    assert f"https://app.occacia.com/verify?token={token}" in body
+    assert f"https://app.occacia.com/customers/register/verify-email?token={token}" in body
     assert "/api/v1/auth" not in body
 
 
