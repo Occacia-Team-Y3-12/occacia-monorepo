@@ -70,6 +70,8 @@ from app.schemas.package_schema import (
     PackageOrderDetailsResponse,
     PackageOrderResponse,
     PaginatedPackageOrdersResponse,
+    ReassignTaskRequest,
+    ReassignTaskResponse,
 )
 from app.services.customer_service import customer_service
 from app.services.event_planning_service import event_planning_service
@@ -689,6 +691,31 @@ def delete_event_task(
         task_id=task_id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/customers/events/{event_id}/tasks/{task_id}/reassign",
+    response_model=ReassignTaskResponse,
+    response_model_by_alias=True,
+)
+def reassign_event_task(
+    event_id: str,
+    task_id: str,
+    body: ReassignTaskRequest,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    task, fulfillment_request = package_order_service.reassign_rejected_task(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+        task_id=task_id,
+        offering_id=body.offeringId,
+    )
+    return ReassignTaskResponse(
+        task=_task_response(task),
+        fulfillmentRequest=_fulfillment_request_response(fulfillment_request),
+    )
 
 
 # --- Event Recommendation Package Routes ---
