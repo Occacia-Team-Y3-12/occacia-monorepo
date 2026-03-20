@@ -1,4 +1,9 @@
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
 import pytest
+from fastapi import HTTPException
+
 from app.services.vendor_service import VendorService, normalize_tags
 from app.core.database import SessionLocal
 
@@ -150,3 +155,134 @@ def test_get_all_tags_returns_list(vendor_with_packages):
     assert isinstance(tags, list)
     assert len(tags) > 0
     assert "romantic" in tags
+
+
+def test_ensure_request_actionable_allows_sent_requests():
+    service = VendorService()
+    request = SimpleNamespace(status="SENT")
+
+    service._ensure_request_actionable(request)
+
+
+def test_ensure_request_actionable_rejects_expired_requests():
+    service = VendorService()
+    request = SimpleNamespace(status="EXPIRED")
+
+    with pytest.raises(HTTPException) as exc:
+        service._ensure_request_actionable(request)
+
+    assert exc.value.status_code == 409
+    assert "expired" in exc.value.detail
+
+
+def test_update_vendor_task_status_updates_valid_transition_and_persists():
+    service = VendorService()
+    db = MagicMock()
+    task = SimpleNamespace(status="ASSIGNED", status_updated_at=None)
+
+    with patch.object(service, "get_vendor_task", return_value=task), \
+         patch("app.services.vendor_service.now_utc", return_value="2026-03-20T12:00:00Z"):
+        updated_task = service.update_vendor_task_status(
+            db,
+            vendor_id="VEN-001",
+            task_id="TSK-001",
+            next_status="IN_PROGRESS",
+        )
+
+    assert updated_task is task
+    assert task.status == "IN_PROGRESS"
+    assert task.status_updated_at == "2026-03-20T12:00:00Z"
+    db.add.assert_called_once_with(task)
+    db.commit.assert_called_once()
+    db.refresh.assert_called_once_with(task)
+
+
+def test_update_vendor_task_status_rejects_invalid_transition():
+    service = VendorService()
+    db = MagicMock()
+    task = SimpleNamespace(status="ASSIGNED")
+
+    with patch.object(service, "get_vendor_task", return_value=task):
+        with pytest.raises(HTTPException) as exc:
+            service.update_vendor_task_status(
+                db,
+                vendor_id="VEN-001",
+                task_id="TSK-001",
+                next_status="DONE",
+            )
+
+    assert exc.value.status_code == 409
+    db.commit.assert_not_called()
+
+
+def test_respond_to_fulfillment_request_accepts_and_assigns_task():
+    service = VendorService()
+    db = MagicMock()
+    request = SimpleNamespace(
+        status="SENT",
+        responded_at=None,
+        response_note=None,
+        task_id="TSK-001",
+    )
+    task = SimpleNamespace(
+        status="PENDING",
+        rejected_at=None,
+        rejection_reason=None,
+        status_updated_at=None,
+    )
+
+    with patch.object(service, "_expire_overdue_fulfillment_requests"), \
+         patch.object(service, "_get_vendor_request_or_404", return_value=request), \
+         patch.object(service, "_get_task_or_404", return_value=task), \
+         patch("app.services.vendor_service.now_utc", return_value="2026-03-20T12:05:00Z"):
+        returned_request, returned_task = service.respond_to_fulfillment_request(
+            db,
+            vendor_id="VEN-001",
+            fulfillment_request_id="TQR-001",
+            decision="ACCEPT",
+            response_note=None,
+        )
+
+    assert returned_request is request
+    assert returned_task is task
+    assert request.status == "ACCEPTED"
+    assert request.responded_at == "2026-03-20T12:05:00Z"
+    assert task.status == "ASSIGNED"
+    assert task.status_updated_at == "2026-03-20T12:05:00Z"
+    db.commit.assert_called_once()
+    assert db.add.call_count == 2
+
+
+def test_respond_to_fulfillment_request_rejects_and_sets_reason():
+    service = VendorService()
+    db = MagicMock()
+    request = SimpleNamespace(
+        status="SENT",
+        responded_at=None,
+        response_note=None,
+        task_id="TSK-001",
+    )
+    task = SimpleNamespace(
+        status="PENDING",
+        rejected_at=None,
+        rejection_reason=None,
+        status_updated_at=None,
+    )
+
+    with patch.object(service, "_expire_overdue_fulfillment_requests"), \
+         patch.object(service, "_get_vendor_request_or_404", return_value=request), \
+         patch.object(service, "_get_task_or_404", return_value=task), \
+         patch("app.services.vendor_service.now_utc", return_value="2026-03-20T12:10:00Z"):
+        service.respond_to_fulfillment_request(
+            db,
+            vendor_id="VEN-001",
+            fulfillment_request_id="TQR-001",
+            decision="REJECT",
+            response_note="Already booked",
+        )
+
+    assert request.status == "REJECTED"
+    assert request.response_note == "Already booked"
+    assert task.status == "REJECTED"
+    assert task.rejected_at == "2026-03-20T12:10:00Z"
+    assert task.rejection_reason == "Already booked"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import timedelta
 
 from fastapi import HTTPException
 from sqlalchemy import and_, or_
@@ -88,6 +89,7 @@ class PackageOrderService:
                         offering_id=offering.offering_id,
                         status="SENT",
                         requested_at=confirmed_at,
+                        respond_by=confirmed_at + timedelta(minutes=5),
                         attempt_no=1,
                     )
                 )
