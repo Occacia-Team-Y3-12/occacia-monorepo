@@ -10,12 +10,12 @@ from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.common.enums import UserRole
-from app.common.utils import generate_prefixed_id, now_utc
+from app.common.utils import now_utc
 from app.models.package import Package
 from app.models.task import Task
 from app.models.task_request import TaskRequest
-from app.models.vendor import Vendor
 from app.models.user import User
+from app.models.vendor import Vendor
 from app.schemas.vendor_schema import VendorRegisterRequest as VendorCreate
 
 logger = logging.getLogger(__name__)
