@@ -31,28 +31,81 @@ _TIMEZONE_ALIASES = {
     "gmt": "UTC",
     "slst": "Asia/Colombo",
     "ist": "Asia/Kolkata",
+    "asia/colombo": "Asia/Colombo",
+    "asia/kolkata": "Asia/Kolkata",
 }
 
 _TASK_TEMPLATES = {
     "birthday": [
-        {"name": "Cake", "description": "Order or prepare the birthday cake."},
-        {"name": "Decorations", "description": "Plan balloons, table setup, and decor."},
-        {"name": "Guest invitations", "description": "Confirm the guest list and invitations."},
+        {"name": "Cake",              "description": "Order or prepare the birthday cake."},
+        {"name": "Decorations",       "description": "Plan balloons, table setup, and decor."},
+        {"name": "Guest invitations", "description": "Confirm the guest list and send invitations."},
+        {"name": "Venue",             "description": "Book or confirm the birthday venue."},
+        {"name": "Entertainment",     "description": "Arrange music, games, or activities."},
     ],
     "wedding": [
-        {"name": "Venue", "description": "Finalize venue requirements and booking."},
-        {"name": "Catering", "description": "Choose menu and serving style."},
-        {"name": "Photography", "description": "Shortlist photo and video coverage."},
+        {"name": "Venue",            "description": "Finalize venue requirements and booking."},
+        {"name": "Catering",         "description": "Choose menu and serving style."},
+        {"name": "Photography",      "description": "Shortlist photo and video coverage."},
+        {"name": "Flowers & Decor",  "description": "Select floral arrangements and decorations."},
+        {"name": "Invitations",      "description": "Design and send wedding invitations."},
+    ],
+    "anniversary": [
+        {"name": "Venue",            "description": "Book a special restaurant or location."},
+        {"name": "Gift",             "description": "Select a meaningful anniversary gift."},
+        {"name": "Flowers",          "description": "Order fresh flowers or a bouquet."},
+        {"name": "Surprise element", "description": "Plan a memorable surprise moment."},
+    ],
+    "proposal": [
+        {"name": "Venue",              "description": "Choose the perfect proposal location."},
+        {"name": "Ring",               "description": "Confirm or collect the engagement ring."},
+        {"name": "Photographer",       "description": "Arrange a discreet photographer to capture the moment."},
+        {"name": "Flowers",            "description": "Order a bouquet for the moment."},
+        {"name": "Celebration dinner", "description": "Book a celebration dinner for after."},
+    ],
+    "dinner": [
+        {"name": "Reservation",      "description": "Book the restaurant or venue."},
+        {"name": "Menu preferences", "description": "Note dietary requirements and preferences."},
+        {"name": "Flowers or gift",  "description": "Arrange a small gift or flowers if appropriate."},
+        {"name": "Transport",        "description": "Arrange transport or parking."},
+    ],
+    "corporate": [
+        {"name": "Venue",          "description": "Confirm corporate event space and facilities."},
+        {"name": "Catering",       "description": "Arrange catering or meals for attendees."},
+        {"name": "AV & Equipment", "description": "Ensure projectors, microphones, and screens are booked."},
+        {"name": "Agenda",         "description": "Prepare and circulate the event agenda."},
+        {"name": "Invitations",    "description": "Send formal invitations to all attendees."},
     ],
     "meeting": [
-        {"name": "Agenda", "description": "Prepare agenda and key discussion points."},
-        {"name": "Attendees", "description": "Confirm required attendees and invites."},
-        {"name": "Materials", "description": "Prepare documents, slides, or notes."},
+        {"name": "Agenda",          "description": "Prepare agenda and key discussion points."},
+        {"name": "Attendees",       "description": "Confirm required attendees and invites."},
+        {"name": "Materials",       "description": "Prepare documents, slides, or notes."},
+        {"name": "Venue / VC link", "description": "Book the room or send the video call link."},
+    ],
+    "retreat": [
+        {"name": "Accommodation", "description": "Book accommodation for all attendees."},
+        {"name": "Activities",    "description": "Plan team-building or wellness activities."},
+        {"name": "Transport",     "description": "Arrange group transport."},
+        {"name": "Meals",         "description": "Coordinate meal arrangements throughout."},
+    ],
+    "graduation": [
+        {"name": "Venue",       "description": "Book a venue for the celebration."},
+        {"name": "Cake",        "description": "Order a graduation cake."},
+        {"name": "Guest list",  "description": "Finalise invitations."},
+        {"name": "Gift",        "description": "Select a meaningful graduation gift."},
+    ],
+    "baby shower": [
+        {"name": "Venue & decor",  "description": "Book venue and plan decorations."},
+        {"name": "Guest list",     "description": "Send invitations to guests."},
+        {"name": "Food & cake",    "description": "Arrange catering and a themed cake."},
+        {"name": "Games",          "description": "Plan baby shower games and activities."},
+        {"name": "Gift registry",  "description": "Share or set up a gift registry."},
     ],
     "default": [
-        {"name": "Venue", "description": "Confirm where the event will happen."},
-        {"name": "Budget", "description": "Set the target spend and constraints."},
-        {"name": "Essentials", "description": "List the must-have items or services."},
+        {"name": "Venue",       "description": "Confirm where the event will happen."},
+        {"name": "Budget",      "description": "Set the target spend and constraints."},
+        {"name": "Essentials",  "description": "List the must-have items or services."},
+        {"name": "Guest list",  "description": "Confirm who will be attending."},
     ],
 }
 
@@ -118,11 +171,21 @@ class EventPlanningService:
         self._apply_chat_updates(event, content)
         suggested_tasks = self._build_suggested_tasks(event)
         reply = self._build_chat_reply(db, event, content, suggested_tasks)
-        self._save_event_message(db, event_id=event.event_id, sender="AI", content=reply)
+        # NOTE: AI reply is NOT saved here anymore.
+        # customer_router saves the real AI reply after planning_service runs,
+        # so GET /messages always shows the actual AI response, not the fallback.
         db.add(event)
         db.commit()
         db.refresh(event)
         return reply, suggested_tasks
+
+    def save_ai_reply(self, db: Session, *, event_id: str, content: str) -> None:
+        """
+        Persist the final AI reply to EventChatMessage.
+        Called by customer_router AFTER planning_service resolves the real reply,
+        so GET /customers/events/{eventId}/messages returns the correct text.
+        """
+        self._save_event_message(db, event_id=event_id, sender="AI", content=content)
 
     def summarize_event_context(self, db: Session, *, customer_id: str, event_id: str) -> str:
         event = self.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
@@ -307,7 +370,7 @@ class EventPlanningService:
         payload: dict[str, object],
     ) -> Event:
         event = self.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
-        self._validate_timezone(payload["timezone"])
+        timezone_name = self._validate_timezone(payload["timezone"])
         start_at = self._ensure_aware_datetime(payload["start_at"])
         end_at = self._ensure_aware_datetime(payload.get("end_at"))
         if end_at and end_at < start_at:
@@ -328,7 +391,7 @@ class EventPlanningService:
 
         event.start_at = start_at
         event.end_at = end_at
-        event.timezone = payload["timezone"]
+        event.timezone = timezone_name
         event.is_all_day = payload["is_all_day"]
         event.recurrence_rule = recurrence_rule
         event.recurrence_until = recurrence_until or (parsed_rrule.get("UNTIL") if parsed_rrule else None)
@@ -964,8 +1027,23 @@ class EventPlanningService:
         return previews
 
     def _resolve_template_key(self, event: Event) -> str:
-        search_text = " ".join(filter(None, [event.event_type, event.title, event.description])).lower()
-        for key in ("birthday", "wedding", "meeting"):
+        search_text = " ".join(filter(None, [
+            event.event_type, event.title, event.description
+        ])).lower()
+        # Ordered by specificity — longer/more specific phrases checked first
+        priority = [
+            "baby shower",
+            "anniversary",
+            "proposal",
+            "graduation",
+            "corporate",
+            "retreat",
+            "birthday",
+            "wedding",
+            "dinner",
+            "meeting",
+        ]
+        for key in priority:
             if key in search_text:
                 return key
         return "default"
@@ -994,11 +1072,17 @@ class EventPlanningService:
             raise HTTPException(status_code=404, detail="Customer not found")
         return customer
 
-    def _validate_timezone(self, timezone_name: str) -> None:
+    def _validate_timezone(self, timezone_name: str) -> str:
+        candidate = str(timezone_name).strip()
+        candidate_key = candidate.lower()
+        normalized = _TIMEZONE_ALIASES.get(candidate_key, candidate)
+        if candidate_key in _TIMEZONE_ALIASES:
+            return normalized
         try:
-            ZoneInfo(timezone_name)
+            ZoneInfo(normalized)
         except ZoneInfoNotFoundError as exc:
             raise HTTPException(status_code=400, detail="Invalid timezone") from exc
+        return normalized
 
     def _ensure_aware_datetime(self, value: datetime | None) -> datetime | None:
         if value is None:

@@ -1,5 +1,14 @@
 """
 app/routers/v1/auth_router.py
+
+Login note
+----------
+The OpenAPI spec defines a JSON body with { email, password }.
+FastAPI's OAuth2PasswordRequestForm uses 'username' for Swagger UI
+compatibility.  We keep form-data and treat 'username' AS the email field.
+auth_service.login_vendor / login_customer must look users up by
+form_data.username (i.e. the email address).  JSON-body clients should
+send the email value in the 'username' form field.
 """
 from types import SimpleNamespace
 

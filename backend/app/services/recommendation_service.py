@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import logging
 import re
 from dataclasses import dataclass
@@ -42,6 +44,27 @@ class RankedOffering:
     offering: Offering
     score: float
     rank: int
+
+
+def _run_async(coro):
+    """
+    Run an async coroutine from a sync context, safely handling the case
+    where we may already be inside a running event loop (e.g. FastAPI threadpool).
+    """
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # We're inside a running loop (FastAPI runs sync endpoints in a
+            # threadpool that shares the loop). Spin up a fresh thread with
+            # its own event loop to avoid blocking the main loop.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(asyncio.run, coro)
+                return future.result()
+        else:
+            return loop.run_until_complete(coro)
+    except RuntimeError:
+        # No current event loop at all — just create one
+        return asyncio.run(coro)
 
 
 class RecommendationService:
@@ -794,54 +817,64 @@ class RecommendationService:
         event,
         personas: list[Persona],
     ) -> list[RankedOffering]:
-        ai_shortlist = ai_service.recommend_offerings_for_task(
-            event_context={
-                "event_id": event.event_id,
-                "title": event.title,
-                "description": event.description,
-                "event_type": event.event_type,
-                "location_text": event.location_text,
-                "status": event.status,
-            },
-            personas=[
-                {
-                    "persona_id": persona.persona_id,
-                    "name": persona.name,
-                    "relationship": persona.relationship,
-                    "personality": persona.personality,
-                    "food_preferences": persona.food_preferences or [],
-                    "color_preferences": persona.color_preferences or [],
-                    "music_preferences": persona.music_preferences or [],
-                    "personality_tags": persona.personality_tags or [],
-                }
-                for persona in personas
-            ],
-            task={
-                "task_id": task.task_id,
-                "name": task.name,
-                "description": task.description,
-                "quantity": task.quantity,
-                "vendor_category": task.needs_vendor,
-                "budget_min": task.budget_min,
-                "budget_max": task.budget_max,
-                "currency": task.currency,
-            },
-            offerings=[
-                {
-                    "offering_id": ranked.offering.offering_id,
-                    "vendor_id": ranked.offering.vendor_id,
-                    "name": ranked.offering.name,
-                    "category": ranked.offering.category,
-                    "description": ranked.offering.description,
-                    "price": ranked.offering.price,
-                    "currency": ranked.offering.currency,
-                    "fallback_score": ranked.score,
-                    "fallback_rank": ranked.rank,
-                }
-                for ranked in ranked_offerings
-            ],
-            limit=5,
-        )
+        # FIX: recommend_offerings_for_task is async but this method is sync.
+        # Use _run_async() to safely bridge the sync/async boundary regardless
+        # of whether we're inside a running event loop or not.
+        try:
+            ai_shortlist = _run_async(
+                ai_service.recommend_offerings_for_task(
+                    event_context={
+                        "event_id": event.event_id,
+                        "title": event.title,
+                        "description": event.description,
+                        "event_type": event.event_type,
+                        "location_text": event.location_text,
+                        "status": event.status,
+                    },
+                    personas=[
+                        {
+                            "persona_id": persona.persona_id,
+                            "name": persona.name,
+                            "relationship": persona.relationship,
+                            "personality": persona.personality,
+                            "food_preferences": persona.food_preferences or [],
+                            "color_preferences": persona.color_preferences or [],
+                            "music_preferences": persona.music_preferences or [],
+                            "personality_tags": persona.personality_tags or [],
+                        }
+                        for persona in personas
+                    ],
+                    task={
+                        "task_id": task.task_id,
+                        "name": task.name,
+                        "description": task.description,
+                        "quantity": task.quantity,
+                        "vendor_category": task.needs_vendor,
+                        "budget_min": task.budget_min,
+                        "budget_max": task.budget_max,
+                        "currency": task.currency,
+                    },
+                    offerings=[
+                        {
+                            "offering_id": ranked.offering.offering_id,
+                            "vendor_id": ranked.offering.vendor_id,
+                            "name": ranked.offering.name,
+                            "category": ranked.offering.category,
+                            "description": ranked.offering.description,
+                            "price": ranked.offering.price,
+                            "currency": ranked.offering.currency,
+                            "fallback_score": ranked.score,
+                            "fallback_rank": ranked.rank,
+                        }
+                        for ranked in ranked_offerings
+                    ],
+                    limit=5,
+                )
+            )
+        except Exception as exc:
+            logger.warning("AI shortlist failed, falling back to score order: %s", exc)
+            ai_shortlist = None
+
         if not ai_shortlist:
             return ranked_offerings
 

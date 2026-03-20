@@ -189,6 +189,11 @@ class VendorService:
         vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
         if vendor:
             vendor.approval_status = status
+            # Keep is_verified in sync: approved vendors are verified
+            if status == "APPROVED":
+                vendor.is_verified = True
+            elif status in ("REJECTED", "SUSPENDED"):
+                vendor.is_verified = False
             db.commit()
             db.refresh(vendor)
         return vendor
@@ -333,15 +338,15 @@ class VendorService:
             return []
 
         canonical_loc = _normalise_city(location)
-        verified_vendor_ids = {v.id for v in db.query(
-            Vendor).filter(Vendor.is_verified == True).all()}
+        # Use APPROVED vendors (admin-approved) OR is_verified (manually verified)
+        # A vendor is visible in matches when admin has approved their application
+        active_vendor_ids = {
+            v.id for v in db.query(Vendor).filter(
+                or_(Vendor.approval_status == "APPROVED", Vendor.is_verified == True)
+            ).all()
+        }
         pkg_query = db.query(Package).options(joinedload(Package.vendor))
-
-        if verified_vendor_ids:
-            all_pkgs = [p for p in pkg_query.all(
-            ) if p.vendor_id in verified_vendor_ids]
-        else:
-            all_pkgs = []
+        all_pkgs = [p for p in pkg_query.all() if p.vendor_id in active_vendor_ids]
 
         def _get_tags(p):
             t = p.tags or []
@@ -752,6 +757,9 @@ class AdminVendorService:
         else:
             logger.warning("Vendor model has no .status column yet. Skipping admin status write.")
 
+        # Keep is_verified in sync with approval_status
+        if hasattr(vendor, "is_verified"):
+            vendor.is_verified = (new_status.upper() == "APPROVED")
         self.db.commit()
         self.db.refresh(vendor)
         logger.info("Admin %s set vendor %s status to %s", admin_email, vendor_id, new_status)
