@@ -37,18 +37,23 @@ const CustomerSidebar = ({ isOpen, isDesktopCollapsed, onToggleDesktopSidebar }:
       <div className="mb-8 flex items-center gap-2">
         <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="ml-[-8px] h-[59px] w-[59px] shrink-0" />
         <span className="text-[22px] font-extrabold tracking-tight text-[#1562CC]">OCCACIA</span>
-        <button
-          type="button"
-          onClick={onToggleDesktopSidebar}
-          className="ml-auto hidden h-10 w-10 items-center justify-center rounded-xl border border-[#E2E5EC] bg-white text-[#5B6478] lg:inline-flex"
-          aria-label="Close sidebar"
-        >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
-            <path d="M9 4.5v15" />
-            <path d="M16 9.5 13 12l3 2.5" />
-          </svg>
-        </button>
+        <div className="group relative ml-auto hidden lg:block">
+          <button
+            type="button"
+            onClick={onToggleDesktopSidebar}
+            className="h-10 w-10 items-center justify-center rounded-xl border border-[#E2E5EC] bg-white text-[#5B6478] lg:inline-flex"
+            aria-label="Close sidebar"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+              <path d="M9 4.5v15" />
+              <path d="M16 9.5 13 12l3 2.5" />
+            </svg>
+          </button>
+          <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-2xl bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-[0_8px_18px_rgba(17,24,39,0.35)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+            Close sidebar
+          </span>
+        </div>
       </div>
 
       <nav className="space-y-2">

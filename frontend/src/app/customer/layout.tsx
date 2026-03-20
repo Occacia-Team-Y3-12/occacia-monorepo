@@ -15,10 +15,10 @@ export default function CustomerLayout({
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith('/customer/auth');
 
-  if (isAuthPage) return <>{children}</>;
+  if (isAuthPage) return <div className="customer-portal-font">{children}</div>;
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#F7F7FA]">
+    <div className="customer-portal-font min-h-screen overflow-x-hidden bg-[#F7F7FA]">
       <CustomerSidebar
         isOpen={isSidebarOpen}
         isDesktopCollapsed={isDesktopSidebarCollapsed}

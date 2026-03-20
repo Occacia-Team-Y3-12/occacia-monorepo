@@ -53,9 +53,13 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
           : 'min-h-[88px] flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:py-0'
       }`}
     >
-      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-5">
+      <div
+        className={`flex w-full items-center gap-3 sm:gap-5 ${
+          isEventFlow ? 'flex-nowrap' : 'flex-col sm:w-auto sm:flex-row'
+        }`}
+      >
         {isDesktopSidebarCollapsed && (
-          <div className="group relative hidden lg:block">
+          <div className="group relative hidden shrink-0 items-center gap-2 lg:flex">
             <button
               type="button"
               onClick={onToggleDesktopSidebar}
@@ -63,14 +67,20 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
               aria-label="Open sidebar"
             >
               <Image src="/icons/logo.svg" alt="Occacia" width={56} height={56} className="h-14 w-14" />
-              <span className="absolute inset-0 inline-flex items-center justify-center bg-white/85 text-[#5B6478] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
-                  <path d="M9 4.5v15" />
-                  <path d="M13 9.5 16 12l-3 2.5" />
-                </svg>
+              <span className="absolute inset-0 inline-flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 group-active:opacity-100">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#E2E5EC] bg-white text-[#5B6478]">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+                    <path d="M9 4.5v15" />
+                    <path d="M13 9.5 16 12l-3 2.5" />
+                  </svg>
+                </span>
               </span>
             </button>
+            <span className="whitespace-nowrap text-[22px] font-extrabold tracking-tight text-[#1562CC]">OCCACIA</span>
+            <span className="pointer-events-none absolute left-7 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-2xl bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-[0_8px_18px_rgba(17,24,39,0.35)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+              Open sidebar
+            </span>
           </div>
         )}
 
@@ -91,9 +101,9 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
           </button>
         )}
 
-        <div className="flex min-h-11 w-full items-center rounded-xl border border-transparent px-1 sm:w-auto">
+        <div className="flex h-14 shrink-0 items-center rounded-xl border border-transparent px-1">
           {isEventFlow ? (
-            <p className="text-[16px] font-medium leading-none text-[#6B7C99]">
+            <p className="inline-flex -translate-y-[2px] items-center whitespace-nowrap text-[16px] font-medium leading-none text-[#6B7C99]">
               <span>Events</span>
               <span className="px-2 text-[#8B97AD]">&gt;</span>
               <span className="font-semibold text-[#1D2638]">{isEventsRootPage ? 'Create New Event' : savedEventTitle}</span>
@@ -126,7 +136,7 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
             className={`flex items-center ${isEventFlow ? 'gap-4 pl-1' : 'gap-4'}`}
             aria-label="Open profile menu"
           >
-            <span className={`${isEventFlow ? 'inline' : 'hidden sm:inline'} text-[17px] font-semibold text-[#182039]`}>Alex Rivers</span>
+            <span className={`${isEventFlow ? 'inline' : 'hidden sm:inline'} whitespace-nowrap text-[17px] font-semibold text-[#182039]`}>Alex Rivers</span>
             <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-[#F4CE95] shadow-[0_6px_18px_rgba(25,35,72,0.18)]">
               <Image
                 src="/icons/customer/dashboard/profile.svg"
