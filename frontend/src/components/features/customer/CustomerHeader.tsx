@@ -78,7 +78,10 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
               </span>
             </button>
             <span className="whitespace-nowrap text-[22px] font-extrabold tracking-tight text-[#1562CC]">OCCACIA</span>
-            <span className="pointer-events-none absolute left-7 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-2xl bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-[0_8px_18px_rgba(17,24,39,0.35)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+            <span
+              className="pointer-events-none absolute left-7 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-2xl bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-[0_8px_18px_rgba(17,24,39,0.35)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+              aria-hidden="true"
+            >
               Open sidebar
             </span>
           </div>
