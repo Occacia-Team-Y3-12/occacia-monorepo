@@ -55,8 +55,11 @@ from app.schemas.event_planning_schema import (
     TaskUpdateRequest,
 )
 from app.schemas.recommendation_schema import (
+    CreateCustomPackageRequest,
+    RecommendationPackageDetailsResponse,
     RecommendationPackageListResponse,
-    RecommendationPackageResponse,
+    TaskRecommendationListResponse,
+    UpdateCustomPackageRequest,
 )
 from app.schemas.package_schema import (
     PackageOrderResponse,
@@ -528,6 +531,24 @@ def generate_event_recommendations(
     )
 
 @router.get(
+    "/customers/events/{event_id}/tasks/{task_id}/recommendations",
+    response_model=TaskRecommendationListResponse,
+    response_model_by_alias=True,
+)
+def get_event_task_recommendations(
+    event_id: str,
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.get_task_recommendations(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+        task_id=task_id,
+    )
+
+@router.get(
     "/customers/events/{event_id}/packages",
     response_model=RecommendationPackageListResponse,
     response_model_by_alias=True,
@@ -545,7 +566,7 @@ def list_event_recommendation_packages(
 
 @router.get(
     "/customers/events/{event_id}/packages/{package_id}",
-    response_model=RecommendationPackageResponse,
+    response_model=RecommendationPackageDetailsResponse,
     response_model_by_alias=True,
 )
 def get_event_recommendation_package(
@@ -560,6 +581,63 @@ def get_event_recommendation_package(
         event_id=event_id,
         package_id=package_id,
     )
+
+@router.post(
+    "/customers/events/{event_id}/packages",
+    response_model=RecommendationPackageDetailsResponse,
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_event_custom_package(
+    event_id: str,
+    payload: CreateCustomPackageRequest,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.create_custom_package(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+        request=payload,
+    )
+
+@router.put(
+    "/customers/events/{event_id}/packages/{package_id}",
+    response_model=RecommendationPackageDetailsResponse,
+    response_model_by_alias=True,
+)
+def update_event_custom_package(
+    event_id: str,
+    package_id: str,
+    payload: UpdateCustomPackageRequest,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.update_custom_package(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+        package_id=package_id,
+        request=payload,
+    )
+
+@router.delete(
+    "/customers/events/{event_id}/packages/{package_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_event_custom_package(
+    event_id: str,
+    package_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    recommendation_service.delete_custom_package(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+        package_id=package_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.get(
     "/customers/events/{event_id}/package-orders",

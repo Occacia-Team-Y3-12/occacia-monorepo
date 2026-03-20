@@ -22,6 +22,24 @@ class RecommendationPackageItemResponse(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class TaskRecommendationResponse(BaseModel):
+    recommendation_id: str = Field(alias="recommendationId")
+    event_id: str = Field(alias="eventId")
+    task_id: str = Field(alias="taskId")
+    offering_id: str = Field(alias="offeringId")
+    score: float
+    rank: int
+    generated_at: datetime = Field(alias="generatedAt")
+
+    model_config = {"populate_by_name": True}
+
+
+class TaskRecommendationListResponse(BaseModel):
+    items: list[TaskRecommendationResponse]
+
+    model_config = {"populate_by_name": True}
+
+
 class RecommendationPackageResponse(BaseModel):
     package_id: str = Field(alias="packageId")
     event_id: str = Field(alias="eventId")
@@ -29,10 +47,18 @@ class RecommendationPackageResponse(BaseModel):
     package_total_price: float = Field(alias="packageTotalPrice")
     currency: str
     is_customized: bool = Field(alias="isCustomized")
+    base_package_id: str | None = Field(default=None, alias="basePackageId")
+    created_by_customer_id: str | None = Field(default=None, alias="createdByCustomerId")
     generated_at: datetime = Field(alias="generatedAt")
     expires_at: datetime | None = Field(default=None, alias="expiresAt")
     is_expired: bool = Field(alias="isExpired")
     items: list[RecommendationPackageItemResponse]
+
+    model_config = {"populate_by_name": True}
+
+
+class RecommendationPackageDetailsResponse(RecommendationPackageResponse):
+    allowed_offerings_by_task: dict[str, list[TaskRecommendationResponse]] = Field(alias="allowedOfferingsByTask")
 
     model_config = {"populate_by_name": True}
 
@@ -43,5 +69,30 @@ class RecommendationPackageListResponse(BaseModel):
     expires_at: datetime | None = Field(default=None, alias="expiresAt")
     is_expired: bool = Field(alias="isExpired")
     packages: list[RecommendationPackageResponse]
+
+    model_config = {"populate_by_name": True}
+
+
+class CustomPackageItemRequest(BaseModel):
+    package_item_id: str | None = Field(default=None, alias="packageItemId")
+    package_id: str | None = Field(default=None, alias="packageId")
+    task_id: str = Field(alias="taskId")
+    offering_id: str = Field(alias="offeringId")
+    quantity: int | None = None
+    unit_price: float | None = Field(default=None, alias="unitPrice")
+    line_total: float | None = Field(default=None, alias="lineTotal")
+
+    model_config = {"populate_by_name": True}
+
+
+class CreateCustomPackageRequest(BaseModel):
+    base_package_id: str = Field(alias="basePackageId")
+    items: list[CustomPackageItemRequest] = Field(min_length=1)
+
+    model_config = {"populate_by_name": True}
+
+
+class UpdateCustomPackageRequest(BaseModel):
+    items: list[CustomPackageItemRequest] = Field(min_length=1)
 
     model_config = {"populate_by_name": True}

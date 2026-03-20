@@ -18,9 +18,14 @@ from app.models.task import Task
 from app.models.task_recommendation import TaskRecommendation
 from app.models.vendor import Vendor
 from app.schemas.recommendation_schema import (
+    CreateCustomPackageRequest,
     RecommendationPackageItemResponse,
+    RecommendationPackageDetailsResponse,
     RecommendationPackageListResponse,
     RecommendationPackageResponse,
+    TaskRecommendationListResponse,
+    TaskRecommendationResponse,
+    UpdateCustomPackageRequest,
 )
 from app.services.ai_service import ai_service
 from app.services.event_planning_service import event_planning_service
@@ -168,25 +173,158 @@ class RecommendationService:
         customer_id: str,
         event_id: str,
         package_id: str,
-    ) -> RecommendationPackageResponse:
+    ) -> RecommendationPackageDetailsResponse:
         event_planning_service.get_event_for_customer(
             db,
             customer_id=customer_id,
             event_id=event_id,
         )
-        package = (
-            db.query(RecommendationPackage)
-            .filter(
-                RecommendationPackage.event_id == event_id,
-                RecommendationPackage.package_id == package_id,
-            )
+        package = self._get_package_or_404(db, event_id=event_id, package_id=package_id)
+        return self._build_package_details_response(db, event_id=event_id, package=package)
+
+    def get_task_recommendations(
+        self,
+        db: Session,
+        *,
+        customer_id: str,
+        event_id: str,
+        task_id: str,
+    ) -> TaskRecommendationListResponse:
+        event_planning_service.get_event_for_customer(
+            db,
+            customer_id=customer_id,
+            event_id=event_id,
+        )
+        task = (
+            db.query(Task)
+            .filter(Task.event_id == event_id, Task.task_id == task_id)
             .first()
         )
-        if not package:
-            raise HTTPException(status_code=404, detail=f"Recommendation package {package_id} not found")
+        if not task:
+            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
-        package_list_response = self._build_package_list_response(db, event_id=event_id, packages=[package])
-        return package_list_response.packages[0]
+        recommendations = self._get_task_recommendations_for_tasks(
+            db,
+            event_id=event_id,
+            task_ids=[task_id],
+        )
+        return TaskRecommendationListResponse(items=recommendations.get(task_id, []))
+
+    def create_custom_package(
+        self,
+        db: Session,
+        *,
+        customer_id: str,
+        event_id: str,
+        request: CreateCustomPackageRequest,
+    ) -> RecommendationPackageDetailsResponse:
+        event_planning_service.get_event_for_customer(
+            db,
+            customer_id=customer_id,
+            event_id=event_id,
+        )
+        base_package = self._get_package_or_404(db, event_id=event_id, package_id=request.base_package_id)
+        if base_package.is_customized:
+            raise HTTPException(status_code=400, detail="Base package must be system generated")
+
+        custom_package = RecommendationPackage(
+            event_id=event_id,
+            package_type="CUSTOM",
+            package_total_price=0.0,
+            currency=base_package.currency,
+            is_customized=True,
+            base_package_id=base_package.package_id,
+            created_by_customer_id=customer_id,
+            generated_at=now_utc(),
+            expires_at=base_package.expires_at,
+        )
+        db.add(custom_package)
+        db.flush()
+
+        try:
+            self._replace_package_items(
+                db,
+                event_id=event_id,
+                package=custom_package,
+                base_package=base_package,
+                requested_items=request.items,
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+        db.refresh(custom_package)
+        return self._build_package_details_response(db, event_id=event_id, package=custom_package)
+
+    def update_custom_package(
+        self,
+        db: Session,
+        *,
+        customer_id: str,
+        event_id: str,
+        package_id: str,
+        request: UpdateCustomPackageRequest,
+    ) -> RecommendationPackageDetailsResponse:
+        event_planning_service.get_event_for_customer(
+            db,
+            customer_id=customer_id,
+            event_id=event_id,
+        )
+        package = self._get_package_or_404(db, event_id=event_id, package_id=package_id)
+        if not package.is_customized:
+            raise HTTPException(status_code=400, detail="Only custom packages can be updated")
+        if package.created_by_customer_id and package.created_by_customer_id != customer_id:
+            raise HTTPException(status_code=403, detail="Custom package does not belong to this customer")
+
+        base_package = self._get_package_or_404(
+            db,
+            event_id=event_id,
+            package_id=package.base_package_id or package.package_id,
+        )
+
+        try:
+            self._replace_package_items(
+                db,
+                event_id=event_id,
+                package=package,
+                base_package=base_package,
+                requested_items=request.items,
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+        db.refresh(package)
+        return self._build_package_details_response(db, event_id=event_id, package=package)
+
+    def delete_custom_package(
+        self,
+        db: Session,
+        *,
+        customer_id: str,
+        event_id: str,
+        package_id: str,
+    ) -> None:
+        event_planning_service.get_event_for_customer(
+            db,
+            customer_id=customer_id,
+            event_id=event_id,
+        )
+        package = self._get_package_or_404(db, event_id=event_id, package_id=package_id)
+        if not package.is_customized:
+            raise HTTPException(status_code=400, detail="Only custom packages can be deleted")
+        if package.created_by_customer_id and package.created_by_customer_id != customer_id:
+            raise HTTPException(status_code=403, detail="Custom package does not belong to this customer")
+
+        (
+            db.query(PackageItem)
+            .filter(PackageItem.package_id == package.package_id)
+            .delete(synchronize_session=False)
+        )
+        db.delete(package)
+        db.commit()
 
     def _build_package_list_response(
         self,
@@ -287,6 +425,8 @@ class RecommendationService:
                     packageTotalPrice=package_row.package_total_price,
                     currency=package_row.currency,
                     isCustomized=package_row.is_customized,
+                    basePackageId=package_row.base_package_id,
+                    createdByCustomerId=package_row.created_by_customer_id,
                     generatedAt=generated_at,
                     expiresAt=expires_at,
                     isExpired=is_expired,
@@ -306,6 +446,21 @@ class RecommendationService:
             expiresAt=expires_at,
             isExpired=is_expired,
             packages=package_responses,
+        )
+
+    def _build_package_details_response(
+        self,
+        db: Session,
+        *,
+        event_id: str,
+        package: RecommendationPackage,
+    ) -> RecommendationPackageDetailsResponse:
+        package_response = self._build_package_list_response(db, event_id=event_id, packages=[package]).packages[0]
+        task_ids = [item.task_id for item in self._get_package_items(db, package.package_id)]
+        allowed_offerings = self._get_task_recommendations_for_tasks(db, event_id=event_id, task_ids=task_ids)
+        return RecommendationPackageDetailsResponse(
+            **package_response.model_dump(),
+            allowedOfferingsByTask=allowed_offerings,
         )
 
     def _delete_existing_generated_records(self, db: Session, *, event_id: str) -> None:
@@ -348,6 +503,162 @@ class RecommendationService:
             .order_by(Task.created_at.asc(), Task.id.asc())
             .all()
         )
+
+    def _get_package_or_404(self, db: Session, *, event_id: str, package_id: str) -> RecommendationPackage:
+        package = (
+            db.query(RecommendationPackage)
+            .filter(
+                RecommendationPackage.event_id == event_id,
+                RecommendationPackage.package_id == package_id,
+            )
+            .first()
+        )
+        if not package:
+            raise HTTPException(status_code=404, detail=f"Recommendation package {package_id} not found")
+        return package
+
+    def _get_package_items(self, db: Session, package_id: str) -> list[PackageItem]:
+        return (
+            db.query(PackageItem)
+            .filter(PackageItem.package_id == package_id)
+            .all()
+        )
+
+    def _get_task_recommendations_for_tasks(
+        self,
+        db: Session,
+        *,
+        event_id: str,
+        task_ids: list[str],
+    ) -> dict[str, list[TaskRecommendationResponse]]:
+        if not task_ids:
+            return {}
+
+        recommendations = (
+            db.query(TaskRecommendation)
+            .filter(
+                TaskRecommendation.event_id == event_id,
+                TaskRecommendation.task_id.in_(task_ids),
+            )
+            .order_by(TaskRecommendation.task_id.asc(), TaskRecommendation.rank.asc(), TaskRecommendation.id.asc())
+            .all()
+        )
+        response: dict[str, list[TaskRecommendationResponse]] = {task_id: [] for task_id in task_ids}
+        for recommendation in recommendations:
+            response.setdefault(recommendation.task_id, []).append(
+                TaskRecommendationResponse(
+                    recommendationId=recommendation.recommendation_id,
+                    eventId=recommendation.event_id,
+                    taskId=recommendation.task_id,
+                    offeringId=recommendation.offering_id,
+                    score=recommendation.score,
+                    rank=recommendation.rank,
+                    generatedAt=self._ensure_aware_datetime(recommendation.generated_at),
+                )
+            )
+        return response
+
+    def _replace_package_items(
+        self,
+        db: Session,
+        *,
+        event_id: str,
+        package: RecommendationPackage,
+        base_package: RecommendationPackage,
+        requested_items,
+    ) -> None:
+        requested_by_task = {}
+        for item in requested_items:
+            if item.task_id in requested_by_task:
+                raise HTTPException(status_code=400, detail=f"Duplicate task {item.task_id} in package update")
+            requested_by_task[item.task_id] = item
+
+        base_items = self._get_package_items(db, base_package.package_id)
+        if not base_items:
+            raise HTTPException(status_code=400, detail="Base package has no items")
+
+        base_items_by_task = {item.task_id: item for item in base_items}
+        invalid_task_ids = sorted(set(requested_by_task) - set(base_items_by_task))
+        if invalid_task_ids:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Tasks not part of base package: {', '.join(invalid_task_ids)}",
+            )
+
+        recommendations_by_task = self._get_task_recommendations_for_tasks(
+            db,
+            event_id=event_id,
+            task_ids=list(base_items_by_task),
+        )
+        offering_ids = [item.offering_id for item in requested_by_task.values()]
+        offerings = (
+            db.query(Offering)
+            .filter(Offering.offering_id.in_(offering_ids))
+            .all()
+            if offering_ids
+            else []
+        )
+        offerings_by_id = {offering.offering_id: offering for offering in offerings}
+
+        new_rows: list[PackageItem] = []
+        total_price = 0.0
+        currency = None
+        for task_id, requested_item in requested_by_task.items():
+            allowed_offering_ids = {
+                recommendation.offering_id
+                for recommendation in recommendations_by_task.get(task_id, [])
+            }
+            if requested_item.offering_id not in allowed_offering_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Offering {requested_item.offering_id} is not in the shortlist for task {task_id}",
+                )
+
+            offering = offerings_by_id.get(requested_item.offering_id)
+            if offering is None:
+                raise HTTPException(status_code=404, detail=f"Offering {requested_item.offering_id} not found")
+            if not (offering.is_active and offering.is_available):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Offering {requested_item.offering_id} is no longer available",
+                )
+
+            base_item = base_items_by_task[task_id]
+            quantity = requested_item.quantity or base_item.quantity
+            if quantity < 1:
+                raise HTTPException(status_code=400, detail=f"Quantity for task {task_id} must be at least 1")
+
+            line_total = offering.price * quantity
+            total_price += line_total
+            currency = currency or offering.currency
+            if offering.currency != currency:
+                raise HTTPException(status_code=400, detail="Custom package requires a single currency")
+
+            new_rows.append(
+                PackageItem(
+                    package_id=package.package_id,
+                    task_id=task_id,
+                    offering_id=offering.offering_id,
+                    quantity=quantity,
+                    unit_price=offering.price,
+                    line_total=line_total,
+                )
+            )
+
+        (
+            db.query(PackageItem)
+            .filter(PackageItem.package_id == package.package_id)
+            .delete(synchronize_session=False)
+        )
+        for row in new_rows:
+            db.add(row)
+
+        package.package_total_price = total_price
+        package.currency = currency or base_package.currency
+        package.base_package_id = base_package.package_id
+        package.is_customized = True
+        db.add(package)
+        db.flush()
 
     def _get_event_personas(self, db: Session, *, event_id: str) -> list[Persona]:
         return (
