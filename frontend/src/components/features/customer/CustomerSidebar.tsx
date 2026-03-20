@@ -50,7 +50,10 @@ const CustomerSidebar = ({ isOpen, isDesktopCollapsed, onToggleDesktopSidebar }:
               <path d="M16 9.5 13 12l3 2.5" />
             </svg>
           </button>
-          <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-2xl bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-[0_8px_18px_rgba(17,24,39,0.35)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+          <span
+            className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-2xl bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-[0_8px_18px_rgba(17,24,39,0.35)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+            aria-hidden="true"
+          >
             Close sidebar
           </span>
         </div>
