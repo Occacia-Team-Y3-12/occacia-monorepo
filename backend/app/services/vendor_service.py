@@ -9,12 +9,14 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.common.enums import UserRole
-from app.common.utils import generate_prefixed_id
-from app.models.package import Package
-from app.models.vendor import Vendor
 from app.models.user import User
+from app.models.vendor import Vendor
+from app.common.enums import UserRole
 from app.schemas.vendor_schema import VendorRegisterRequest as VendorCreate
+from app.models.package import Package
+from fastapi import HTTPException, status
+from app.core.security import get_password_hash
+from app.common.utils import generate_prefixed_id
 
 logger = logging.getLogger(__name__)
 
