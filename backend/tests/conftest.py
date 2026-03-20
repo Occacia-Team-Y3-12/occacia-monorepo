@@ -40,6 +40,7 @@ from app.models.customer import Customer
 from app.models.event import Event
 from app.models.event_chat_message import EventChatMessage
 from app.models.event_persona import EventPersona
+from app.models.notification import Notification
 from app.models.offering import Offering
 from app.models.package import Package
 from app.models.package_execution_request import PackageExecutionRequest
@@ -71,6 +72,7 @@ def clean_tables():
         for model in (
             ChatMessage,
             EventChatMessage,
+            Notification,
             PackageExecutionRequest,
             TaskRequest,
             PackageItem,

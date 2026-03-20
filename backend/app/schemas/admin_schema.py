@@ -38,3 +38,26 @@ class VendorAdminView(BaseModel):
 
 class VendorRejectRequest(BaseModel):
     reason: str = "Your application did not meet our current requirements."
+
+
+class NotificationResponse(BaseModel):
+    notification_id: str
+    user_id: str
+    event_id: str | None = None
+    task_id: str | None = None
+    channel: str
+    type: str
+    status: str
+    dedupe_key: str | None = None
+    payload: dict
+    error_message: str | None = None
+    sent_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedNotificationsResponse(BaseModel):
+    items: list[NotificationResponse]
+    next_cursor: str | None = None
