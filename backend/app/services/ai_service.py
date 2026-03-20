@@ -452,7 +452,7 @@ class AIService:
 
         # nosec comment below suppresses Bandit B608 false positive.
         # This string is an AI prompt, not a SQL query.
-        system_msg = (
+        system_msg = (  # nosec B608
             "You are a vendor offering ranking engine for Occacia, a premium event "
             "planning platform in Sri Lanka. Rank the candidate offerings for the given "
             "task. Return ONLY a JSON object — no explanation, no markdown.\n\n"
@@ -463,7 +463,7 @@ class AIService:
             "4. Event context fit — suits event type, location, guest count\n"
             "5. Availability — prefer isAvailable=true and isActive=true\n\n"
             "RULES:\n"
-            f"- Select up to {limit} offerings maximum\n"  # nosec B608
+            f"- Choose up to {limit} offerings maximum\n"
             "- Prefer offerings from different vendors when possible\n"
             "- Only use offering_ids that exist in CANDIDATE_OFFERINGS\n"
             "- Order best-first (index 0 = best match)\n"
