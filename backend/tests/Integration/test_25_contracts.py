@@ -231,7 +231,7 @@ class TestCustomerLogin:
         assert resp.status_code == 401
 
     def test_login_unverified_customer_403(self, client, db_session):
-        cust = _make_customer(db_session, verified=False, status="PENDING_VERIFICATION")
+        cust = _make_customer(db_session, verified=False, status="PENDING")
         # 💥 THE FIX
         resp = client.post(
             self.URL,

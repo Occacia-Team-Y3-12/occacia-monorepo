@@ -6,14 +6,16 @@ from datetime import date, timedelta
 from typing import List, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, or_
+from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.common.enums import UserRole
-from app.common.utils import generate_prefixed_id
+from app.common.utils import now_utc
 from app.models.package import Package
-from app.models.vendor import Vendor
+from app.models.task import Task
+from app.models.task_request import TaskRequest
 from app.models.user import User
+from app.models.vendor import Vendor
 from app.schemas.vendor_schema import VendorRegisterRequest as VendorCreate
 
 logger = logging.getLogger(__name__)
@@ -175,6 +177,7 @@ def _attach_vendors(db: Session, packages: List[Package]) -> List[Package]:
 
 
 class VendorService:
+    _DEFAULT_VENDOR_TASK_STATUSES = ("ASSIGNED", "IN_PROGRESS", "DONE")
 
     @staticmethod
     def register_vendor(db: Session, vendor_in: VendorCreate) -> Vendor:
@@ -541,6 +544,274 @@ class VendorService:
             if alias in lower:
                 return _CITY_ALIASES[alias]
         return None
+
+    def list_fulfillment_requests(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        status_filter: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[TaskRequest], str | None]:
+        self._expire_overdue_fulfillment_requests(db, vendor_id=vendor_id)
+
+        query = db.query(TaskRequest).filter(TaskRequest.vendor_id == vendor_id)
+        normalized_status = status_filter.upper() if status_filter else "SENT"
+        query = query.filter(TaskRequest.status == normalized_status)
+
+        if cursor:
+            cursor_request = (
+                db.query(TaskRequest)
+                .filter(
+                    TaskRequest.vendor_id == vendor_id,
+                    TaskRequest.request_id == cursor,
+                )
+                .first()
+            )
+            if cursor_request:
+                query = query.filter(
+                    or_(
+                        TaskRequest.requested_at < cursor_request.requested_at,
+                        and_(
+                            TaskRequest.requested_at == cursor_request.requested_at,
+                            TaskRequest.id > cursor_request.id,
+                        ),
+                    )
+                )
+
+        items = (
+            query.order_by(TaskRequest.requested_at.desc(), TaskRequest.id.asc())
+            .limit(limit + 1)
+            .all()
+        )
+        next_cursor = None
+        if len(items) > limit:
+            next_cursor = items[limit].request_id
+            items = items[:limit]
+        return items, next_cursor
+
+    def get_fulfillment_request_detail(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        fulfillment_request_id: str,
+    ) -> TaskRequest:
+        self._expire_overdue_fulfillment_requests(db, vendor_id=vendor_id)
+        request = self._get_vendor_request_or_404(
+            db,
+            vendor_id=vendor_id,
+            fulfillment_request_id=fulfillment_request_id,
+        )
+        return request
+
+    def respond_to_fulfillment_request(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        fulfillment_request_id: str,
+        decision: str,
+        response_note: str | None,
+    ) -> tuple[TaskRequest, Task]:
+        self._expire_overdue_fulfillment_requests(db, vendor_id=vendor_id)
+        request = self._get_vendor_request_or_404(
+            db,
+            vendor_id=vendor_id,
+            fulfillment_request_id=fulfillment_request_id,
+        )
+        task = self._get_task_or_404(db, task_id=request.task_id)
+        self._ensure_request_actionable(request)
+
+        timestamp = now_utc()
+        request.responded_at = timestamp
+        request.response_note = response_note
+
+        if decision == "ACCEPT":
+            request.status = "ACCEPTED"
+            task.status = "ASSIGNED"
+        else:
+            request.status = "REJECTED"
+            task.status = "REJECTED"
+            task.rejected_at = timestamp
+            task.rejection_reason = response_note
+
+        task.status_updated_at = timestamp
+        db.add(request)
+        db.add(task)
+        db.commit()
+        db.refresh(request)
+        db.refresh(task)
+        return request, task
+
+    def list_vendor_tasks(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        status_filter: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[Task], str | None]:
+        self._expire_overdue_fulfillment_requests(db, vendor_id=vendor_id)
+
+        query = db.query(Task).filter(Task.assigned_vendor_id == vendor_id)
+        if status_filter:
+            query = query.filter(Task.status == status_filter.upper())
+        else:
+            query = query.filter(Task.status.in_(self._DEFAULT_VENDOR_TASK_STATUSES))
+
+        if cursor:
+            cursor_task = (
+                db.query(Task)
+                .filter(
+                    Task.assigned_vendor_id == vendor_id,
+                    Task.task_id == cursor,
+                )
+                .first()
+            )
+            if cursor_task:
+                query = query.filter(
+                    or_(
+                        Task.created_at < cursor_task.created_at,
+                        and_(
+                            Task.created_at == cursor_task.created_at,
+                            Task.id > cursor_task.id,
+                        ),
+                    )
+                )
+
+        items = (
+            query.order_by(Task.created_at.desc(), Task.id.asc())
+            .limit(limit + 1)
+            .all()
+        )
+        next_cursor = None
+        if len(items) > limit:
+            next_cursor = items[limit].task_id
+            items = items[:limit]
+        return items, next_cursor
+
+    def get_vendor_task(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        task_id: str,
+    ) -> Task:
+        self._expire_overdue_fulfillment_requests(db, vendor_id=vendor_id)
+        task = (
+            db.query(Task)
+            .filter(
+                Task.task_id == task_id,
+                Task.assigned_vendor_id == vendor_id,
+                Task.status != "PENDING",
+            )
+            .first()
+        )
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return task
+
+    def update_vendor_task_status(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        task_id: str,
+        next_status: str,
+    ) -> Task:
+        task = self.get_vendor_task(db, vendor_id=vendor_id, task_id=task_id)
+        current_status = task.status.upper()
+        allowed_transitions = {
+            "ASSIGNED": "IN_PROGRESS",
+            "IN_PROGRESS": "DONE",
+        }
+        expected_status = allowed_transitions.get(current_status)
+        if expected_status != next_status:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Task cannot transition from {current_status} to {next_status}",
+            )
+
+        task.status = next_status
+        task.status_updated_at = now_utc()
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+        return task
+
+    def _expire_overdue_fulfillment_requests(
+        self,
+        db: Session,
+        *,
+        vendor_id: str | None = None,
+    ) -> None:
+        current_time = now_utc()
+        query = db.query(TaskRequest).filter(
+            TaskRequest.status == "SENT",
+            TaskRequest.respond_by.isnot(None),
+            TaskRequest.respond_by <= current_time,
+        )
+        if vendor_id:
+            query = query.filter(TaskRequest.vendor_id == vendor_id)
+
+        expired_requests = query.all()
+        if not expired_requests:
+            return
+
+        task_ids = [request.task_id for request in expired_requests]
+        tasks = (
+            db.query(Task)
+            .filter(Task.task_id.in_(task_ids))
+            .all()
+        )
+        tasks_by_id = {task.task_id: task for task in tasks}
+
+        for request in expired_requests:
+            request.status = "EXPIRED"
+            request.responded_at = current_time
+            db.add(request)
+            task = tasks_by_id.get(request.task_id)
+            if task:
+                task.status = "EXPIRED"
+                task.expires_at = current_time
+                task.status_updated_at = current_time
+                db.add(task)
+
+        db.commit()
+
+    def _get_vendor_request_or_404(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        fulfillment_request_id: str,
+    ) -> TaskRequest:
+        request = (
+            db.query(TaskRequest)
+            .filter(
+                TaskRequest.request_id == fulfillment_request_id,
+                TaskRequest.vendor_id == vendor_id,
+            )
+            .first()
+        )
+        if not request:
+            raise HTTPException(status_code=404, detail="Fulfillment request not found")
+        return request
+
+    def _get_task_or_404(self, db: Session, *, task_id: str) -> Task:
+        task = db.query(Task).filter(Task.task_id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return task
+
+    def _ensure_request_actionable(self, request: TaskRequest) -> None:
+        if request.status == "EXPIRED":
+            raise HTTPException(status_code=409, detail="Fulfillment request has expired")
+        if request.status != "SENT":
+            raise HTTPException(status_code=409, detail="Fulfillment request has already been responded to")
 
 
 class AdminVendorService:

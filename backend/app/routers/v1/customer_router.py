@@ -7,14 +7,16 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.customer import Customer
 from app.models.task import Task
 from app.models.package_execution_request import PackageExecutionRequest
+from app.models.task_request import TaskRequest
 from app.core.dependencies import get_current_customer
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.schemas.customer_schema import (
@@ -56,15 +58,22 @@ from app.schemas.event_planning_schema import (
     TaskUpdateRequest,
 )
 from app.schemas.recommendation_schema import (
+    CreateCustomPackageRequest,
+    RecommendationPackageDetailsResponse,
     RecommendationPackageListResponse,
-    RecommendationPackageResponse,
+    TaskRecommendationListResponse,
+    UpdateCustomPackageRequest,
 )
 from app.schemas.package_schema import (
+    ConfirmPackageOrderResponse,
+    FulfillmentRequestResponse,
+    PackageOrderDetailsResponse,
     PackageOrderResponse,
     PaginatedPackageOrdersResponse,
 )
 from app.services.customer_service import customer_service
 from app.services.event_planning_service import event_planning_service
+from app.services.package_order_service import package_order_service
 from app.services.recommendation_service import recommendation_service
 from app.services.planning_service import planning_service
 from app.services.ai_service import ai_service
@@ -231,6 +240,22 @@ def _package_order_response(order: PackageExecutionRequest) -> PackageOrderRespo
         statusUpdatedAt=order.status_updated_at,
         notes=order.notes,
         idempotencyKey=order.idempotency_key,
+    )
+
+
+def _fulfillment_request_response(request: TaskRequest) -> FulfillmentRequestResponse:
+    return FulfillmentRequestResponse(
+        fulfillmentRequestId=request.request_id,
+        packageOrderId=request.package_order_id,
+        taskId=request.task_id,
+        vendorId=request.vendor_id,
+        offeringId=request.offering_id,
+        status=request.status,
+        requestedAt=request.requested_at,
+        respondBy=request.respond_by,
+        respondedAt=request.responded_at,
+        responseNote=request.response_note,
+        attemptNo=request.attempt_no,
     )
 
 def _calendar_status_response(customer: Customer) -> CalendarConnectionStatusResponse:
@@ -685,6 +710,24 @@ def generate_event_recommendations(
     )
 
 @router.get(
+    "/customers/events/{event_id}/tasks/{task_id}/recommendations",
+    response_model=TaskRecommendationListResponse,
+    response_model_by_alias=True,
+)
+def get_event_task_recommendations(
+    event_id: str,
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.get_task_recommendations(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+        task_id=task_id,
+    )
+
+@router.get(
     "/customers/events/{event_id}/packages",
     response_model=RecommendationPackageListResponse,
     response_model_by_alias=True,
@@ -702,7 +745,7 @@ def list_event_recommendation_packages(
 
 @router.get(
     "/customers/events/{event_id}/packages/{package_id}",
-    response_model=RecommendationPackageResponse,
+    response_model=RecommendationPackageDetailsResponse,
     response_model_by_alias=True,
 )
 def get_event_recommendation_package(
@@ -716,6 +759,92 @@ def get_event_recommendation_package(
         customer_id=current_customer.customer_id,
         event_id=event_id,
         package_id=package_id,
+    )
+
+@router.post(
+    "/customers/events/{event_id}/packages",
+    response_model=RecommendationPackageDetailsResponse,
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_event_custom_package(
+    event_id: str,
+    payload: CreateCustomPackageRequest,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.create_custom_package(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+        request=payload,
+    )
+
+@router.put(
+    "/customers/events/{event_id}/packages/{package_id}",
+    response_model=RecommendationPackageDetailsResponse,
+    response_model_by_alias=True,
+)
+def update_event_custom_package(
+    event_id: str,
+    package_id: str,
+    payload: UpdateCustomPackageRequest,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return recommendation_service.update_custom_package(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+        package_id=package_id,
+        request=payload,
+    )
+
+@router.delete(
+    "/customers/events/{event_id}/packages/{package_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_event_custom_package(
+    event_id: str,
+    package_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    recommendation_service.delete_custom_package(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+        package_id=package_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/customers/events/{event_id}/packages/{package_id}/confirm",
+    response_model=ConfirmPackageOrderResponse,
+    response_model_by_alias=True,
+)
+def confirm_event_package(
+    event_id: str,
+    package_id: str,
+    idempotency_key: UUID = Header(alias="Idempotency-Key"),
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    order, tasks, fulfillment_requests = package_order_service.confirm_package_order(
+        db,
+        customer_id=current_customer.customer_id,
+        event_id=event_id,
+        package_id=package_id,
+        idempotency_key=str(idempotency_key),
+    )
+    return ConfirmPackageOrderResponse(
+        packageOrder=_package_order_response(order),
+        tasks=[_task_response(task) for task in tasks],
+        fulfillmentRequests=[
+            _fulfillment_request_response(request)
+            for request in fulfillment_requests
+        ],
     )
 
 @router.get(
@@ -740,6 +869,50 @@ def list_event_package_orders(
     return PaginatedPackageOrdersResponse(
         items=[_package_order_response(item) for item in items],
         nextCursor=next_cursor,
+    )
+
+
+@router.get(
+    "/customers/package-orders",
+    response_model=PaginatedPackageOrdersResponse,
+    response_model_by_alias=True,
+)
+def list_customer_package_orders(
+    limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    items, next_cursor = package_order_service.list_customer_package_orders(
+        db,
+        customer_id=current_customer.customer_id,
+        limit=limit,
+        cursor=cursor,
+    )
+    return PaginatedPackageOrdersResponse(
+        items=[_package_order_response(item) for item in items],
+        nextCursor=next_cursor,
+    )
+
+
+@router.get(
+    "/customers/package-orders/{package_order_id}",
+    response_model=PackageOrderDetailsResponse,
+    response_model_by_alias=True,
+)
+def get_customer_package_order(
+    package_order_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    order, tasks = package_order_service.get_customer_package_order_detail(
+        db,
+        customer_id=current_customer.customer_id,
+        package_order_id=package_order_id,
+    )
+    return PackageOrderDetailsResponse(
+        packageOrder=_package_order_response(order),
+        tasks=[_task_response(task) for task in tasks],
     )
 
 

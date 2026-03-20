@@ -22,7 +22,7 @@ class Customer(Base):
     password_hash = Column(String, nullable=False)
     address = Column(String, nullable=True)
     email_verified = Column(Boolean, default=False, nullable=False)
-    status = Column(String, default="PENDING_VERIFICATION", nullable=False)
+    status = Column(String, default="PENDING", nullable=False)
     verification_token = Column(String, nullable=True)
     verification_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     calendar_provider = Column(String, nullable=True)

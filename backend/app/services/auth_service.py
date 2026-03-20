@@ -32,6 +32,7 @@ from app.schemas.auth_schema import (
     ForgotPasswordRequest,
     LoginRequest,
     RefreshTokenRequest,
+    ResendVerificationRequest,
     ResetPasswordRequest
 )
 from app.services.customer_service import customer_service
@@ -78,7 +79,7 @@ def _send_email(to: str, subject: str, text_body: str) -> bool:
 
 
 def _build_customer_verification_email(email: str, token: str) -> tuple[str, str]:
-    link = f"https://app.occacia.com/verify?token={token}"
+    link = f"https://app.occacia.com/customers/register/verify-email?token={token}"
     subject = "Verify your Occacia account"
     body = (
         "Welcome to Occacia!\n\n"
@@ -142,10 +143,9 @@ class AuthService:
             email=str(payload.email),
             password_hash=get_password_hash(payload.password),
             phone=payload.phone,
-            address=payload.address,
             locale=getattr(payload, "locale", None),
             email_verified=False,
-            status="PENDING_VERIFICATION",
+            status="PENDING",
             verification_token=verification_token,
             verification_token_expires_at=expires_at,
         )
@@ -155,7 +155,7 @@ class AuthService:
         subject, body = _build_customer_verification_email(str(payload.email), verification_token)
         _send_email(str(payload.email), subject, body)
 
-        return {"message": "Verification email sent", "email": str(payload.email)}
+        return {"message": "Registration successful. Please verify your email."}
 
     def login_customer(self, db: Session, payload: LoginRequest | OAuth2PasswordRequestForm) -> dict:
         # 🚨 DEVSECOPS FIX: Dynamically grab email whether from JSON (.email) or Swagger Form (.username)
@@ -265,6 +265,38 @@ class AuthService:
         db.commit()
 
         return {"message": "Email verified successfully"}
+
+    def resend_customer_verification_email(
+        self,
+        db: Session,
+        payload: ResendVerificationRequest,
+    ) -> dict[str, str]:
+        customer = db.query(Customer).filter(Customer.email == str(payload.email)).first()
+        if not customer:
+            raise HTTPException(status_code=400, detail="Customer account not found.")
+
+        if customer.email_verified or customer.status == "ACTIVE":
+            raise HTTPException(status_code=400, detail="Email already verified.")
+
+        if customer.status not in {"PENDING", "PENDING_VERIFICATION"}:
+            raise HTTPException(
+                status_code=400,
+                detail="Customer account is not pending email verification.",
+            )
+
+        verification_token, expires_at = self._create_verification_token_internal(
+            str(payload.email),
+            token_type="verify_customer_email",
+            hours=EMAIL_VERIFICATION_TTL_HOURS,
+        )
+        customer.verification_token = verification_token
+        customer.verification_token_expires_at = expires_at
+        db.add(customer)
+        db.commit()
+
+        subject, body = _build_customer_verification_email(str(payload.email), verification_token)
+        _send_email(str(payload.email), subject, body)
+        return {"message": "Verification email resent successfully."}
 
     # --- Vendor Registration & Login ---
 

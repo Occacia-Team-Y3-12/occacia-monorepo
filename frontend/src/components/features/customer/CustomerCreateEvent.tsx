@@ -57,7 +57,7 @@ const CustomerCreateEvent = () => {
               src="/icons/customer/events/Info_Icon.svg"
               alt=""
               aria-hidden="true"
-              className="h-4 w-4"
+              className="h-5 w-5"
             />
             <span className="text-[15px] font-semibold text-[#1B2237]">General Information</span>
           </div>
@@ -112,7 +112,7 @@ const CustomerCreateEvent = () => {
 
         <div className="overflow-hidden rounded-2xl border border-[#E4E8F2] bg-[#FFFFFF]">
           <div className="flex items-center gap-2 border-b border-[#E4E8F2] px-5 py-4">
-            <img src="/icons/customer/events/Add_People_Icon.svg" alt="" aria-hidden="true" className="h-4 w-4" />
+            <img src="/icons/customer/events/Add_People_Icon.svg" alt="" aria-hidden="true" className="h-5 w-5" />
             <span className="text-[15px] font-semibold text-[#1B2237]">Assign People</span>
           </div>
 
