@@ -166,7 +166,6 @@ def _detect_tone(
 
     best = max(scores, key=lambda t: scores[t])
     if scores[best] == 0:
-        # Default by event type
         et = (event_type or "").lower()
         if any(w in et for w in ["anniversary", "date", "proposal"]):
             return _TONE_ROMANTIC
@@ -181,23 +180,17 @@ def _detect_tone(
 
 
 def _build_memory_block(past_events: Optional[list]) -> str:
-    """
-    Build a MEMORY block from the user's past confirmed events.
-    Each entry: {event_type, event_date, location, packages_used: [name...]}
-    """
     if not past_events:
         return ""
 
     lines = ["RECURRING INTELLIGENCE — past events for this user:"]
-    for ev in past_events[:5]:  # cap at 5
-        ev_type    = ev.get("event_type", "event")
-        ev_date    = ev.get("event_date", "unknown date")
-        ev_loc     = ev.get("location", "unknown location")
-        ev_pkgs    = ev.get("packages_used", [])
-        pkg_str    = (", ".join(ev_pkgs[:3])) if ev_pkgs else "no packages recorded"
-        lines.append(
-            f"  • {ev_type} on {ev_date} in {ev_loc} — packages: {pkg_str}"
-        )
+    for ev in past_events[:5]:
+        ev_type = ev.get("event_type", "event")
+        ev_date = ev.get("event_date", "unknown date")
+        ev_loc  = ev.get("location", "unknown location")
+        ev_pkgs = ev.get("packages_used", [])
+        pkg_str = (", ".join(ev_pkgs[:3])) if ev_pkgs else "no packages recorded"
+        lines.append(f"  • {ev_type} on {ev_date} in {ev_loc} — packages: {pkg_str}")
 
     lines.append(
         "\nUSE THIS MEMORY: If the user is planning a similar or recurring event "
@@ -209,15 +202,6 @@ def _build_memory_block(past_events: Optional[list]) -> str:
 
 
 def _build_structured_persona_context(personas: list) -> str:
-    """
-    Build a structured persona context block that maps preference fields
-    (food, music, personality_tags, color_preferences) to concrete package tags.
-
-    Replaces the old text-blob _build_persona_block for use in system messages
-    so the AI receives explicit tag guidance.
-
-    Returns empty string for an empty persona list.
-    """
     if not personas:
         return ""
 
@@ -238,12 +222,10 @@ def _build_structured_persona_context(personas: list) -> str:
         music      = _to_list(getattr(p, "music_preferences", None))
         ptags      = _to_list(getattr(p, "personality_tags",  None))
         colors     = _to_list(getattr(p, "color_preferences", None))
-        # Legacy fallback: if all new structured fields are empty, use preferences_json
         prefs_json = _to_list(getattr(p, "preferences_json",  None))
         if not any([food, music, ptags, colors]) and prefs_json:
             ptags = prefs_json
 
-        # Derive package tags from every preference field
         derived: list[str] = []
         for lst in [food, music, ptags, colors]:
             for pref in lst:
@@ -273,8 +255,7 @@ def _build_structured_persona_context(personas: list) -> str:
 
 
 def _build_persona_block(personas: list) -> str:
-    """Legacy helper kept for internal use. New code should call
-    _build_structured_persona_context instead."""
+    """Legacy helper kept for internal use."""
     def _to_list(val) -> list[str]:
         if not val:
             return []
@@ -334,7 +315,6 @@ def _build_system_message(
         if parts:
             event_block = "EVENT (already created by the user — use this context):\n" + "\n".join(parts) + "\n\n"
 
-    # Use structured persona context (maps prefs → tags explicitly)
     persona_block = _build_structured_persona_context(personas) if personas else ""
     memory_block  = _build_memory_block(past_events)
     tone_addon    = _TONE_SYSTEM_ADDON.get(tone, "")
@@ -470,6 +450,8 @@ class AIService:
         if not self.groq_api_key or not offerings:
             return None
 
+        # nosec comment below suppresses Bandit B608 false positive.
+        # This string is an AI prompt, not a SQL query.
         system_msg = (
             "You are a vendor offering ranking engine for Occacia, a premium event "
             "planning platform in Sri Lanka. Rank the candidate offerings for the given "
@@ -481,7 +463,7 @@ class AIService:
             "4. Event context fit — suits event type, location, guest count\n"
             "5. Availability — prefer isAvailable=true and isActive=true\n\n"
             "RULES:\n"
-            f"- Select up to {limit} offerings maximum\n"
+            f"- Select up to {limit} offerings maximum\n"  # nosec B608
             "- Prefer offerings from different vendors when possible\n"
             "- Only use offering_ids that exist in CANDIDATE_OFFERINGS\n"
             "- Order best-first (index 0 = best match)\n"
@@ -550,17 +532,15 @@ class AIService:
         missing_info: List[str] = None,
         session_id: str = "",
         event_context: Optional[dict] = None,
-        past_events: Optional[list] = None,   # ← NEW: recurring intelligence
+        past_events: Optional[list] = None,
     ):
         history  = history or []
         personas = personas or []
 
-        # ── Detect tone ───────────────────────────────────────────────────────
         event_type_str = (event_context or {}).get("event_type", "")
         tone = _detect_tone(event_type_str, raw_query, personas)
         logger.info(f"Detected tone: {tone} | session={session_id}")
 
-        # ── Build system message (uses _build_structured_persona_context) ─────
         system_msg = _build_system_message(
             event_context,
             available_tags,
@@ -576,7 +556,6 @@ class AIService:
             f"tone={tone} messages={len(messages)}"
         )
 
-        # ── Cache check ───────────────────────────────────────────────────────
         cache_seed = f"{session_id}:{turn_count}:{raw_query}:{tone}"
         cache_key  = "ai_cache:" + hashlib.md5(cache_seed.encode(), usedforsecurity=False).hexdigest()
         r = _get_redis()
@@ -589,7 +568,6 @@ class AIService:
             except Exception:
                 pass
 
-        # ── Call Groq ─────────────────────────────────────────────────────────
         headers = {
             "Authorization": f"Bearer {self.groq_api_key}",
             "Content-Type":  "application/json",
@@ -613,7 +591,6 @@ class AIService:
                 logger.error(f"Groq error: {type(e).__name__}: {repr(e)}")
                 raise
 
-        # ── Parse response ────────────────────────────────────────────────────
         data    = response.json()
         outputs = ""
         try:
@@ -636,11 +613,9 @@ class AIService:
                     "I'm here to help you plan something amazing! What are we celebrating?"
                 )
 
-            # ── Inject gift_category from tone if AI left it null ─────────────
             intent = parsed_data.get("intent", "chat")
             if intent in ("planning", "date", "multi", "gift"):
                 if not parsed_data.get("gift_suggestion"):
-                    # AI missed the gift — inject a tone-appropriate fallback
                     fallbacks = {
                         _TONE_ROMANTIC:    "A personalised flower bouquet with a handwritten card",
                         _TONE_ADVENTURE:   "An outdoor experience voucher for two",
@@ -654,7 +629,6 @@ class AIService:
                 if not parsed_data.get("gift_category"):
                     parsed_data["gift_category"] = _GIFT_CATEGORY_BY_TONE.get(tone)
 
-            # ── Tag validation ────────────────────────────────────────────────
             if available_tags and parsed_data.get("venue_tags"):
                 valid    = set(available_tags)
                 original = parsed_data["venue_tags"]
@@ -663,7 +637,6 @@ class AIService:
                     logger.warning(f"Stripped invalid tags: {set(original) - valid}")
                 parsed_data["venue_tags"] = filtered
 
-            # ── Attach tone to response for planning_service ──────────────────
             parsed_data["detected_tone"] = tone
 
             if r:
