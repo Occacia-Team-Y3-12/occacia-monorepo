@@ -34,12 +34,13 @@ def _activate_customer(email: str) -> None:
 def test_customer_register_success(client):
     email = f"user-{uuid4().hex[:8]}@test.com"
     r = client.post("/api/v1/auth/customer/register", json={
-        "full_name": "Jane Doe",
+        "fullName": "Jane Doe",
         "email": email,
         "password": "StrongPass123!",
         "phone": "+94771234567",
     })
     assert r.status_code == 201
+    assert r.json()["message"] == "Registration successful. Please verify your email."
 
 
 def test_customer_register_duplicate_email(client):
@@ -76,7 +77,7 @@ def test_vendor_register_duplicate_email(client):
 def test_customer_verify_email_success(client):
     email = f"user-{uuid4().hex[:8]}@test.com"
     client.post("/api/v1/auth/customer/register", json={
-        "full_name": "Jane", "email": email, "password": "Pass123!"
+        "fullName": "Jane", "email": email, "password": "Pass12345!"
     })
     db = SessionLocal()
     customer = db.query(Customer).filter(Customer.email == email).first()
@@ -102,7 +103,7 @@ def test_customer_verify_email_invalid_token(client):
 def test_customer_login_success(client, monkeypatch):
     email = f"user-{uuid4().hex[:8]}@test.com"
     client.post("/api/v1/auth/customer/register", json={
-        "full_name": "Jane", "email": email, "password": "Pass123!"
+        "fullName": "Jane", "email": email, "password": "Pass12345!"
     })
     _activate_customer(email)
     
@@ -110,7 +111,7 @@ def test_customer_login_success(client, monkeypatch):
     
     # 💥 THE FIX: data= instead of json=
     r = client.post("/api/v1/auth/customer/login",
-                    data={"username": email, "password": "Pass123!"})
+                    data={"username": email, "password": "Pass12345!"})
     
     assert r.status_code == 200
     data = r.json()
@@ -122,8 +123,8 @@ def test_customer_login_success(client, monkeypatch):
 def test_customer_login_wrong_password(client):
     email = f"user-{uuid4().hex[:8]}@test.com"
     client.post("/api/v1/auth/customer/register", json={
-        "full_name": "Jane", "email": email, "password": "Pass123!"
-    })
+        "fullName": "Jane", "email": email, "password": "Pass12345!"}
+    )
     _activate_customer(email)
     
     # 💥 THE FIX: data= instead of json=
@@ -136,8 +137,8 @@ def test_customer_login_wrong_password(client):
 def test_customer_refresh_token_success(client, monkeypatch):
     email = f"user-{uuid4().hex[:8]}@test.com"
     client.post("/api/v1/auth/customer/register", json={
-        "full_name": "Jane", "email": email, "password": "Pass123!"
-    })
+        "fullName": "Jane", "email": email, "password": "Pass12345!"}
+    )
     _activate_customer(email)
     
     monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
@@ -145,7 +146,7 @@ def test_customer_refresh_token_success(client, monkeypatch):
     # 💥 THE FIX: data= instead of json=
     login = client.post(
         "/api/v1/auth/customer/login",
-        data={"username": email, "password": "Pass123!"},
+        data={"username": email, "password": "Pass12345!"},
     )
     
     data = login.json()
@@ -192,8 +193,8 @@ def test_vendor_login_wrong_password(client):
 def test_customer_forgot_password(client):
     email = f"user-{uuid4().hex[:8]}@test.com"
     client.post("/api/v1/auth/customer/register", json={
-        "full_name": "Jane", "email": email, "password": "Pass123!"
-    })
+        "fullName": "Jane", "email": email, "password": "Pass12345!"}
+    )
     r = client.post("/api/v1/auth/customer/password/forgot",
                     json={"email": email})
     assert r.status_code == 200
@@ -209,3 +210,20 @@ def test_customer_reset_password_invalid_token(client):
     r = client.post("/api/v1/auth/customer/password/reset",
                     json={"token": "bad-token", "new_password": "NewPass123!"})
     assert r.status_code == 400
+
+
+def test_customer_resend_verification_success(client):
+    email = f"user-{uuid4().hex[:8]}@test.com"
+    client.post("/api/v1/auth/customer/register", json={
+        "fullName": "Jane",
+        "email": email,
+        "password": "Pass12345!",
+    })
+
+    r = client.post(
+        "/api/v1/auth/customer/email-verification/resend",
+        json={"email": email},
+    )
+
+    assert r.status_code == 200
+    assert r.json()["message"] == "Verification email resent successfully."
