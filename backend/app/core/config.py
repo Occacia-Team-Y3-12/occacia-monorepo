@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     LANGFLOW_URL: str | None = None
     LANGFLOW_ORG_ID: str | None = None
     LANGFLOW_TOKEN: str | None = None
-
+    GROQ_API_KEY: str | None = None
     DATABASE_URL: str | None = None
 
     DB_USER: str = "admin"

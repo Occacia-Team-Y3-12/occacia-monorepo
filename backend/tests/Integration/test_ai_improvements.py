@@ -204,8 +204,7 @@ class TestStructuredPersonaContext:
 
     @pytest.mark.asyncio
     async def test_generate_date_plan_uses_structured_persona(self):
-        """generate_date_plan should call _build_structured_persona_context
-        (not the old persona_service.build_persona_context)."""
+        """generate_date_plan should call _build_structured_persona_context."""
         from app.services.ai_service import AIService, _build_structured_persona_context
 
         service = AIService()
@@ -220,41 +219,38 @@ class TestStructuredPersonaContext:
 
         with patch("app.services.ai_service._build_structured_persona_context",
                    side_effect=_fake_build) as mock_build:
-            # Make Langflow call fail immediately so we don't need network
-            with patch.object(service, "base_url", "http://fake"), \
-                 patch.object(service, "token", "tok"), \
-                 patch.object(service, "org_id", "org"):
 
-                mock_response = MagicMock()
-                mock_response.raise_for_status = MagicMock()
-                mock_response.json.return_value = {
-                    "outputs": [{
-                        "outputs": [{
-                            "results": {
-                                "message": {
-                                    "text": json.dumps({
-                                        "intent": "planning",
-                                        "venue_tags": ["romantic"],
-                                        "missing_info": [],
-                                    })
-                                }
-                            }
-                        }]
-                    }]
-                }
+            # Build a valid Groq-format mock response
+            mock_response = MagicMock()
+            mock_response.raise_for_status = MagicMock()
+            mock_response.json.return_value = {
+                "choices": [{
+                    "message": {
+                        "content": json.dumps({
+                            "intent": "planning",
+                            "venue_tags": ["romantic"],
+                            "missing_info": [],
+                            "chat_response": "Great! Let me help you plan something romantic.",
+                            "gift_suggestion": None,
+                            "gift_category": None,
+                        })
+                    }
+                }]
+            }
 
-                with patch("httpx.AsyncClient") as mock_client_cls:
-                    mock_client = AsyncMock()
-                    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-                    mock_client.__aexit__ = AsyncMock(return_value=False)
-                    mock_client.post = AsyncMock(return_value=mock_response)
-                    mock_client_cls.return_value = mock_client
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(return_value=mock_response)
 
-                    with patch("app.services.ai_service._get_redis", return_value=None):
-                        await service.generate_date_plan(
-                            raw_query="Plan something romantic",
-                            personas=[persona],
-                        )
+            with patch("httpx.AsyncClient", return_value=mock_client), \
+                 patch("app.services.ai_service._get_redis", return_value=None):
+                # Provide a dummy key so the service doesn't fail on missing key
+                service.groq_api_key = "test-key"
+                await service.generate_date_plan(
+                    raw_query="Plan something romantic",
+                    personas=[persona],
+                )
 
         assert captured.get("called"), (
             "_build_structured_persona_context was not called — "
@@ -267,12 +263,13 @@ class TestStructuredPersonaContext:
 # ═════════════════════════════════════════════════════════════════════════════
 
 class TestLangflowTimeout:
-    """generate_date_plan must return a friendly fallback dict when Langflow
+    """generate_date_plan must return a friendly fallback dict when Groq
     times out, and must NOT raise an exception to the caller."""
 
     def _service(self):
         from app.services.ai_service import AIService
         svc = AIService()
+        svc.groq_api_key = "test-key"   # provide a key so the guard doesn't fire
         svc.base_url  = "http://fake-langflow"
         svc.token     = "fake-token"
         svc.org_id    = "fake-org"
@@ -326,18 +323,15 @@ class TestLangflowTimeout:
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
         mock_response.json.return_value = {
-            "outputs": [{
-                "outputs": [{
-                    "results": {
-                        "message": {
-                            "text": json.dumps({
-                                "intent": "chat",
-                                "venue_tags": [],
-                                "missing_info": [],
-                            })
-                        }
-                    }
-                }]
+            "choices": [{
+                "message": {
+                    "content": json.dumps({
+                        "intent": "chat",
+                        "venue_tags": [],
+                        "missing_info": [],
+                        "chat_response": "Hello!",
+                    })
+                }
             }]
         }
 
@@ -390,27 +384,25 @@ class TestRedisCacheTTL:
     def _service(self):
         from app.services.ai_service import AIService
         svc = AIService()
+        svc.groq_api_key = "test-key"   # provide a key so the guard doesn't fire
         svc.base_url  = "http://fake-langflow"
         svc.token     = "fake-token"
         svc.org_id    = "fake-org"
         return svc
 
-    def _good_langflow_response(self):
+    def _good_groq_response(self):
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
         mock_response.json.return_value = {
-            "outputs": [{
-                "outputs": [{
-                    "results": {
-                        "message": {
-                            "text": json.dumps({
-                                "intent": "planning",
-                                "venue_tags": ["romantic"],
-                                "missing_info": [],
-                            })
-                        }
-                    }
-                }]
+            "choices": [{
+                "message": {
+                    "content": json.dumps({
+                        "intent": "planning",
+                        "venue_tags": ["romantic"],
+                        "missing_info": [],
+                        "chat_response": "Here is your plan.",
+                    })
+                }
             }]
         }
         return mock_response
@@ -428,7 +420,7 @@ class TestRedisCacheTTL:
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client.post = AsyncMock(return_value=self._good_langflow_response())
+        mock_client.post = AsyncMock(return_value=self._good_groq_response())
 
         with patch("httpx.AsyncClient", return_value=mock_client), \
              patch("app.services.ai_service._get_redis", return_value=mock_redis):
@@ -438,7 +430,7 @@ class TestRedisCacheTTL:
         ttl_used = mock_redis.setex.call_args[0][1]
         assert ttl_used == 7200, f"Expected TTL=7200 s (2 h), got {ttl_used} s"
 
-    # ── 2. Cache hit avoids Langflow call ────────────────────────────────────
+    # ── 2. Cache hit avoids Groq call ────────────────────────────────────────
 
     @pytest.mark.asyncio
     async def test_cache_hit_skips_langflow(self):
@@ -468,7 +460,7 @@ class TestRedisCacheTTL:
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client.post = AsyncMock(return_value=self._good_langflow_response())
+        mock_client.post = AsyncMock(return_value=self._good_groq_response())
 
         with patch("httpx.AsyncClient", return_value=mock_client), \
              patch("app.services.ai_service._get_redis", return_value=mock_redis):
