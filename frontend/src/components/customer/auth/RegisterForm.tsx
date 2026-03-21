@@ -29,6 +29,25 @@ export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps)
     }
   };
 
+  const validateField = (name: keyof RegisterFormValues, value: string) => {
+    try {
+      const fieldSchema = registerSchema.shape[name];
+      fieldSchema.parse(value);
+      setErrors(prev => ({ ...prev, [name]: undefined }));
+    } catch (error: any) {
+      if (error.errors?.[0]) {
+        setErrors(prev => ({ ...prev, [name]: error.errors[0].message }));
+      }
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (value.trim()) {
+      validateField(name as keyof RegisterFormValues, value);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -53,9 +72,12 @@ export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps)
         name="username"
         value={formData.username}
         onChange={handleChange}
+        onBlur={handleBlur}
         placeholder="Username"
         disabled={isLoading}
-        className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        className={`w-full border rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 disabled:bg-gray-100 ${
+          errors.username ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+        }`}
       />
       {errors.username && <p className="text-xs text-red-500 -mt-2">{errors.username}</p>}
 
@@ -64,9 +86,12 @@ export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps)
         name="fullName"
         value={formData.fullName}
         onChange={handleChange}
+        onBlur={handleBlur}
         placeholder="Full Name"
         disabled={isLoading}
-        className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        className={`w-full border rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 disabled:bg-gray-100 ${
+          errors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+        }`}
       />
       {errors.fullName && <p className="text-xs text-red-500 -mt-2">{errors.fullName}</p>}
 
@@ -75,9 +100,12 @@ export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps)
         name="email"
         value={formData.email}
         onChange={handleChange}
+        onBlur={handleBlur}
         placeholder="Email Address"
         disabled={isLoading}
-        className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        className={`w-full border rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 disabled:bg-gray-100 ${
+          errors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+        }`}
       />
       {errors.email && <p className="text-xs text-red-500 -mt-2">{errors.email}</p>}
 
@@ -86,9 +114,12 @@ export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps)
         name="mobileNumber"
         value={formData.mobileNumber}
         onChange={handleChange}
+        onBlur={handleBlur}
         placeholder="Mobile Number"
         disabled={isLoading}
-        className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        className={`w-full border rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 disabled:bg-gray-100 ${
+          errors.mobileNumber ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+        }`}
       />
       {errors.mobileNumber && <p className="text-xs text-red-500 -mt-2">{errors.mobileNumber}</p>}
 
@@ -98,9 +129,12 @@ export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps)
           name="password"
           value={formData.password}
           onChange={handleChange}
+          onBlur={handleBlur}
           placeholder="Password"
           disabled={isLoading}
-          className="w-full border border-gray-300 rounded-md px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className={`w-full border rounded-md px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 disabled:bg-gray-100 ${
+            errors.password ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+          }`}
         />
         <button
           type="button"
