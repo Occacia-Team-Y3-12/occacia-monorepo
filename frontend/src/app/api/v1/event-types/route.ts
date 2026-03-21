@@ -1,7 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { proxyApiRequest, shouldUseCustomerPlanningMockApi } from '@/app/api/v1/_proxy';
 import { EventTypesResponse } from '@/types/customer';
 
-export async function GET(): Promise<NextResponse<EventTypesResponse>> {
+export async function GET(request: NextRequest): Promise<NextResponse<EventTypesResponse>> {
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, '/event-types') as Promise<NextResponse<EventTypesResponse>>;
+  }
+
   return NextResponse.json(
     {
       status: 'success',

@@ -3,7 +3,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jwt.exceptions import PyJWTError as JWTError
+from sqlalchemy.orm import Session
+
 from app.core.config import settings
+from app.core.database import get_db
+from app.models.vendor import Vendor
 
 # Configure password hashing
 # Prefers Argon2 (industry standard), falls back to Passlib/bcrypt if unavailable
@@ -69,3 +76,41 @@ def decode_token(token: str) -> dict:
 def generate_reset_token() -> str:
     """Generates a secure, URL-safe random string for password resets."""
     return secrets.token_urlsafe(32)
+
+
+oauth2_vendor_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/auth/vendor/login", scheme_name="VendorAuthSecurity"
+)
+
+
+def get_current_vendor(
+    token: str = Depends(oauth2_vendor_scheme), db: Session = Depends(get_db)
+) -> Vendor:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired vendor token.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    vendor = db.query(Vendor).filter(Vendor.email == email).first()
+    if vendor is None:
+        raise credentials_exception
+
+    return vendor
+
+
+def require_vendor_approved(vendor: Vendor = Depends(get_current_vendor)) -> Vendor:
+    """Ensure vendor is approved before accessing task features"""
+    if vendor.approval_status != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account approval status is {vendor.approval_status}. Approval required to view tasks."
+        )
+    return vendor

@@ -1,5 +1,6 @@
 // src/types/customer/index.ts
 export * from './auth';
+export * from './task';
 
 export interface Customer {
   id: string;

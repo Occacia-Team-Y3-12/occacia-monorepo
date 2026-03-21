@@ -3,8 +3,10 @@
 import { useMemo } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
+import { featureFlags } from '@/config/featureFlags';
 import { useEventChatPlanner } from '@/hooks/customer/useEventChatPlanner';
 import { ROUTES } from '@/lib/routes';
+import { MOCK_DRAFT_TASKS } from '@/mocks/customerExperience';
 
 const formatDateLabel = (date: string): string => {
   if (!date) {
@@ -87,12 +89,7 @@ export default function CustomerEventDraftPage() {
       return tasks.slice(0, 4);
     }
 
-    return [
-      { id: 'fallback-1', title: 'Book High Tea Venue', category: 'Venue', completed: true },
-      { id: 'fallback-2', title: 'Order Custom Birthday Cake', category: 'Food', completed: true },
-      { id: 'fallback-3', title: 'Send Invitations', category: 'Planning', completed: true },
-      { id: 'fallback-4', title: 'Buy Birthday Gift', category: 'Shopping', completed: true },
-    ];
+    return featureFlags.useCustomerPlanningMockApi ? MOCK_DRAFT_TASKS : [];
   }, [tasks]);
 
   if (!eventId) {

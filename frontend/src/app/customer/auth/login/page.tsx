@@ -12,16 +12,19 @@ export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
-  const onSubmit = async (data: { username: string; password: string }) => {
+  const onSubmit = async (data: { email: string; password: string }) => {
     setIsLoading(true);
-
     try {
-      await customerAuthService.login({ email: data.username, password: data.password });
+      await customerAuthService.login({ email: data.email, password: data.password });
+      if (!customerAuthService.isAuthenticated()) {
+        throw new Error('Authentication token was not returned from login response.');
+      }
       toast.success('Login successful!');
-      router.push('/customer/dashboard');
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';
-      toast.error(errorMessage);
+      sessionStorage.setItem('customerAuthVerified', '1');
+      router.replace('/customer/dashboard');
+    } catch (error: unknown) {
+      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'Invalid email or password. Please try again.');
     } finally {
       setIsLoading(false);
     }

@@ -1,4 +1,6 @@
 import { VendorFormData } from '@/lib/validation';
+import { featureFlags } from '@/config/featureFlags';
+import { API_BASE_URL } from '@/services/api';
 
 type RegisterResponse = {
 	status?: string;
@@ -8,10 +10,20 @@ type RegisterResponse = {
 
 export const vendorAuthService = {
 	async login(payload: { email: string; password: string }) {
-		await new Promise((resolve) => setTimeout(resolve, 350));
-		return {
-			ok: payload.email.trim().length > 0 && payload.password.trim().length > 0,
-		};
+		if (featureFlags.useVendorAuthMock) {
+			await new Promise((resolve) => setTimeout(resolve, 350));
+			return {
+				ok: payload.email.trim().length > 0 && payload.password.trim().length > 0,
+			};
+		}
+
+		const response = await fetch(`${API_BASE_URL}/auth/vendor/login`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+		});
+
+		return { ok: response.ok };
 	},
 
 	async register(payload: VendorFormData & { organizationType: 'join' | 'create' }) {
@@ -26,23 +38,60 @@ export const vendorAuthService = {
 			location_base: payload.businessAddress,
 		};
 
-		const response = await fetch('/api/v1/auth/vendor/register', {
+		if (featureFlags.useVendorAuthMock) {
+			return {
+				ok: true,
+				data: {
+					status: 'pending_verification',
+					message: 'Please verify your email',
+					data: { token: `mock_${Date.now()}` },
+				},
+			};
+		}
+
+		const response = await fetch(`${API_BASE_URL}/auth/vendor/register`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(backendPayload),
 		});
 
-		const data = (await response.json()) as RegisterResponse;
+		const responseData = (await response.json()) as Record<string, unknown>;
+		const data: RegisterResponse = {
+			status: response.ok ? 'pending_verification' : 'error',
+			message:
+				typeof responseData.detail === 'string'
+					? responseData.detail
+					: typeof responseData.message === 'string'
+						? responseData.message
+						: response.ok
+							? 'Please verify your email'
+							: 'Registration failed',
+		};
 		return { ok: response.ok, data };
 	},
 
 	async forgotPassword(email: string) {
-		await new Promise((resolve) => setTimeout(resolve, 1200));
-		return { ok: email.trim().length > 0 };
+		if (featureFlags.useVendorAuthMock) {
+			await new Promise((resolve) => setTimeout(resolve, 1200));
+			return { ok: email.trim().length > 0 };
+		}
+
+		return { ok: false };
 	},
 
 	async verifyEmail(token: string | null) {
-		await new Promise((resolve) => setTimeout(resolve, 2000));
-		return { ok: Boolean(token && token.startsWith('mock_')) };
+		if (featureFlags.useVendorAuthMock) {
+			await new Promise((resolve) => setTimeout(resolve, 2000));
+			return { ok: Boolean(token && token.startsWith('mock_')) };
+		}
+
+		if (!token) {
+			return { ok: false };
+		}
+
+		const response = await fetch(
+			`${API_BASE_URL}/auth/vendor/verify-email?token=${encodeURIComponent(token)}`
+		);
+		return { ok: response.ok };
 	},
 };
