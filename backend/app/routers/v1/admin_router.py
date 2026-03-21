@@ -15,9 +15,11 @@ from app.core.database import get_db
 from app.models.admin import Admin
 from app.models.vendor import Vendor
 from app.schemas.admin_schema import (
-    AdminRegister, AdminResponse, VendorAdminView, VendorRejectRequest
+    AdminRegister, AdminResponse, NotificationResponse, PaginatedNotificationsResponse,
+    VendorAdminView, VendorRejectRequest
 )
 from app.services.admin_service import admin_service 
+from app.services.notification_service import notification_service
 from app.services.auth_service import _send_email
 
 logger = logging.getLogger(__name__)
@@ -92,3 +94,32 @@ def reject_vendor(
     vendor = admin_service.reject_vendor(db, vendor_id=vendor_id, reason=body.reason, admin_email=current_admin.email)
     _send_rejection_email(vendor, body.reason)
     return vendor
+
+
+@router.get("/notifications", response_model=PaginatedNotificationsResponse)
+def list_notifications(
+    limit: int = 50,
+    cursor: str | None = None,
+    user_id: str | None = None,
+    event_id: str | None = None,
+    task_id: str | None = None,
+    status: str | None = None,
+    type: str | None = None,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    _ = current_admin
+    items, next_cursor = notification_service.list_notifications(
+        db,
+        limit=limit,
+        cursor=cursor,
+        user_id=user_id,
+        event_id=event_id,
+        task_id=task_id,
+        status=status,
+        type=type,
+    )
+    return PaginatedNotificationsResponse(
+        items=[NotificationResponse.model_validate(item) for item in items],
+        next_cursor=next_cursor,
+    )

@@ -14,11 +14,99 @@ from app.models.package_execution_request import PackageExecutionRequest
 from app.models.package_item import PackageItem
 from app.models.recommendation_package import RecommendationPackage
 from app.models.task import Task
+from app.models.task_recommendation import TaskRecommendation
 from app.models.task_request import TaskRequest
 from app.services.event_planning_service import event_planning_service
 
 
 class PackageOrderService:
+    def reassign_rejected_task(
+        self,
+        db: Session,
+        *,
+        customer_id: str,
+        event_id: str,
+        task_id: str,
+        offering_id: str,
+    ) -> tuple[Task, TaskRequest]:
+        event = event_planning_service.get_event_for_customer(
+            db,
+            customer_id=customer_id,
+            event_id=event_id,
+        )
+        if event.status != "ACTIVE":
+            raise HTTPException(status_code=409, detail="Event must be active before reassigning a task")
+
+        task = (
+            db.query(Task)
+            .filter(Task.event_id == event_id, Task.task_id == task_id)
+            .first()
+        )
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        if task.status != "REJECTED":
+            raise HTTPException(status_code=409, detail="Only rejected tasks can be reassigned")
+
+        shortlisted = (
+            db.query(TaskRecommendation)
+            .filter(
+                TaskRecommendation.event_id == event_id,
+                TaskRecommendation.task_id == task_id,
+                TaskRecommendation.offering_id == offering_id,
+            )
+            .first()
+        )
+        if not shortlisted:
+            raise HTTPException(status_code=400, detail=f"Offering {offering_id} is not in the shortlist for task {task_id}")
+
+        offering = (
+            db.query(Offering)
+            .filter(Offering.offering_id == offering_id)
+            .first()
+        )
+        if not offering:
+            raise HTTPException(status_code=404, detail="Offering not found")
+        if not offering.is_active or not offering.is_available:
+            raise HTTPException(status_code=400, detail=f"Offering {offering_id} is no longer available")
+        if task.assigned_vendor_id and offering.vendor_id == task.assigned_vendor_id:
+            raise HTTPException(status_code=400, detail="Replacement vendor must be different from the rejected vendor")
+
+        previous_request = (
+            db.query(TaskRequest)
+            .filter(TaskRequest.task_id == task.task_id)
+            .order_by(TaskRequest.attempt_no.desc(), TaskRequest.id.desc())
+            .first()
+        )
+        if not previous_request:
+            raise HTTPException(status_code=409, detail="Task cannot be reassigned without an existing fulfillment request")
+
+        timestamp = now_utc()
+        task.selected_offering_id = offering.offering_id
+        task.assigned_vendor_id = offering.vendor_id
+        task.status = "PENDING"
+        task.rejected_at = None
+        task.rejection_reason = None
+        task.expires_at = None
+        task.status_updated_at = timestamp
+
+        request = TaskRequest(
+            package_order_id=previous_request.package_order_id,
+            task_id=task.task_id,
+            vendor_id=offering.vendor_id,
+            offering_id=offering.offering_id,
+            status="SENT",
+            requested_at=timestamp,
+            respond_by=timestamp + timedelta(minutes=5),
+            attempt_no=previous_request.attempt_no + 1,
+        )
+
+        db.add(task)
+        db.add(request)
+        db.commit()
+        db.refresh(task)
+        db.refresh(request)
+        return task, request
+
     def confirm_package_order(
         self,
         db: Session,

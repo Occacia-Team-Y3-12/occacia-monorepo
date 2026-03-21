@@ -20,6 +20,7 @@ from app.models.persona import Persona
 from app.models.task import Task
 from app.models.package_execution_request import PackageExecutionRequest
 from app.services.google_calendar_service import google_calendar_service
+from app.services.notification_service import notification_service
 
 _RRULE_PART_RE = re.compile(r"^(?P<key>[A-Z]+)=(?P<value>.+)$")
 _DURATION_RE = re.compile(r"^P(?:(?P<days>\d+)D)?(?:T(?:(?P<hours>\d+)H)?(?:(?P<minutes>\d+)M)?)?$")
@@ -299,8 +300,8 @@ class EventPlanningService:
 
     def delete_task(self, db: Session, *, customer_id: str, event_id: str, task_id: str) -> None:
         task = self._get_task(db, customer_id=customer_id, event_id=event_id, task_id=task_id)
-        if task.status != "DRAFT":
-            raise HTTPException(status_code=409, detail="Only draft tasks can be deleted")
+        if task.status not in {"DRAFT", "REJECTED"}:
+            raise HTTPException(status_code=409, detail="Only draft or rejected tasks can be deleted")
         db.delete(task)
         db.commit()
 
@@ -353,6 +354,13 @@ class EventPlanningService:
         db.refresh(event)
         for task in confirmed_tasks:
             db.refresh(task)
+        customer = self._get_customer(db, customer_id)
+        notification_service.send_task_confirmed_notifications(
+            db,
+            customer=customer,
+            event=event,
+            tasks=confirmed_tasks,
+        )
         return event, confirmed_tasks
 
     def get_schedule(self, db: Session, *, customer_id: str, event_id: str) -> Event:

@@ -19,6 +19,13 @@ from uuid import uuid4
 
 import pytest
 
+from app.core.database import SessionLocal
+from app.models.notification import Notification
+from app.services.notification_service import (
+    NOTIFICATION_STATUS_QUEUED,
+    PASSWORD_RESET_NOTIFICATION,
+)
+
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -121,15 +128,29 @@ class TestEmailSending:
         assert resp.status_code in (200, 201), resp.text
 
     def test_password_reset_triggers_email(self, client, active_customer):
-        with patch("app.services.auth_service._send_email", return_value=False) as mock_send:
-            resp = client.post(
-                AUTH_URL + "/password/forgot",
-                json={"email": active_customer.email},
+        resp = client.post(
+            AUTH_URL + "/password/forgot",
+            json={"email": active_customer.email},
+        )
+
+        assert resp.status_code in (200, 202), resp.text
+
+        db = SessionLocal()
+        try:
+            notification = (
+                db.query(Notification)
+                .filter(
+                    Notification.user_id == active_customer.customer_id,
+                    Notification.type == PASSWORD_RESET_NOTIFICATION,
+                )
+                .order_by(Notification.created_at.desc())
+                .first()
             )
-        if resp.status_code in (200, 202):
-            mock_send.assert_called_once()
-        else:
-            assert resp.status_code == 404
+            assert notification is not None
+            assert notification.recipient_email == active_customer.email
+            assert notification.status == NOTIFICATION_STATUS_QUEUED
+        finally:
+            db.close()
 
 
 # ══════════════════════════════════════════════════════════════════════════════

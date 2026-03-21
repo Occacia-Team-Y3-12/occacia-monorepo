@@ -95,3 +95,15 @@ class ConfirmPackageOrderResponse(BaseModel):
     fulfillmentRequests: List[FulfillmentRequestResponse]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ReassignTaskRequest(BaseModel):
+    offeringId: str
+    note: Optional[str] = None
+
+
+class ReassignTaskResponse(BaseModel):
+    task: TaskResponse
+    fulfillmentRequest: FulfillmentRequestResponse
+
+    model_config = ConfigDict(from_attributes=True)
