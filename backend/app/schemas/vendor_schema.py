@@ -43,6 +43,22 @@ class VendorUpdate(BaseModel):
 # 3. Standard Output (Safe Response)
 
 
+class VendorResponse(BaseModel):
+    id: int
+    user_id: int
+    business_name: str
+    email: EmailStr
+    location_base: Optional[str] = None
+    phone: Optional[str] = None
+    display_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    is_verified: bool
+    approval_status: str
+    task_summary: Optional[dict] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PaginatedFulfillmentRequestsResponse(BaseModel):
     items: list[FulfillmentRequestResponse]
     next_cursor: str | None = Field(default=None, alias="nextCursor")
@@ -74,7 +90,8 @@ class RespondFulfillmentRequestRequest(BaseModel):
 
 
 class RespondFulfillmentRequestResponse(BaseModel):
-    fulfillment_request: FulfillmentRequestResponse = Field(alias="fulfillmentRequest")
+    fulfillment_request: FulfillmentRequestResponse = Field(
+        alias="fulfillmentRequest")
     task: TaskResponse
 
     model_config = ConfigDict(populate_by_name=True)
