@@ -1,5 +1,6 @@
 // src/services/customer/authService.ts
 import axios from 'axios';
+import { featureFlags } from '@/config/featureFlags';
 import { RegisterFormData, RegisterResponse, VerifyEmailResponse, LoginFormData, LoginResponse } from '@/types/customer/auth';
 
 const api = axios.create({
@@ -11,10 +12,6 @@ const api = axios.create({
 
 const CUSTOMER_TOKEN_COOKIE = 'customerToken';
 const CUSTOMER_AUTH_FLAG = 'customerAuthVerified';
-const ENABLE_CUSTOMER_AUTH_MOCK =
-  process.env.NEXT_PUBLIC_CUSTOMER_AUTH_MOCK === 'true' ||
-  process.env.NODE_ENV === 'development';
-
 const setAuthCookie = (token: string) => {
   if (typeof document === 'undefined') return;
   document.cookie = `${CUSTOMER_TOKEN_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=604800; SameSite=Lax`;
@@ -79,17 +76,17 @@ const createMockLoginResponse = (email: string): LoginResponse => {
 
 export const customerAuthService = {
   register: async (data: RegisterFormData): Promise<RegisterResponse> => {
-    const response = await api.post('/auth/register', data);
+    const response = await api.post('/auth/customer/register', data);
     return response.data;
   },
 
   verifyEmail: async (token: string): Promise<VerifyEmailResponse> => {
-    const response = await api.get(`/auth/verify-email?token=${token}`);
+    const response = await api.get(`/auth/customer/verify-email?token=${token}`);
     return response.data;
   },
 
   resendVerification: async (email: string): Promise<void> => {
-    await api.post('/auth/resend-verification', { email });
+    await api.post('/auth/customer/email-verification/resend', { email });
   },
 
   login: async (data: LoginFormData): Promise<LoginResponse> => {
@@ -98,7 +95,7 @@ export const customerAuthService = {
       const response = await api.post('/auth/customer/login', data);
       result = response.data as LoginResponse & Record<string, unknown>;
     } catch (error) {
-      if (!ENABLE_CUSTOMER_AUTH_MOCK) {
+      if (!featureFlags.useCustomerAuthMock) {
         throw error;
       }
       result = createMockLoginResponse(data.email) as LoginResponse & Record<string, unknown>;

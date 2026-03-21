@@ -4,34 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Star, X, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { featureFlags } from '@/config/featureFlags';
 import { ROUTES } from '@/lib/routes';
+import { MOCK_PACKAGE, MOCK_SHORTLIST } from '@/mocks/customerExperience';
 import { packageService } from '@/services/customer/packageService';
 import type { RecommendationPackage, PackageItem, ShortlistedOffering } from '@/types/customer/package';
-
-// ─── Mock shortlist per task ──────────────────────────────────────────────────
-
-const MOCK_SHORTLIST: ShortlistedOffering[] = [
-  { offeringId: 'o1', offeringTitle: 'Premium Studio', vendorName: 'Lumen Studios', taskPrice: 2500, rating: 4.9, isBestMatch: true },
-  { offeringId: 'o2', offeringTitle: 'Classic Coverage', vendorName: 'SnapShot Co.', taskPrice: 1800, rating: 4.6 },
-  { offeringId: 'o3', offeringTitle: 'Budget Shots', vendorName: 'QuickPic', taskPrice: 1200, rating: 4.2 },
-  { offeringId: 'o4', offeringTitle: 'Drone + Ground', vendorName: 'SkyFrame', taskPrice: 3100, rating: 4.8 },
-  { offeringId: 'o5', offeringTitle: 'Full Day Package', vendorName: 'ArtFrame Studios', taskPrice: 2800, rating: 4.7 },
-];
-
-const MOCK_PACKAGE: RecommendationPackage = {
-  packageId: 'pkg-001',
-  type: 'RECOMMENDED',
-  packageTotalPrice: 19000,
-  currency: 'USD',
-  expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-  items: [
-    { taskId: 't1', taskName: 'Photography', offeringId: 'o1', offeringTitle: 'Premium Studio', offeringCategory: 'Photography', vendorName: 'Lumen Studios', taskPrice: 2500, rating: 4.9 },
-    { taskId: 't2', taskName: 'Catering', offeringId: 'o2', offeringTitle: "Chef's Menu", offeringCategory: 'Catering', vendorName: 'Gourmet Bites', taskPrice: 8500, rating: 4.8 },
-    { taskId: 't3', taskName: 'Venue Decoration', offeringId: 'o3', offeringTitle: 'Floral Setup', offeringCategory: 'Decoration', vendorName: 'Bloom & Drape', taskPrice: 3200, rating: 4.7 },
-    { taskId: 't4', taskName: 'DJ & Music', offeringId: 'o4', offeringTitle: 'DJ + MC Package', offeringCategory: 'Entertainment', vendorName: 'BeatMasters', taskPrice: 1800, rating: 4.6 },
-    { taskId: 't5', taskName: 'Videography', offeringId: 'o5', offeringTitle: 'Cinematic Video', offeringCategory: 'Videography', vendorName: 'CineWed', taskPrice: 3000, rating: 4.8 },
-  ],
-};
 
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
@@ -130,6 +107,7 @@ export default function CustomizePackagePage() {
   const [shortlists, setShortlists] = useState<Record<string, ShortlistedOffering[]>>({});
   const [saving, setSaving] = useState(false);
   const [packageLabel, setPackageLabel] = useState('Package');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Load package from sessionStorage or mock
   useEffect(() => {
@@ -141,7 +119,14 @@ export default function CustomizePackagePage() {
       pkg = parsed.find(p => p.packageId === packageId) ?? null;
     }
 
-    if (!pkg) pkg = MOCK_PACKAGE;
+    if (!pkg && featureFlags.useCustomerPackagesMock) {
+      pkg = MOCK_PACKAGE;
+    }
+
+    if (!pkg) {
+      setLoadError('Package not found.');
+      return;
+    }
 
     setPackageLabel(pkg.type.charAt(0) + pkg.type.slice(1).toLowerCase().replace('_', ' ') + ' Package');
     setItems(pkg.items);
@@ -153,6 +138,10 @@ export default function CustomizePackagePage() {
         try {
           map[item.taskId] = await packageService.getTaskRecommendations(eventId, item.taskId);
         } catch {
+          if (!featureFlags.useCustomerPackagesMock) {
+            setLoadError('Unable to load package recommendations.');
+            return;
+          }
           map[item.taskId] = MOCK_SHORTLIST.map(o => ({ ...o, offeringId: `${item.taskId}-${o.offeringId}` }));
           // keep first as best match aligned to current item
           map[item.taskId][0] = { ...map[item.taskId][0], offeringId: item.offeringId, vendorName: item.vendorName, taskPrice: item.taskPrice, isBestMatch: true };
@@ -185,6 +174,10 @@ export default function CustomizePackagePage() {
       toast.success('Customization saved!');
       router.push(ROUTES.CUSTOMER.EVENT_PACKAGE_DETAIL(eventId, packageId));
     } catch {
+      if (!featureFlags.useCustomerPackagesMock) {
+        toast.error('Failed to save customization.');
+        return;
+      }
       // Update sessionStorage mock
       const stored = sessionStorage.getItem(`packages_${eventId}`);
       if (stored) {
@@ -203,6 +196,11 @@ export default function CustomizePackagePage() {
 
   return (
     <div>
+      {loadError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loadError}
+        </div>
+      )}
       {/* Header */}
       <div className="mb-6">
         <button

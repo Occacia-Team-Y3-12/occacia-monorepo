@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { proxyApiRequest, shouldUseCustomerPlanningMockApi } from '@/app/api/v1/_proxy';
 import { EventScheduleRequest, EventScheduleResponse } from '@/types/customerEventChat';
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
@@ -20,6 +21,10 @@ export async function PUT(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventScheduleResponse>> {
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${params.eventId}/schedule`) as Promise<NextResponse<EventScheduleResponse>>;
+  }
+
   const { eventId } = params;
 
   if (!eventId) {
