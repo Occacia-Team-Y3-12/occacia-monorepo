@@ -5,6 +5,7 @@ export const ROUTES = {
     DASHBOARD: '/customer/dashboard',
     REGISTER: '/customer/register',
     EVENTS: '/customer/events',
+    EVENTS_NEW: '/customer/events/new',
     EVENT_CHAT: (eventId: string) => `/customer/events/${eventId}/chat`,
     EVENT_DRAFT_REVIEW: (eventId: string) => `/customer/events/${eventId}/draft`,
     EVENT_RECOMMENDATIONS: (eventId: string) => `/customer/events/${eventId}/recommendations`,
