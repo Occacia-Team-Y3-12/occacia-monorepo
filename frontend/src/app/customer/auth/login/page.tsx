@@ -14,14 +14,13 @@ export default function LoginPage() {
 
   const onSubmit = async (data: { username: string; password: string }) => {
     setIsLoading(true);
-
     try {
       await customerAuthService.login({ email: data.username, password: data.password });
       toast.success('Login successful!');
       router.push('/customer/dashboard');
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';
-      toast.error(errorMessage);
+    } catch (error: unknown) {
+      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'Invalid email or password. Please try again.');
     } finally {
       setIsLoading(false);
     }
