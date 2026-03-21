@@ -53,7 +53,7 @@ async def _parse_login_payload(request: Request) -> LoginRequest | SimpleNamespa
     return SimpleNamespace(username=str(username), password=str(password))
 
 # --- Vendor Routes ---
-
+# last two commits belongs to OCA-188
 
 @router.post("/vendor/register", response_model=VendorResponse, status_code=201)
 def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(get_db)):
