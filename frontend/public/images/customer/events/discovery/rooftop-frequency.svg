@@ -1,0 +1,16 @@
+<svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="800" fill="#020617"/>
+  <rect x="80" y="80" width="1040" height="640" rx="44" fill="url(#paint0_linear)"/>
+  <circle cx="956" cy="170" r="104" fill="#FDE68A"/>
+  <path d="M82 582C232 528 330 520 438 544C612 584 700 610 820 586C930 564 1012 516 1120 434V720H80L82 582Z" fill="#0F172A" fill-opacity="0.55"/>
+  <text x="148" y="254" fill="white" font-family="Arial, sans-serif" font-size="76" font-weight="700" letter-spacing="-2">ROOFTOP</text>
+  <text x="148" y="342" fill="#E0F2FE" font-family="Georgia, serif" font-size="92" letter-spacing="-2">Frequency</text>
+  <text x="154" y="622" fill="#E2E8F0" font-family="Arial, sans-serif" font-size="26" letter-spacing="8">SKYLINE NETWORKING AT GOLDEN HOUR</text>
+  <defs>
+    <linearGradient id="paint0_linear" x1="150" y1="100" x2="1060" y2="696" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#082F49"/>
+      <stop offset="0.52" stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+</svg>
