@@ -83,27 +83,27 @@ def test_admin_review_approve_vendor_registration_uc25_full_workflow(client, mon
     assert list_response.status_code == 200, list_response.text
     pending_vendors = list_response.json()
     assert len(pending_vendors) == 2
-    assert all(v["approvalStatus"] == "PENDING" for v in pending_vendors)
-    assert any(v["businessName"] == "Premium Catering Services" for v in pending_vendors)
-    assert any(v["businessName"] == "Budget Event Planning" for v in pending_vendors)
+    assert all(v["approval_status"] == "PENDING" for v in pending_vendors)
+    assert any(v["business_name"] == "Premium Catering Services" for v in pending_vendors)
+    assert any(v["business_name"] == "Budget Event Planning" for v in pending_vendors)
 
     # Step 3: Get vendor detail for the one to approve
     detail_response = client.get(f"/api/v1/admin/vendors/{vendor_approve_id}", headers=auth_header)
     assert detail_response.status_code == 200, detail_response.text
     vendor_detail = detail_response.json()
-    assert vendor_detail["businessName"] == "Premium Catering Services"
-    assert vendor_detail["approvalStatus"] == "PENDING"
-    assert vendor_detail["isVerified"] is False
+    assert vendor_detail["business_name"] == "Premium Catering Services"
+    assert vendor_detail["approval_status"] == "PENDING"
+    assert vendor_detail["is_verified"] is False
     assert vendor_detail["email"] == "premium-catering@test.com"
-    assert vendor_detail["locationBase"] == "Colombo"
+    assert vendor_detail["location_base"] == "Colombo"
 
     # Step 4: Approve the first vendor
     approve_response = client.post(f"/api/v1/admin/vendors/{vendor_approve_id}/approve", headers=auth_header)
     assert approve_response.status_code == 200, approve_response.text
     approved_vendor = approve_response.json()
-    assert approved_vendor["approvalStatus"] == "APPROVED"
-    assert approved_vendor["isVerified"] is True
-    assert approved_vendor["approvedAt"] is not None
+    assert approved_vendor["approval_status"] == "APPROVED"
+    assert approved_vendor["is_verified"] is True
+    assert approved_vendor["approved_at"] is not None
 
     # Step 5: Reject the second vendor
     reject_response = client.post(
@@ -113,8 +113,8 @@ def test_admin_review_approve_vendor_registration_uc25_full_workflow(client, mon
     )
     assert reject_response.status_code == 200, reject_response.text
     rejected_vendor = reject_response.json()
-    assert rejected_vendor["approvalStatus"] == "REJECTED"
-    assert rejected_vendor["isVerified"] is False
+    assert rejected_vendor["approval_status"] == "REJECTED"
+    assert rejected_vendor["is_verified"] is False
 
     # Step 6: Verify pending list now empty
     list_after_response = client.get("/api/v1/admin/vendors?approval_status=PENDING", headers=auth_header)

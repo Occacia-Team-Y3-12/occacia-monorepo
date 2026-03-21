@@ -62,7 +62,7 @@ def test_admin_can_list_pending_vendors(client):
     assert response.status_code == 200, response.text
     body = response.json()
     assert len(body) == 2
-    assert all(v["approvalStatus"] == "PENDING" for v in body)
+    assert all(v["approval_status"] == "PENDING" for v in body)
 
 
 def test_admin_can_get_vendor_detail(client):
@@ -84,8 +84,8 @@ def test_admin_can_get_vendor_detail(client):
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["id"] == vendor_id
-    assert body["businessName"] == "Test Vendor Detail"
-    assert body["approvalStatus"] == "PENDING"
+    assert body["business_name"] == "Test Vendor Detail"
+    assert body["approval_status"] == "PENDING"
 
 
 def test_admin_can_approve_pending_vendor(client, monkeypatch):
@@ -108,9 +108,9 @@ def test_admin_can_approve_pending_vendor(client, monkeypatch):
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["approvalStatus"] == "APPROVED"
-    assert body["isVerified"] is True
-    assert body["approvedAt"] is not None
+    assert body["approval_status"] == "APPROVED"
+    assert body["is_verified"] is True
+    assert body["approved_at"] is not None
 
     db = SessionLocal()
     try:
@@ -143,8 +143,8 @@ def test_admin_can_reject_pending_vendor(client, monkeypatch):
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["approvalStatus"] == "REJECTED"
-    assert body["isVerified"] is False
+    assert body["approval_status"] == "REJECTED"
+    assert body["is_verified"] is False
 
     db = SessionLocal()
     try:

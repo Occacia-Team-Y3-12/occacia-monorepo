@@ -20,18 +20,18 @@ class AdminResponse(BaseModel):
 
 class VendorAdminView(BaseModel):
     id: int
-    vendor_id: Optional[str] = Field(alias="vendorId")
-    business_name: str = Field(alias="businessName")
+    vendor_id: Optional[str]
+    business_name: str
     email: str
     phone: Optional[str]
-    display_name: Optional[str] = Field(alias="displayName")
-    contact_phone: Optional[str] = Field(alias="contactPhone")
-    location_base: Optional[str] = Field(alias="locationBase")
-    approval_status: str = Field(alias="approvalStatus")
-    is_verified: bool = Field(alias="isVerified")
-    approved_at: Optional[datetime] = Field(alias="approvedAt")
+    display_name: Optional[str]
+    contact_phone: Optional[str]
+    location_base: Optional[str]
+    approval_status: str
+    is_verified: bool
+    approved_at: Optional[datetime]
     status: Optional[str] = None
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    model_config = ConfigDict(from_attributes=True)
 
 
 class VendorRejectRequest(BaseModel):
