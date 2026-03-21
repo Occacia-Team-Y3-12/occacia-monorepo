@@ -15,7 +15,7 @@ FIX 9  Same pkg as venue + gift     → dedup by id before returning gifts
 FIX 10 Booking notes missing prefs  → notes include full persona summary
 FIX 11 venue_data stale post-booking→ cleared from state after booking created
 FIX #1 No DB matches               → AI-generated fallback with inquiry record
-FIX #2 No budget hard-check        → filter venues/gifts before showing user
+FIX #2 Budget filter               → only applied to AI-generated venues, not DB results
 FIX #3 No vendor redirect          → redirect_url returned after booking
 FIX #4 Vibe question missing        → dedicated question after date confirmed
 """
@@ -548,7 +548,7 @@ def _venue_missing(vd: dict) -> list:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FIX #2 — Budget filter
+# FIX #2 — Budget filter (AI-generated venues ONLY)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _filter_by_budget(
@@ -558,26 +558,34 @@ def _filter_by_budget(
     guest_count,
 ) -> tuple:
     """
-    Hard budget check.
-    Venue: price_per_head * guests must be ≤ 75% of total budget.
-    Gift:  price_per_head must be ≤ 25% of total budget.
+    Budget filter for AI-GENERATED venues/gifts only.
+
+    NEVER call this on DB results — find_perfect_matches already filters by budget.
+    Only call this on venues/gifts from _generate_ai_fallback() which provide
+    explicit estimated_price values that we can check against total budget.
+
     Returns (filtered_venues, filtered_gifts, all_over_budget: bool).
     """
     if not total_budget or float(total_budget) <= 0:
         return venues, gifts, False
 
-    guests    = int(guest_count or 1)
-    venue_cap = float(total_budget) * 0.75
-    gift_cap  = float(total_budget) * 0.25
+    gift_cap = float(total_budget) * 0.25
 
-    filtered_venues = [
-        v for v in venues
-        if (getattr(v, "price_per_head", None) or 0) * guests <= venue_cap
-    ]
-    filtered_gifts = [
-        g for g in gifts
-        if (getattr(g, "price_per_head", None) or 0) <= gift_cap
-    ]
+    filtered_venues = []
+    for v in venues:
+        total_est = getattr(v, "total_estimated_price", None)
+        # Only exclude when explicitly computed AND clearly over budget
+        if total_est is not None and float(total_est) > float(total_budget):
+            continue
+        filtered_venues.append(v)
+
+    filtered_gifts = []
+    for g in gifts:
+        est = getattr(g, "estimated_price", None)
+        # Only exclude when explicitly computed AND clearly over gift cap
+        if est is not None and float(est) > gift_cap:
+            continue
+        filtered_gifts.append(g)
 
     all_over = (len(venues) > 0 and len(filtered_venues) == 0)
     return filtered_venues, filtered_gifts, all_over
@@ -597,7 +605,6 @@ async def _generate_ai_fallback(
     """
     Calls Groq to generate 3 venue concepts and 3 gift concepts when DB has no matches.
     Returns (venues: list[dict], gifts: list[dict]).
-    Each item has keys: name, description, estimated_price (LKR).
     """
     import httpx as _httpx
 
@@ -1002,8 +1009,15 @@ class PlanningService:
                 booking_id   = None
                 redirect_url = None
 
-                # ── FIX #1: AI fallback booking path ─────────────────────────
-                if state.is_ai_fallback:
+                # ── Determine path by rec_id type, NOT state flag ─────────────
+                # AI-generated IDs always start with "AI-". DB package IDs are ints.
+                # Using the ID type is more reliable than state.is_ai_fallback
+                # which can be a MagicMock in tests.
+                pkg_id_candidate = rec_ids[selected_idx] if selected_idx < len(rec_ids) else ""
+                _is_ai_rec = str(pkg_id_candidate).startswith("AI-")
+
+                if _is_ai_rec:
+                    # ── FIX #1: AI fallback booking path ─────────────────────
                     fb_venues = state.ai_fallback_venues
                     fb_gifts  = state.ai_fallback_gifts
 
@@ -1110,7 +1124,6 @@ class PlanningService:
                 ai_msg=reply, customer_id=customer.customer_id,
                 missing_info=[],
             )
-            # Update state so the rest of process_plan runs fresh this turn
             user_query   = f"{user_query} [VIBE CONFIRMED: {vibe_answer}]"
             current_step = _STEP_CHAT
             venue_data   = vd
@@ -1344,7 +1357,6 @@ class PlanningService:
 
         effective_intent = _resolve_intent(intent, user_query)
 
-        vm = _venue_missing(vd)
         can_recommend = (
             effective_intent in ("planning", "date", "multi", "gift")
             and (venue_tags or effective_intent in ("gift", "multi"))
@@ -1399,7 +1411,7 @@ class PlanningService:
             elif budget_ai:
                 venue_bph = float(budget_ai)
 
-            # Venue matching
+            # ── Venue matching (planning / date / multi) ──────────────────────
             if effective_intent in ("planning", "date", "multi"):
                 matched_venues = _get_3_venues(
                     vendor_svc, db, venue_tags, venue_bph,
@@ -1411,7 +1423,7 @@ class PlanningService:
                     first = matched_venues[0]
                     venue_match_tier = 1 if not first.tweak_note else 2
 
-            # Gift matching
+            # ── Gift matching (gift / multi only) ─────────────────────────────
             if effective_intent in ("gift", "multi"):
                 gift_tags = list(venue_tags or [])
                 all_persona_sources = personas_for_ai or personas or []
@@ -1463,134 +1475,85 @@ class PlanningService:
                     vendor_svc, db, gift_tags_pd, gift_bph, guests_ai, all_ps
                 ) or [])
 
-            # ── FIX #2: Hard budget filter ────────────────────────────────────
-            if vd.get("budget"):
-                matched_venues, matched_gifts, all_over_budget = _filter_by_budget(
-                    matched_venues,
-                    matched_gifts,
-                    float(vd["budget"]),
-                    vd.get("guest_count"),
-                )
-            else:
-                all_over_budget = False
+            # ── NOTE: NO _filter_by_budget on DB results ──────────────────────
+            # find_perfect_matches() and find_gift_matches() already filter by
+            # budget internally. Applying another filter here would double-filter
+            # and remove perfectly valid packages. Budget filter is only applied
+            # to AI-generated fallback venues (see below) where estimated_price
+            # is explicitly provided by the AI.
 
-            # ── FIX #1: AI fallback when DB empty or all over budget ──────────
+            # ── FIX #1: AI fallback when DB returns nothing ───────────────────
             if not matched_venues and effective_intent in ("planning", "date", "multi"):
-                if all_over_budget:
-                    budget_msg = (
-                        f"Hmm, I couldn't find any venues within your budget of "
-                        f"**LKR {float(vd.get('budget', 0)):,.0f}** "
-                        f"in **{vd.get('location', 'that area')}**. 😔\n\n"
-                        "Would you like to:\n"
-                        "- **Increase your budget** — what's the maximum you could stretch to?\n"
-                        "- **Try a different location** — I might find better options nearby\n"
-                        "- **See AI-curated suggestions** — I can suggest ideas even if they're "
-                        "not listed yet *(just say: show me AI suggestions)*"
-                    )
-                    state.step = _STEP_CHAT
-                    state.clear("rec_ids")
-                    chat_svc.save_message(
-                        db, session_id=session_id, user_msg=user_query,
-                        ai_msg=budget_msg, customer_id=customer.customer_id,
-                        missing_info=["budget or location adjustment"],
-                    )
-                    return PlanResponse(
-                        intent="planning",
-                        reasoning="All venues over budget — asking user to adjust.",
-                        chat_response=budget_msg,
-                        missing_info=["budget or location adjustment"],
-                        venue_tags=venue_tags,
-                        matched_venues=[],
-                        matched_gifts=[],
-                        ask_save_persona=False,
-                        persona_saved=False,
-                        persona_confirmed=bool(chosen_persona),
+                wants_ai = any(
+                    w in user_query.lower()
+                    for w in ["ai suggestion", "show me ai", "no options",
+                              "nothing matches", "ai curated", "suggest anyway",
+                              "show anyway", "show me ai suggestions",
+                              "curate", "creative"]
+                )
+
+                if wants_ai:
+                    fb_venues_raw, fb_gifts_raw = await _generate_ai_fallback(
+                        ai_svc=ai_svc,
+                        vd=vd,
+                        persona_draft=persona_draft,
+                        chosen_persona=chosen_persona,
+                        event_context=ai_event_context,
                     )
 
-                else:
-                    wants_ai = any(
-                        w in user_query.lower()
-                        for w in ["ai suggestion", "show me ai", "no options",
-                                  "nothing matches", "ai curated", "suggest anyway",
-                                  "show anyway", "show me ai suggestions",
-                                  "curate", "creative"]
-                    )
+                    if fb_venues_raw:
+                        state.ai_fallback_venues = fb_venues_raw
+                        state.ai_fallback_gifts  = fb_gifts_raw
+                        state.is_ai_fallback = True
 
-                    if wants_ai or not state.rec_ids:
-                        fb_venues_raw, fb_gifts_raw = await _generate_ai_fallback(
-                            ai_svc=ai_svc,
-                            vd=vd,
-                            persona_draft=persona_draft,
-                            chosen_persona=chosen_persona,
-                            event_context=ai_event_context,
+                        ai_venues = [
+                            _ai_venue_to_display(v, i)
+                            for i, v in enumerate(fb_venues_raw)
+                        ]
+                        ai_gifts = [
+                            _ai_gift_to_display(g, i)
+                            for i, g in enumerate(fb_gifts_raw)
+                        ]
+
+                        # Apply budget filter ONLY to AI-generated estimates
+                        if vd.get("budget"):
+                            ai_venues, ai_gifts, _ = _filter_by_budget(
+                                ai_venues, ai_gifts,
+                                float(vd["budget"]),
+                                vd.get("guest_count"),
+                            )
+
+                        matched_venues = ai_venues
+                        matched_gifts  = ai_gifts
+
+                        state.rec_ids = [v.id for v in matched_venues]
+                        state.step = _STEP_RECS_SHOWN
+
+                        disclaimer = (
+                            "✨ These aren't listed on our platform yet, but our concierge "
+                            "team will arrange everything once you pick one!\n\n"
                         )
-
-                        if fb_venues_raw:
-                            state.ai_fallback_venues = fb_venues_raw
-                            state.ai_fallback_gifts  = fb_gifts_raw
-                            state.is_ai_fallback = True
-
-                            matched_venues = [
-                                _ai_venue_to_display(v, i)
-                                for i, v in enumerate(fb_venues_raw)
-                            ]
-                            matched_gifts = [
-                                _ai_gift_to_display(g, i)
-                                for i, g in enumerate(fb_gifts_raw)
-                            ]
-
-                            state.rec_ids = [v.id for v in matched_venues]
-                            state.step = _STEP_RECS_SHOWN
-
-                            disclaimer = (
-                                "✨ These aren't listed on our platform yet, but our concierge "
-                                "team will arrange everything once you pick one!\n\n"
-                            )
-                            chat_response = disclaimer + (chat_response or "")
-                        else:
-                            no_match_msg = (
-                                "I couldn't find any options that match right now. 😔\n\n"
-                                "Could you help me with one of these?\n"
-                                "- A **different location** in Sri Lanka?\n"
-                                "- A **higher budget** (even slightly)?\n"
-                                "- A **different vibe** — e.g. casual instead of luxury?"
-                            )
-                            state.clear("rec_ids")
-                            chat_svc.save_message(
-                                db, session_id=session_id, user_msg=user_query,
-                                ai_msg=no_match_msg, customer_id=customer.customer_id,
-                                missing_info=["location or budget adjustment"],
-                            )
-                            return PlanResponse(
-                                intent="planning",
-                                reasoning="No DB matches and AI fallback failed.",
-                                chat_response=no_match_msg,
-                                missing_info=["location or budget adjustment"],
-                                venue_tags=venue_tags,
-                                matched_venues=[],
-                                matched_gifts=[],
-                                ask_save_persona=False,
-                                persona_saved=False,
-                                persona_confirmed=bool(chosen_persona),
-                            )
+                        chat_response = disclaimer + (chat_response or "")
                     else:
+                        # AI fallback failed — ask user to tweak
                         no_match_msg = (
-                            "I searched our vendor network but couldn't find exact matches "
-                            f"in **{vd.get('location', 'that area')}** right now. 🔍\n\n"
-                            "Want me to **curate some ideas** based on what you described? "
-                            "Our team can arrange them even if they're not on the platform yet — "
-                            "just say *show me AI suggestions* and I'll get creative! 🎨"
+                            "I couldn't find any options that match right now. 😔\n\n"
+                            "Could you help me with one of these?\n"
+                            "- A **different location** in Sri Lanka?\n"
+                            "- A **higher budget** (even slightly)?\n"
+                            "- A **different vibe** — e.g. casual instead of luxury?"
                         )
+                        state.clear("rec_ids")
                         chat_svc.save_message(
                             db, session_id=session_id, user_msg=user_query,
                             ai_msg=no_match_msg, customer_id=customer.customer_id,
-                            missing_info=[],
+                            missing_info=new_missing,
                         )
                         return PlanResponse(
-                            intent="planning",
-                            reasoning="No DB matches — offering AI fallback option.",
+                            intent=intent,
+                            reasoning="No DB matches and AI fallback failed.",
                             chat_response=no_match_msg,
-                            missing_info=[],
+                            missing_info=new_missing,
                             venue_tags=venue_tags,
                             matched_venues=[],
                             matched_gifts=[],
@@ -1598,6 +1561,32 @@ class PlanningService:
                             persona_saved=False,
                             persona_confirmed=bool(chosen_persona),
                         )
+                else:
+                    # No matches, user hasn't asked for AI suggestions yet
+                    no_match_msg = (
+                        "I searched our vendor network but couldn't find exact matches "
+                        f"in **{vd.get('location', 'that area')}** right now. 🔍\n\n"
+                        "Want me to **curate some ideas** based on what you described? "
+                        "Our team can arrange them even if they're not on the platform yet — "
+                        "just say *show me AI suggestions* and I'll get creative! 🎨"
+                    )
+                    chat_svc.save_message(
+                        db, session_id=session_id, user_msg=user_query,
+                        ai_msg=no_match_msg, customer_id=customer.customer_id,
+                        missing_info=new_missing,
+                    )
+                    return PlanResponse(
+                        intent=intent,
+                        reasoning="No DB matches — offering AI fallback option.",
+                        chat_response=no_match_msg,
+                        missing_info=new_missing,
+                        venue_tags=venue_tags,
+                        matched_venues=[],
+                        matched_gifts=[],
+                        ask_save_persona=False,
+                        persona_saved=False,
+                        persona_confirmed=bool(chosen_persona),
+                    )
 
             # Append selection prompt
             if matched_venues and len(matched_venues) > 1:
@@ -1774,7 +1763,6 @@ class PlanningService:
             db.add(inq)
             db.commit()
         except Exception as exc:
-            # Inquiry model may not exist yet — return the ref ID anyway, no crash
             logger.warning(f"Inquiry model save failed (model may not exist yet): {exc}")
             try:
                 db.rollback()
