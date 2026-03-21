@@ -43,6 +43,8 @@ class VendorRejectRequest(BaseModel):
 class NotificationResponse(BaseModel):
     notification_id: str
     user_id: str
+    recipient_email: str
+    recipient_name: str | None = None
     event_id: str | None = None
     task_id: str | None = None
     channel: str
@@ -50,6 +52,15 @@ class NotificationResponse(BaseModel):
     status: str
     dedupe_key: str | None = None
     payload: dict
+    subject: str
+    body_text: str
+    body_html: str | None = None
+    provider: str | None = None
+    provider_message_id: str | None = None
+    attempt_count: int
+    max_attempts: int
+    last_attempt_at: datetime | None = None
+    next_attempt_at: datetime | None = None
     error_message: str | None = None
     sent_at: datetime | None = None
     created_at: datetime

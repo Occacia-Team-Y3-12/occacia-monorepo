@@ -25,6 +25,7 @@ os.environ.update({
     "GOOGLE_CLIENT_SECRET": "test-google-client-secret",
     "GOOGLE_REDIRECT_URI": "https://app.occacia.com/oauth/callback",
     "CALENDAR_TOKEN_ENCRYPTION_KEY": "test-calendar-token-key",
+    "NOTIFICATION_WORKER_ENABLED": "false",
 })
 
 repo_root = Path(__file__).resolve().parent.parent

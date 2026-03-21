@@ -64,6 +64,9 @@ class Settings(BaseSettings):
 
     SENDGRID_API_KEY: str | None = None
     FROM_EMAIL: str = "noreply@occacia.com"
+    NOTIFICATION_WORKER_ENABLED: bool = True
+    NOTIFICATION_POLL_INTERVAL_SECONDS: float = 0.2
+    NOTIFICATION_BATCH_SIZE: int = 20
 
     GOOGLE_CLIENT_ID: str | None = None
     GOOGLE_CLIENT_SECRET: str | None = None

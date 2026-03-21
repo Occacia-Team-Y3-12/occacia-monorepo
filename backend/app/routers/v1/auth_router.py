@@ -64,7 +64,7 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
         raise HTTPException(status_code=400, detail="Business name already in use!")
         
     vendor = vendor_service.create_vendor(db, vendor_data)
-    auth_service.register_vendor_verification(vendor.email)
+    auth_service.register_vendor_verification(db, vendor)
     return vendor
 
 @router.post("/vendor/login", tags=["Authentication"])

@@ -13,6 +13,7 @@ from app.models.customer import Customer
 from app.models.event import Event
 from app.models.notification import Notification
 from app.models.task import Task
+from app.services.notification_service import notification_service
 
 
 def _create_event_with_task(customer: Customer) -> tuple[str, str]:
@@ -70,19 +71,28 @@ def _admin_headers() -> dict[str, str]:
 
 def test_task_confirmed_notifications_are_logged_once_within_dedupe_window(auth_client, active_customer, monkeypatch):
     event_id, task_id = _create_event_with_task(active_customer)
-    send_calls: list[tuple[str, str, str]] = []
+    send_calls: list[str] = []
 
-    def fake_send_email(to: str, subject: str, body: str) -> bool:
-        send_calls.append((to, subject, body))
-        return True
+    def fake_send_email(*, to: str, subject: str, text_body: str, html_body: str | None):
+        send_calls.append(to)
+        from app.services.notification_service import ProviderResult
+        return ProviderResult(success=True, provider="SENDGRID", provider_message_id="msg-1")
 
-    monkeypatch.setattr("app.services.auth_service._send_email", fake_send_email)
+    monkeypatch.setattr(notification_service, "_send_email", fake_send_email)
 
     first_response = auth_client.post(f"/api/v1/customers/events/{event_id}/tasks/confirm")
     second_response = auth_client.post(f"/api/v1/customers/events/{event_id}/tasks/confirm")
 
     assert first_response.status_code == 200
     assert second_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        processed = notification_service.process_pending_notifications(db, batch_size=10)
+        assert processed == 1
+    finally:
+        db.close()
+
     assert len(send_calls) == 1
 
     db = SessionLocal()
@@ -104,7 +114,12 @@ def test_task_confirmed_notifications_are_logged_once_within_dedupe_window(auth_
 
 def test_admin_can_query_notification_history(auth_client, active_customer, monkeypatch):
     event_id, task_id = _create_event_with_task(active_customer)
-    monkeypatch.setattr("app.services.auth_service._send_email", lambda *_args, **_kwargs: True)
+    from app.services.notification_service import ProviderResult
+    monkeypatch.setattr(
+        notification_service,
+        "_send_email",
+        lambda **_kwargs: ProviderResult(success=True, provider="SENDGRID", provider_message_id="msg-2"),
+    )
 
     response = auth_client.post(f"/api/v1/customers/events/{event_id}/tasks/confirm")
 
@@ -112,6 +127,7 @@ def test_admin_can_query_notification_history(auth_client, active_customer, monk
 
     db = SessionLocal()
     try:
+        notification_service.process_pending_notifications(db, batch_size=10)
         notifications = (
             db.query(Notification)
             .filter(Notification.event_id == event_id, Notification.task_id == task_id)
@@ -136,3 +152,4 @@ def test_admin_can_query_notification_history(auth_client, active_customer, monk
     assert item["task_id"] == task_id
     assert item["type"] == "TASK_CONFIRMED"
     assert item["status"] == "SENT"
+    assert item["attempt_count"] == 1

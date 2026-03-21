@@ -2,16 +2,18 @@
 
 from app.core.database import SessionLocal
 from app.models.notification import Notification
+from app.services.notification_service import notification_service
 
 
 def test_whenCustomerConfirmsTaskTwice_notificationIsLoggedOnceAndQueryable(auth_client, active_customer, monkeypatch):
-    send_calls: list[tuple[str, str, str]] = []
+    send_calls: list[str] = []
 
-    def fake_send_email(to: str, subject: str, body: str) -> bool:
-        send_calls.append((to, subject, body))
-        return True
+    def fake_send_email(*, to: str, subject: str, text_body: str, html_body: str | None):
+        send_calls.append(to)
+        from app.services.notification_service import ProviderResult
+        return ProviderResult(success=True, provider="SENDGRID", provider_message_id="jit-msg")
 
-    monkeypatch.setattr("app.services.auth_service._send_email", fake_send_email)
+    monkeypatch.setattr(notification_service, "_send_email", fake_send_email)
 
     create_response = auth_client.post(
         "/api/v1/customers/events",
@@ -42,6 +44,7 @@ def test_whenCustomerConfirmsTaskTwice_notificationIsLoggedOnceAndQueryable(auth
 
     db = SessionLocal()
     try:
+        notification_service.process_pending_notifications(db, batch_size=10)
         notifications = (
             db.query(Notification)
             .filter(
@@ -58,5 +61,6 @@ def test_whenCustomerConfirmsTaskTwice_notificationIsLoggedOnceAndQueryable(auth
     assert len(send_calls) == 1
     assert len(notifications) == 1
     assert notifications[0].status == "SENT"
+    assert notifications[0].attempt_count == 1
     assert notifications[0].payload["eventId"] == event_id
     assert notifications[0].payload["taskId"] == task_id

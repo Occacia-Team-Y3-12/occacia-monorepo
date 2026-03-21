@@ -4,91 +4,137 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from app.services.notification_service import NotificationService
+from app.services.notification_service import (
+    CUSTOMER_VERIFICATION_NOTIFICATION,
+    NOTIFICATION_STATUS_PERMANENT_FAILURE,
+    NOTIFICATION_STATUS_RETRY_PENDING,
+    NOTIFICATION_STATUS_SENT,
+    NotificationService,
+    ProviderResult,
+)
 
 
-def test_send_task_confirmed_notification_skips_duplicate_send_within_window(monkeypatch):
+def test_enqueue_notification_skips_duplicate_within_window():
     service = NotificationService()
     db = MagicMock()
-    customer = SimpleNamespace(customer_id="CUS-001", email="customer@test.com")
-    event = SimpleNamespace(event_id="EVT-001", title="Birthday")
-    task = SimpleNamespace(task_id="TSK-001", name="Cake", status="PENDING", confirmed_at=datetime(2026, 3, 21, 8, 0, tzinfo=timezone.utc))
+    service._resolve_recipient = MagicMock(return_value={"email": "customer@test.com", "name": "Jane"})
+    service._has_recent_non_terminal = MagicMock(return_value=True)
 
-    service._has_recent_success = MagicMock(return_value=True)
-    send_email = MagicMock(return_value=True)
-    monkeypatch.setattr("app.services.auth_service._send_email", send_email)
-
-    result = service._send_task_confirmed_notification(
+    result = service.enqueue_notification(
         db,
-        customer=customer,
-        event=event,
-        task=task,
-        window=timedelta(minutes=10),
+        notification_type="TASK_CONFIRMED",
+        recipient_id="CUS-001",
+        context_data={"eventId": "EVT-001", "taskId": "TSK-001"},
+        dedupe_window=timedelta(minutes=10),
     )
 
     assert result is None
-    send_email.assert_not_called()
     db.add.assert_not_called()
     db.commit.assert_not_called()
 
 
-def test_send_task_confirmed_notification_logs_failed_send(monkeypatch):
+def test_render_template_injects_dynamic_values():
     service = NotificationService()
-    db = MagicMock()
-    customer = SimpleNamespace(customer_id="CUS-001", email="customer@test.com")
-    event = SimpleNamespace(event_id="EVT-001", title="Birthday")
-    task = SimpleNamespace(task_id="TSK-001", name="Cake", status="PENDING", confirmed_at=datetime(2026, 3, 21, 8, 0, tzinfo=timezone.utc))
-    timestamp = datetime(2026, 3, 21, 8, 5, tzinfo=timezone.utc)
 
-    service._has_recent_success = MagicMock(return_value=False)
-    monkeypatch.setattr("app.services.notification_service.now_utc", MagicMock(return_value=timestamp))
-    monkeypatch.setattr("app.services.auth_service._send_email", MagicMock(return_value=False))
-
-    captured = {}
-
-    def capture_add(notification):
-        captured["notification"] = notification
-
-    db.add.side_effect = capture_add
-
-    result = service._send_task_confirmed_notification(
-        db,
-        customer=customer,
-        event=event,
-        task=task,
-        window=timedelta(minutes=10),
+    rendered = service.render_template(
+        notification_type=CUSTOMER_VERIFICATION_NOTIFICATION,
+        recipient_name="Jane Doe",
+        context_data={
+            "verificationLink": "https://app.occacia.com/verify?token=abc",
+        },
     )
 
-    assert result is captured["notification"]
-    assert result.user_id == "CUS-001"
-    assert result.event_id == "EVT-001"
-    assert result.task_id == "TSK-001"
-    assert result.type == "TASK_CONFIRMED"
-    assert result.status == "FAILED"
-    assert result.sent_at is None
-    assert result.error_message == "Email send returned False"
-    assert result.payload["taskId"] == "TSK-001"
-    db.commit.assert_called_once()
-    db.refresh.assert_called_once_with(result)
+    assert "Jane Doe" in rendered.subject or rendered.subject == "Verify your Occacia account"
+    assert "Jane Doe" in rendered.text_body
+    assert "https://app.occacia.com/verify?token=abc" in rendered.text_body
+    assert "https://app.occacia.com/verify?token=abc" in rendered.html_body
 
 
-def test_has_recent_success_uses_sent_status_and_cutoff(monkeypatch):
+def test_deliver_notification_marks_sent_on_provider_success(monkeypatch):
+    service = NotificationService()
+    db = MagicMock()
+    timestamp = datetime(2026, 3, 21, 8, 5, tzinfo=timezone.utc)
+    monkeypatch.setattr("app.services.notification_service.now_utc", MagicMock(return_value=timestamp))
+    monkeypatch.setattr(
+        service,
+        "_send_email",
+        MagicMock(return_value=ProviderResult(success=True, provider="SENDGRID", provider_message_id="msg-123")),
+    )
+
+    notification = SimpleNamespace(
+        attempt_count=0,
+        max_attempts=4,
+        recipient_email="customer@test.com",
+        subject="Subject",
+        body_text="Body",
+        body_html="<p>Body</p>",
+        provider=None,
+        provider_message_id=None,
+        error_message=None,
+        status="QUEUED",
+        sent_at=None,
+        next_attempt_at=timestamp,
+        last_attempt_at=None,
+    )
+
+    result = service._deliver_notification(db, notification=notification)
+
+    assert result.status == NOTIFICATION_STATUS_SENT
+    assert result.sent_at == timestamp
+    assert result.attempt_count == 1
+    assert result.provider_message_id == "msg-123"
+    assert result.next_attempt_at is None
+
+
+def test_deliver_notification_retries_until_permanent_failure(monkeypatch):
     service = NotificationService()
     db = MagicMock()
     timestamp = datetime(2026, 3, 21, 9, 0, tzinfo=timezone.utc)
     monkeypatch.setattr("app.services.notification_service.now_utc", MagicMock(return_value=timestamp))
-
-    query = db.query.return_value
-    filtered = query.filter.return_value
-    filtered.first.return_value = object()
-
-    result = service._has_recent_success(
-        db,
-        type="TASK_CONFIRMED",
-        dedupe_key="TASK_CONFIRMED:CUS-001:EVT-001:TSK-001",
-        window=timedelta(minutes=10),
+    monkeypatch.setattr(
+        service,
+        "_send_email",
+        MagicMock(return_value=ProviderResult(success=False, provider="SENDGRID", error_message="provider down")),
     )
 
-    assert result is True
-    db.query.assert_called_once()
-    query.filter.assert_called_once()
+    retryable = SimpleNamespace(
+        attempt_count=2,
+        max_attempts=4,
+        recipient_email="customer@test.com",
+        subject="Subject",
+        body_text="Body",
+        body_html=None,
+        provider=None,
+        provider_message_id=None,
+        error_message=None,
+        status="QUEUED",
+        sent_at=None,
+        next_attempt_at=timestamp,
+        last_attempt_at=None,
+    )
+    permanent = SimpleNamespace(
+        attempt_count=3,
+        max_attempts=4,
+        recipient_email="customer@test.com",
+        subject="Subject",
+        body_text="Body",
+        body_html=None,
+        provider=None,
+        provider_message_id=None,
+        error_message=None,
+        status="QUEUED",
+        sent_at=None,
+        next_attempt_at=timestamp,
+        last_attempt_at=None,
+    )
+
+    retry_result = service._deliver_notification(db, notification=retryable)
+    permanent_result = service._deliver_notification(db, notification=permanent)
+
+    assert retry_result.status == NOTIFICATION_STATUS_RETRY_PENDING
+    assert retry_result.attempt_count == 3
+    assert retry_result.next_attempt_at == timestamp + timedelta(minutes=1)
+
+    assert permanent_result.status == NOTIFICATION_STATUS_PERMANENT_FAILURE
+    assert permanent_result.attempt_count == 4
+    assert permanent_result.next_attempt_at is None
