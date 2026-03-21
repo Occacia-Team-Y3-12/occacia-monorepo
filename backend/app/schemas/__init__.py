@@ -30,3 +30,10 @@ __all__ = [
     "VendorResponse",
     "VerifyEmailResponse",
 ]
+# Add to existing imports
+from .vendor_task_schema import (
+    TaskListItem, 
+    TaskDetail, 
+    TaskListResponse,
+    TaskFilterParams
+)
