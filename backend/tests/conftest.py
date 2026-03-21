@@ -53,6 +53,7 @@ from app.models.support_note import SupportNote
 from app.models.task import Task
 from app.models.task_recommendation import TaskRecommendation
 from app.models.task_request import TaskRequest
+from app.models.user import User
 from app.models.vendor import Vendor
 from app.services.google_calendar_service import google_calendar_service
 
@@ -89,6 +90,7 @@ def clean_tables():
             Vendor,
             Customer,
             Admin,
+            User,
         ):
             try:
                 db.query(model).delete()

@@ -22,3 +22,24 @@ export interface PaginatedCustomersResponse {
 export interface UpdateCustomerStatusRequest {
   status: CustomerAccountStatus;
 }
+
+export interface DashboardMetricCounts {
+  total: number;
+  active: number;
+  pending: number;
+}
+
+export interface AdminDashboardMetricsResponse {
+  users: DashboardMetricCounts;
+  vendors: DashboardMetricCounts;
+  events: DashboardMetricCounts;
+  packageOrders: DashboardMetricCounts;
+  generatedAt: string;
+}
+
+export interface HealthStatusResponse {
+  status: string;
+  system: string;
+  version: string;
+  uptimeSeconds: number;
+}
