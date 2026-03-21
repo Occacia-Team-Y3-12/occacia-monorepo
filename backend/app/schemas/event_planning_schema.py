@@ -4,7 +4,7 @@ app/schemas/event_planning_schema.py
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -52,7 +52,8 @@ class SuggestedTaskDraftResponse(BaseModel):
 
 class VenueDisplay(BaseModel):
     """Vendor package matched by the AI planning engine."""
-    id: str | None = None  # str to support AI-VENUE-1 style IDs
+    # Union[int, str] so DB integer IDs and AI-generated string IDs both work
+    id: int | str | None = None
     name: str
     description: str | None = None
     price_per_head: float | None = Field(default=None, alias="pricePerHead")
@@ -73,7 +74,8 @@ class VenueDisplay(BaseModel):
 
 class GiftDisplay(BaseModel):
     """One of the 3 gift recommendations shown alongside venue packages."""
-    id: str | None = None  # str to support AI-GIFT-1 style IDs
+    # Union[int, str] so DB integer IDs and AI-generated string IDs both work
+    id: int | str | None = None
     name: str
     description: str | None = None
     price_per_head: float | None = Field(default=None, alias="pricePerHead")
@@ -142,12 +144,9 @@ class ChatSendResponse(BaseModel):
     booking_id: str | None = Field(default=None, alias="bookingId")
 
     # ── FIX #3 — redirect after booking ──────────────────────────────────────
-    # For real DB bookings: /customers/package-orders/{bookingId}
-    # For AI fallback bookings: None (show inquiry message instead)
     redirect_url: str | None = Field(default=None, alias="redirectUrl")
 
     # ── FIX #1 — AI fallback indicator ───────────────────────────────────────
-    # True when matched_venues/gifts are AI-generated concepts, not real DB packages
     is_ai_fallback: bool = Field(default=False, alias="isAiFallback")
 
     model_config = {"populate_by_name": True}
