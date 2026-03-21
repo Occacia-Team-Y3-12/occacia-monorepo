@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { proxyApiRequest, shouldUseCustomerPlanningMockApi } from '@/app/api/v1/_proxy';
 import { EventTaskMutationPayload, EventTasksResponse, EventTaskResponse } from '@/types/customerEventChat';
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
@@ -9,9 +10,13 @@ type RouteContext = {
 };
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventTasksResponse>> {
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${params.eventId}/tasks`) as Promise<NextResponse<EventTasksResponse>>;
+  }
+
   const { eventId } = params;
 
   if (!eventId) {
@@ -53,6 +58,10 @@ export async function POST(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventTaskResponse>> {
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${params.eventId}/tasks`) as Promise<NextResponse<EventTaskResponse>>;
+  }
+
   const { eventId } = params;
 
   if (!eventId) {

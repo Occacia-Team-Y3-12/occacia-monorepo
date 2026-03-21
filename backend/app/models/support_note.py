@@ -13,10 +13,10 @@ class SupportNote(Base):
     note_id = Column(String, unique=True, index=True, default=lambda: generate_prefixed_id("SUP"))
 
     admin_id = Column(String, index=True, nullable=False)
+    package_order_id = Column(String, index=True, nullable=True)
     event_id = Column(String, index=True, nullable=True)
     task_id = Column(String, index=True, nullable=True)
     vendor_id = Column(String, index=True, nullable=True)
     action_type = Column(String, nullable=False)
     note = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), default=now_utc, nullable=False)
-

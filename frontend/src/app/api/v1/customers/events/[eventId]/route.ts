@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { proxyApiRequest, shouldUseCustomerPlanningMockApi } from '@/app/api/v1/_proxy';
 import { DeleteDraftEventResponse } from '@/types/customer';
 import { EventDetailResponse } from '@/types/customerEventChat';
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
@@ -10,9 +11,13 @@ type RouteContext = {
 };
 
 export async function GET(
-  _request: Request,
+  request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventDetailResponse>> {
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${params.eventId}`) as Promise<NextResponse<EventDetailResponse>>;
+  }
+
   try {
     const { eventId } = params;
 
@@ -51,9 +56,13 @@ export async function GET(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<DeleteDraftEventResponse>> {
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${params.eventId}`) as Promise<NextResponse<DeleteDraftEventResponse>>;
+  }
+
   const { eventId } = params;
 
   if (!eventId) {

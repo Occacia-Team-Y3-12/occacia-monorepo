@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { proxyApiRequest, shouldUseCustomerPlanningMockApi } from '@/app/api/v1/_proxy';
 import { EventTaskResponse } from '@/types/customerEventChat';
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
@@ -13,6 +14,10 @@ export async function PUT(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventTaskResponse>> {
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${params.eventId}/tasks/${params.taskId}`) as Promise<NextResponse<EventTaskResponse>>;
+  }
+
   const { eventId, taskId } = params;
 
   if (!eventId || !taskId) {
@@ -63,9 +68,13 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<{ status: 'success' | 'error'; message: string }>> {
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${params.eventId}/tasks/${params.taskId}`) as Promise<NextResponse<{ status: 'success' | 'error'; message: string }>>;
+  }
+
   const { eventId, taskId } = params;
 
   if (!eventId || !taskId) {
