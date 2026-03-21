@@ -24,9 +24,13 @@ export interface PackageItem {
 
 export interface RecommendationPackage {
   packageId: string;
+  name?: string;
   type: PackageType;
   packageTotalPrice: number;
   currency: string;
   items: PackageItem[];
   expiresAt: string;
+  eventName?: string;
+  eventDate?: string;
+  eventLocation?: string;
 }

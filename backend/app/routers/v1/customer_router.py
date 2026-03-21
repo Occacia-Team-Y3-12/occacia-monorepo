@@ -109,7 +109,6 @@ def get_authenticated_user(
 
     token = credentials.credentials
 
-    # Full signature verification via the app's own decode_token (PyJWT)
     try:
         payload = _decode(token)
         email: str | None = payload.get("sub")
@@ -119,12 +118,10 @@ def get_authenticated_user(
     if not email:
         raise _HTTPEx(status_code=401, detail="Invalid token payload")
 
-    # Customer first
     customer = db.query(Customer).filter(Customer.email == email).first()
     if customer:
         return customer
 
-    # Vendor fallback
     vendor = db.query(_Vendor).filter(_Vendor.email == email).first()
     if vendor:
         return vendor
@@ -244,7 +241,6 @@ def _package_order_response(order: PackageExecutionRequest) -> PackageOrderRespo
         idempotencyKey=order.idempotency_key,
     )
 
-
 def _fulfillment_request_response(request: TaskRequest) -> FulfillmentRequestResponse:
     return FulfillmentRequestResponse(
         fulfillmentRequestId=request.request_id,
@@ -293,7 +289,6 @@ def _message_response(message) -> ChatMessageResponse:
 
 @router.get("/customers/me", response_model=CustomerProfileResponse, response_model_by_alias=True)
 def get_customer_me(current_customer: Customer = Depends(get_current_customer)):
-    """Get current customer profile."""
     return _customer_response(current_customer)
 
 @router.put("/customers/me", response_model=CustomerProfileResponse, response_model_by_alias=True)
@@ -302,7 +297,6 @@ def update_customer_me(
     db: Session = Depends(get_db),
     current_customer: Customer = Depends(get_current_customer),
 ):
-    """Update current customer profile."""
     updated_customer = customer_service.update_customer_profile(
         db,
         current_customer,
@@ -445,29 +439,29 @@ async def send_event_chat_message(
     """
     Unified event chat endpoint (UC-13).
 
-    Two services run in sequence:
+    Flow:
+      1. event_planning_service.send_chat_message()
+         - Validates event ownership
+         - Extracts schedule / timezone / reminders from message
+         - Builds template-based suggested tasks
+         - Saves both sides of the message to EventChatMessage
+         - Returns a rule-based fallback reply
 
-    1. event_planning_service.send_chat_message()
-       - Validates the event belongs to this customer
-       - Extracts schedule / timezone / reminders / recurrence from the
-         message text and writes them to the Event row
-       - Builds template-based suggested tasks
-       - Saves both sides of the message to EventChatMessage
-       - Returns a rule-based fallback reply
+      2. planning_service.process_plan()  [session_id = event_id]
+         - First message: greets, asks about persona
+         - Persona collection: name, vibe, food, music (in-memory via Redis)
+         - After persona complete: asks to save profile
+         - Venue collection: location, date, budget, guests
+         - Once all 4 venue fields known: shows 3 packages + 3 gifts
+         - 3 packages from find_perfect_matches() with tweak_note on fallbacks
+         - 3 gifts priced from 25% of total budget
+         - User selects 1/2/3: PackageExecutionRequest created immediately
+         - User rolls back: AI re-collects changed details, re-recommends
 
-    2. planning_service.process_plan()  [session_id = event_id]
-       - Runs the multi-turn persona flow (Redis-backed)
-       - Calls the AI for a rich conversational reply
-       - Extracts budget / guests / location / date
-       - Matches vendor packages (matchedVenues)
-       - Manages persona save / confirm flow
-       - Returns PlanResponse with 15+ fields
-
-    The AI reply from step 2 wins; the rule-based reply from step 1
-    is used only if step 2 fails entirely.  suggestedTasks always
-    comes from step 1 (template-driven, event-type aware).
+    AI reply from step 2 wins; rule-based reply from step 1 used only
+    if step 2 fails entirely.
     """
-    # ── Step 1: rule-based service (DB writes + message persistence) ─────────
+    # ── Step 1: rule-based (DB writes + message persistence) ─────────────────
     rule_reply, suggested_tasks = event_planning_service.send_chat_message(
         db,
         customer_id=str(current_customer.customer_id),
@@ -476,12 +470,10 @@ async def send_event_chat_message(
     )
 
     # ── Build event context for AI ────────────────────────────────────────────
-    # Fetch the event so the AI knows what it's planning for (title, type, date, etc.)
     try:
         _event = event_planning_service.get_event_for_customer(
             db, customer_id=str(current_customer.customer_id), event_id=event_id
         )
-        from app.services.event_planning_service import EventPlanningService as _EPS
         _tasks = event_planning_service.list_tasks(
             db, customer_id=str(current_customer.customer_id), event_id=event_id
         )
@@ -495,14 +487,13 @@ async def send_event_chat_message(
     except Exception:
         _event_context = None
 
-    # ── Step 2: AI planning service (persona flow + vendor matching) ──────────
-    # session_id == event_id (confirmed architecture decision)
+    # ── Step 2: AI planning service ───────────────────────────────────────────
     plan: PlanResponse | None = None
     try:
         plan = await planning_service.process_plan(
             db=db,
             customer=current_customer,
-            session_id=event_id,          # event_id IS the session_id
+            session_id=event_id,
             user_query=body.content,
             persona_svc=_persona_service,
             ai_svc=ai_service,
@@ -520,36 +511,39 @@ async def send_event_chat_message(
     # ── Merge: AI reply wins; fallback to rule-based if AI failed ────────────
     final_reply = (plan.chat_response or rule_reply) if plan else rule_reply
 
-    # FIX #4: save the real AI reply to EventChatMessage so
-    # GET /customers/events/{eventId}/messages shows it, not the rule-based fallback.
+    # Save AI reply to EventChatMessage so GET /messages shows it
     try:
         event_planning_service.save_ai_reply(db, event_id=event_id, content=final_reply)
     except Exception as _save_err:
         logger.warning("save_ai_reply failed: %s", _save_err)
 
     return ChatSendResponse(
-        # ── Spec fields ──────────────────────────────────────
-        reply=final_reply,
-        suggestedTasks=suggested_tasks,
-        # ── Planning engine fields (all optional / default-safe) ──────────────
-        intent=plan.intent if plan else None,
-        reasoning=plan.reasoning if plan else None,
-        personalityProfile=plan.personality_profile if plan else None,
-        giftSuggestion=plan.gift_suggestion if plan else None,
-        eventType=plan.event_type if plan else None,
-        eventDate=plan.event_date if plan else None,
-        location=plan.location if plan else None,
-        budgetPerHead=plan.budget_per_head if plan else None,
-        guestCount=plan.guest_count if plan else None,
-        venueTags=plan.venue_tags if plan else [],
-        missingInfo=plan.missing_info if plan else [],
-        matchedVenues=plan.matched_venues if plan else [],
-        matchedPackages=plan.matched_packages if plan else [],
-        venueMatchTier=plan.venue_match_tier if plan else None,
-        # ── Persona flow flags ────────────────────────────────
-        askSavePersona=plan.ask_save_persona if plan else False,
-        personaSaved=plan.persona_saved if plan else False,
-        personaConfirmed=plan.persona_confirmed if plan else False,
+        # ── Spec fields ───────────────────────────────────────────────────────
+        reply          = final_reply,
+        suggestedTasks = suggested_tasks,
+        # ── Planning engine fields ────────────────────────────────────────────
+        intent             = plan.intent              if plan else None,
+        reasoning          = plan.reasoning           if plan else None,
+        personalityProfile = plan.personality_profile if plan else None,
+        giftSuggestion     = plan.gift_suggestion     if plan else None,
+        eventType          = plan.event_type          if plan else None,
+        eventDate          = plan.event_date          if plan else None,
+        location           = plan.location            if plan else None,
+        budgetPerHead      = plan.budget_per_head     if plan else None,
+        guestCount         = plan.guest_count         if plan else None,
+        venueTags          = plan.venue_tags          if plan else [],
+        missingInfo        = plan.missing_info        if plan else [],
+        matchedVenues      = plan.matched_venues      if plan else [],
+        matchedGifts       = plan.matched_gifts       if plan else [],
+        matchedPackages    = plan.matched_packages    if plan else [],
+        venueMatchTier     = plan.venue_match_tier    if plan else None,
+        # ── Persona flow flags ────────────────────────────────────────────────
+        askSavePersona  = plan.ask_save_persona  if plan else False,
+        personaSaved    = plan.persona_saved     if plan else False,
+        personaConfirmed= plan.persona_confirmed if plan else False,
+        # ── Booking ───────────────────────────────────────────────────────────
+        bookingCreated  = plan.booking_created if plan else False,
+        bookingId       = plan.booking_id      if plan else None,
     )
 
 @router.post(
@@ -691,7 +685,6 @@ def delete_event_task(
         task_id=task_id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
 
 @router.post(
     "/customers/events/{event_id}/tasks/{task_id}/reassign",
@@ -845,7 +838,6 @@ def delete_event_custom_package(
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-
 @router.post(
     "/customers/events/{event_id}/packages/{package_id}/confirm",
     response_model=ConfirmPackageOrderResponse,
@@ -898,7 +890,6 @@ def list_event_package_orders(
         nextCursor=next_cursor,
     )
 
-
 @router.get(
     "/customers/package-orders",
     response_model=PaginatedPackageOrdersResponse,
@@ -920,7 +911,6 @@ def list_customer_package_orders(
         items=[_package_order_response(item) for item in items],
         nextCursor=next_cursor,
     )
-
 
 @router.get(
     "/customers/package-orders/{package_order_id}",

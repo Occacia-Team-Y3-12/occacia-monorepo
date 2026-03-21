@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useCustomerAuth } from '@/app/context/AuthContext';
 
 type CustomerHeaderProps = {
   isSidebarOpen: boolean;
@@ -13,8 +14,15 @@ type CustomerHeaderProps = {
 
 const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSidebar, onToggleDesktopSidebar }: CustomerHeaderProps) => {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout } = useCustomerAuth();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [savedEventTitle, setSavedEventTitle] = useState("Sister's Birthday");
+
+  const handleLogout = () => {
+    logout();
+    router.push('/customer/auth/login');
+  };
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const isEventsRootPage = pathname === '/customer/events';
@@ -139,7 +147,7 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
             className={`flex items-center ${isEventFlow ? 'gap-4 pl-1' : 'gap-4'}`}
             aria-label="Open profile menu"
           >
-            <span className={`${isEventFlow ? 'inline' : 'hidden sm:inline'} whitespace-nowrap text-[17px] font-semibold text-[#182039]`}>Alex Rivers</span>
+            <span className={`${isEventFlow ? 'inline' : 'hidden sm:inline'} whitespace-nowrap text-[17px] font-semibold text-[#182039]`}>{user?.fullName || user?.username || 'Account'}</span>
             <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-[#F4CE95] shadow-[0_6px_18px_rgba(25,35,72,0.18)]">
               <Image
                 src="/icons/customer/dashboard/profile.svg"
@@ -156,7 +164,7 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
               <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#1F293F] transition-colors hover:bg-[#F3F5FA]">
                 My Profile
               </button>
-              <button className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#C22525] transition-colors hover:bg-[#FFF1F1]">
+              <button onClick={handleLogout} className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#C22525] transition-colors hover:bg-[#FFF1F1]">
                 Logout
               </button>
             </div>

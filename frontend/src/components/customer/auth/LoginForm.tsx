@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
 type LoginFormData = {
-  username: string;
+  email: string;
   password: string;
 };
 
@@ -15,7 +15,7 @@ interface LoginFormProps {
 
 export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
   const [formData, setFormData] = useState<LoginFormData>({
-    username: '',
+    email: '',
     password: '',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof LoginFormData, string>>>({});
@@ -35,8 +35,8 @@ export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
 
     const nextErrors: Partial<Record<keyof LoginFormData, string>> = {};
 
-    if (!formData.username.trim()) {
-      nextErrors.username = 'Username is required';
+    if (!formData.email.trim()) {
+      nextErrors.email = 'Email is required';
     }
 
     if (!formData.password) {
@@ -49,7 +49,7 @@ export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
     }
 
     await onSubmit({
-      username: formData.username.trim(),
+      email: formData.email.trim(),
       password: formData.password,
     });
   };
@@ -58,14 +58,14 @@ export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <input
         type="text"
-        name="username"
-        value={formData.username}
+        name="email"
+        value={formData.email}
         onChange={handleChange}
-        placeholder="Username"
+        placeholder="Email"
         disabled={isLoading}
         className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
       />
-      {errors.username && <p className="-mt-2 text-xs text-red-500">{errors.username}</p>}
+      {errors.email && <p className="-mt-2 text-xs text-red-500">{errors.email}</p>}
 
       <div className="relative">
         <input

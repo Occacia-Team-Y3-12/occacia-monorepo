@@ -1,1 +1,1 @@
-// Custom hooks
+export { useCustomerAuth as useAuth } from '@/app/context/AuthContext';

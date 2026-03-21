@@ -11,6 +11,8 @@ export const ROUTES = {
     EVENT_PACKAGES: (eventId: string) => `/customer/events/${eventId}/packages`,
     EVENT_PACKAGE_DETAIL: (eventId: string, packageId: string) => `/customer/events/${eventId}/packages/${packageId}`,
     EVENT_PACKAGE_CUSTOMIZE: (eventId: string, packageId: string) => `/customer/events/${eventId}/packages/${packageId}/customize`,
+    EVENT_PACKAGE_CONFIRM: (eventId: string, packageId: string) => `/customer/events/${eventId}/packages/${packageId}/confirm`,
+    EVENT_ORDER_CONFIRMATION: (eventId: string, packageOrderId: string) => `/customer/events/${eventId}/orders/${packageOrderId}`,
     PRODUCTS: '/customer/products',
     CART: '/customer/cart',
     ORDERS: '/customer/orders',
@@ -34,6 +36,7 @@ export const ROUTES = {
     DASHBOARD: '/admin',
     APPROVALS: '/admin/approvals',
     USERS: '/admin/users',
+    CUSTOMERS: '/admin/customers',
     SETTINGS: '/admin/settings',
   },
 } as const;
@@ -44,4 +47,3 @@ export const ROUTES_ALIAS = {
   VENDOR_ACTIVATED: ROUTES.VENDOR.ACTIVATED,
   VENDOR_PRODUCTS: ROUTES.VENDOR.PRODUCTS,
 } as const;
-

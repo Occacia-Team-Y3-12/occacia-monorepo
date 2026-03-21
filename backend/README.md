@@ -25,7 +25,7 @@ Start in the `backend/` directory.
 If you are on Windows and PowerShell blocks `.\.venv\Scripts\Activate.ps1`, do not stop there. The Windows setup section includes both:
 
 - an execution policy fix
-- a no-activation fallback using `.\.venv\Scripts\poetry`
+- a no-activation fallback using Poetry's full executable path
 
 ## Tech Stack
 
@@ -121,19 +121,26 @@ poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Open Windows PowerShell after Python 3.11 is installed, then continue here.
 
-1. Install Poetry globally.
+1. Install Poetry.
 
 ```powershell
 (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
 ```
 
-Add Poetry to your PATH (replace `C:\Users\yourusername` with your actual username):
+Use Poetry directly from its installed location in the current PowerShell session:
 
 ```powershell
-[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\Users\yourusername\AppData\Roaming\Python\Scripts", "User")
+$Poetry = "$env:APPDATA\Python\Scripts\poetry.exe"
+& $Poetry --version
 ```
 
-Restart PowerShell or run `$env:Path += ";C:\Users\yourusername\AppData\Roaming\Python\Scripts"` in the current session.
+Optional: add Poetry to your user `PATH` for future terminals:
+
+```powershell
+[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:APPDATA\Python\Scripts", "User")
+```
+
+Then restart PowerShell. In the steps below, you can keep using `& $Poetry ...` even if you do not update `PATH`.
 
 2. Create the virtual environment.
 
@@ -168,14 +175,14 @@ No activation:
 
 ```powershell
 .\.venv\Scripts\python -m pip install --upgrade pip
-poetry sync --no-root
+& $Poetry sync --no-root
 ```
 
 4. If activation worked, install dependencies.
 
 ```powershell
 python -m pip install --upgrade pip
-poetry sync --no-root
+& $Poetry sync --no-root
 ```
 
 5. Create the local env file.
@@ -206,13 +213,13 @@ docker compose -f docker-compose-local.yml up -d
 Activated venv:
 
 ```powershell
-poetry run alembic upgrade head
+& $Poetry run alembic upgrade head
 ```
 
 No activation:
 
 ```powershell
-poetry run alembic upgrade head
+& $Poetry run alembic upgrade head
 ```
 
 9. Start the API.
@@ -220,13 +227,13 @@ poetry run alembic upgrade head
 Activated venv:
 
 ```powershell
-poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+& $Poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 No activation:
 
 ```powershell
-poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+& $Poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Configuration
@@ -324,7 +331,7 @@ docker compose -f docker-compose-local.yml --profile tools run --rm migrate
 
 - Poetry uses the wrong Python:
   - macOS/Linux: `poetry env use python3.11`
-  - Windows: `poetry env use 3.11`
+  - Windows: `& "$env:APPDATA\Python\Scripts\poetry.exe" env use 3.11`
 - `backend/.env` is not being read:
   Ensure it exists and contains `SECRET_KEY` plus either `DB_PASSWORD` or `DATABASE_URL`.
 - Database auth errors after changing credentials:
