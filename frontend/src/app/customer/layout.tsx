@@ -1,17 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import CustomerSidebar from '@/components/features/customer/CustomerSidebar';
 import CustomerHeader from '@/components/features/customer/CustomerHeader';
 import { CustomerAuthProvider } from '@/app/context/AuthContext';
-import { customerAuthService } from '@/services/customer/authServices';
 
 function CustomerLayoutInner({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
   const isAuthPage = pathname?.startsWith('/customer/auth');
 
   // Authentication temporarily disabled for development
