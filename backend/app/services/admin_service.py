@@ -89,6 +89,10 @@ class AdminService:
         vendor.is_verified = True
         vendor.approval_status = "APPROVED"
         vendor.approved_at = datetime.now(timezone.utc)
+        
+        if hasattr(vendor, "status"):
+            vendor.status = "ACTIVE"
+        
         db.commit()
         db.refresh(vendor)
         

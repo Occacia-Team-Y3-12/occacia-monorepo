@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class AdminRegister(BaseModel):
@@ -20,20 +20,18 @@ class AdminResponse(BaseModel):
 
 class VendorAdminView(BaseModel):
     id: int
-    vendor_id: Optional[str]
-    business_name: str
+    vendor_id: Optional[str] = Field(alias="vendorId")
+    business_name: str = Field(alias="businessName")
     email: str
     phone: Optional[str]
-    display_name: Optional[str]
-    contact_phone: Optional[str]
-    location_base: Optional[str]
-    approval_status: str
-    is_verified: bool
-    approved_at: Optional[datetime]
-    # Spec: AccountStatus — ACTIVE / SUSPENDED / DISABLED
-    # Falls back to None if the column doesn't exist on older DB rows
+    display_name: Optional[str] = Field(alias="displayName")
+    contact_phone: Optional[str] = Field(alias="contactPhone")
+    location_base: Optional[str] = Field(alias="locationBase")
+    approval_status: str = Field(alias="approvalStatus")
+    is_verified: bool = Field(alias="isVerified")
+    approved_at: Optional[datetime] = Field(alias="approvedAt")
     status: Optional[str] = None
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class VendorRejectRequest(BaseModel):

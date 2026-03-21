@@ -5,7 +5,132 @@ import pytest
 from fastapi import HTTPException
 
 from app.services.vendor_service import VendorService, normalize_tags
+from app.services.admin_service import AdminService
 from app.core.database import SessionLocal
+
+
+# ── AdminService tests ────────────────────────────────────────────────
+
+def test_approve_vendor_sets_approved_status_and_verified():
+    service = AdminService()
+    db = MagicMock()
+    vendor = SimpleNamespace(
+        vendor_id="VEN-001",
+        approval_status="PENDING",
+        is_verified=False,
+        approved_at=None,
+        status="PENDING",
+    )
+
+    with patch.object(service, "get_vendor", return_value=vendor):
+        result = service.approve_vendor(db, vendor_id=1, admin_email="admin@test.com")
+
+    assert result is vendor
+    assert vendor.approval_status == "APPROVED"
+    assert vendor.is_verified is True
+    assert vendor.approved_at is not None
+    assert vendor.status == "ACTIVE"
+    db.commit.assert_called_once()
+    db.refresh.assert_called_once_with(vendor)
+
+
+def test_approve_vendor_fails_when_already_approved():
+    service = AdminService()
+    db = MagicMock()
+    vendor = SimpleNamespace(approval_status="APPROVED")
+
+    with patch.object(service, "get_vendor", return_value=vendor):
+        with pytest.raises(HTTPException) as exc:
+            service.approve_vendor(db, vendor_id=1, admin_email="admin@test.com")
+
+    assert exc.value.status_code == 400
+    assert "already approved" in exc.value.detail
+    db.commit.assert_not_called()
+
+
+def test_reject_vendor_sets_rejected_status_and_unverified():
+    service = AdminService()
+    db = MagicMock()
+    vendor = SimpleNamespace(
+        vendor_id="VEN-002",
+        approval_status="PENDING",
+        is_verified=True,
+    )
+
+    with patch.object(service, "get_vendor", return_value=vendor):
+        result = service.reject_vendor(db, vendor_id=2, reason="Incomplete docs", admin_email="admin@test.com")
+
+    assert result is vendor
+    assert vendor.approval_status == "REJECTED"
+    assert vendor.is_verified is False
+    db.commit.assert_called_once()
+    db.refresh.assert_called_once_with(vendor)
+
+
+def test_reject_vendor_fails_when_already_rejected():
+    service = AdminService()
+    db = MagicMock()
+    vendor = SimpleNamespace(approval_status="REJECTED")
+
+    with patch.object(service, "get_vendor", return_value=vendor):
+        with pytest.raises(HTTPException) as exc:
+            service.reject_vendor(db, vendor_id=2, reason="Test", admin_email="admin@test.com")
+
+    assert exc.value.status_code == 400
+    assert "already rejected" in exc.value.detail
+    db.commit.assert_not_called()
+
+
+def test_get_vendor_returns_vendor_when_exists():
+    service = AdminService()
+    db = MagicMock()
+    vendor = SimpleNamespace(id=1, vendor_id="VEN-001")
+    db.query.return_value.filter.return_value.first.return_value = vendor
+
+    result = service.get_vendor(db, vendor_id=1)
+
+    assert result is vendor
+
+
+def test_get_vendor_raises_404_when_not_found():
+    service = AdminService()
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = None
+
+    with pytest.raises(HTTPException) as exc:
+        service.get_vendor(db, vendor_id=999)
+
+    assert exc.value.status_code == 404
+    assert "not found" in exc.value.detail
+
+
+def test_list_vendors_filters_by_approval_status():
+    service = AdminService()
+    db = MagicMock()
+    vendors = [SimpleNamespace(id=1), SimpleNamespace(id=2)]
+    query_mock = db.query.return_value
+    filter_mock = query_mock.filter.return_value
+    order_mock = filter_mock.order_by.return_value
+    order_mock.all.return_value = vendors
+
+    result = service.list_vendors(db, approval_status="PENDING")
+
+    assert result == vendors
+    query_mock.filter.assert_called()
+
+
+def test_list_vendors_returns_all_when_no_filters():
+    service = AdminService()
+    db = MagicMock()
+    vendors = [SimpleNamespace(id=1), SimpleNamespace(id=2), SimpleNamespace(id=3)]
+    query_mock = db.query.return_value
+    order_mock = query_mock.order_by.return_value
+    order_mock.all.return_value = vendors
+
+    result = service.list_vendors(db)
+
+    assert result == vendors
+    assert len(result) == 3
 
 
 # ── normalize_tags ────────────────────────────────────────────────────
