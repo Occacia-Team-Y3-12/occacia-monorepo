@@ -36,6 +36,7 @@ export const ROUTES = {
     DASHBOARD: '/admin',
     APPROVALS: '/admin/approvals',
     USERS: '/admin/users',
+    CUSTOMERS: '/admin/customers',
     SETTINGS: '/admin/settings',
   },
 } as const;
@@ -46,4 +47,3 @@ export const ROUTES_ALIAS = {
   VENDOR_ACTIVATED: ROUTES.VENDOR.ACTIVATED,
   VENDOR_PRODUCTS: ROUTES.VENDOR.PRODUCTS,
 } as const;
-

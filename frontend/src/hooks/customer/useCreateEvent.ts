@@ -2,37 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { featureFlags } from '@/config/featureFlags';
 import { customerEventService } from '@/services/customer/eventServices';
 import { ROUTES } from '@/lib/routes';
 import { CreateCustomerEventPayload, CustomerPersonaOption, CustomerEventType, EventTypeOption } from '@/types/customer';
+import { EVENT_TYPE_FALLBACKS } from '@/mocks/customerExperience';
 
 type CustomerEventFormType = CustomerEventType | string;
 
 const DEFAULT_EVENT_TYPE: CustomerEventFormType = '';
-
-const EVENT_TYPE_FALLBACKS: EventTypeOption[] = [
-  {
-    id: 'individual',
-    value: 'individual',
-    label: 'Individual',
-    example: 'Visit someone',
-    titlePlaceholder: 'e.g., Visiting to see sick mom',
-  },
-  {
-    id: 'group',
-    value: 'group',
-    label: 'Group',
-    example: 'Celebration',
-    titlePlaceholder: 'e.g., Family dinner planning',
-  },
-  {
-    id: 'others',
-    value: 'others',
-    label: 'Others',
-    example: 'Appointment',
-    titlePlaceholder: 'e.g., Doctor appointment this Saturday',
-  },
-];
 
 export const PERSONA_OPTIONS: CustomerPersonaOption[] = [
   { id: 'john-cena', name: 'John Cena', role: 'Professional Athlete', imageUrl: '/images/customer/events/Jhon.svg' },
@@ -45,7 +23,9 @@ export const useCreateEvent = () => {
   const [eventType, setEventType] = useState<CustomerEventFormType>(DEFAULT_EVENT_TYPE);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [eventTypes, setEventTypes] = useState<EventTypeOption[]>(EVENT_TYPE_FALLBACKS);
+  const [eventTypes, setEventTypes] = useState<EventTypeOption[]>(
+    featureFlags.useCustomerPlanningMockApi ? EVENT_TYPE_FALLBACKS : []
+  );
   const [personas, setPersonas] = useState<CustomerPersonaOption[]>(PERSONA_OPTIONS);
   const [selectedPersonaIds, setSelectedPersonaIds] = useState<string[]>([]);
   const [errors, setErrors] = useState<{ eventType?: string; title?: string; form?: string }>({});
@@ -72,6 +52,9 @@ export const useCreateEvent = () => {
       if (result.ok && result.data?.data?.eventTypes?.length) {
         setEventTypes(result.data.data.eventTypes);
       } else if (!result.ok) {
+        if (featureFlags.useCustomerPlanningMockApi) {
+          setEventTypes(EVENT_TYPE_FALLBACKS);
+        }
         setErrors((prev) => ({ ...prev, form: result.error || 'Unable to load event types right now.' }));
       }
 

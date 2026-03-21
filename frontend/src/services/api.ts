@@ -1,6 +1,22 @@
 import { CustomerRegistrationData, Customer, VerifyEmailResponse } from '@/types/customer/index';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+function resolveApiBaseUrl() {
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+  if (!configuredBaseUrl) {
+    // Use same-origin requests in frontend dev so Next.js rewrites can proxy to the backend.
+    return '/api/v1';
+  }
+
+  const normalizedBaseUrl = configuredBaseUrl.replace(/\/+$/, '');
+  return normalizedBaseUrl.endsWith('/api/v1')
+    ? normalizedBaseUrl
+    : `${normalizedBaseUrl}/api/v1`;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
+
+export { API_BASE_URL, resolveApiBaseUrl };
 
 export const authApi = {
   register: async (data: CustomerRegistrationData): Promise<Customer> => {
@@ -23,7 +39,7 @@ export const authApi = {
 import axios from 'axios';
 
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },

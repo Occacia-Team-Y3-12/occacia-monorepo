@@ -9,6 +9,8 @@ import { CustomerAuthProvider } from '@/app/context/AuthContext';
 function CustomerLayoutInner({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith('/customer/auth');
 
@@ -20,6 +22,7 @@ function CustomerLayoutInner({ children }: { children: React.ReactNode }) {
   // }, [isAuthPage, router]);
 
   if (isAuthPage) return <div className="customer-portal-font">{children}</div>;
+  if (!authChecked || !isAuthenticated) return null;
 
   return (
     <div className="customer-portal-font min-h-screen overflow-x-hidden bg-[#F7F7FA]">

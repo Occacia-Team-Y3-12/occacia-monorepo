@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { featureFlags } from '@/config/featureFlags';
 import type { RecommendationPackage, ShortlistedOffering } from '@/types/customer/package';
 import type { ConfirmPackageOrderResponse, PackageOrder, OrderTask, FulfillmentRequest } from '@/types/customer/order';
 
@@ -38,6 +39,7 @@ export const packageService = {
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       if (status === 409 || status === 400 || status === 401 || status === 403) throw err;
+      if (!featureFlags.useCustomerPackagesMock) throw err;
 
       // Backend not available — build mock response from cached package
       const stored = typeof window !== 'undefined' ? sessionStorage.getItem(`packages_${eventId}`) : null;

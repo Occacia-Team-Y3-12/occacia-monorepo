@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 
 type LoginFormData = {
-  username: string;
+  email: string;
   password: string;
 };
 
@@ -15,7 +15,7 @@ interface LoginFormProps {
 
 export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
   const [formData, setFormData] = useState<LoginFormData>({
-    username: '',
+    email: '',
     password: '',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof LoginFormData, string>>>({});
@@ -49,7 +49,7 @@ export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
     }
 
     await onSubmit({
-      username: formData.username.trim(),
+      email: formData.email.trim(),
       password: formData.password,
     });
   };

@@ -1,7 +1,13 @@
 from __future__ import annotations
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from typing import Literal, Optional
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+from app.schemas.event_planning_schema import TaskResponse
+from app.schemas.package_schema import (
+    FulfillmentRequestResponse,
+    PackageOrderResponse,
+)
 
 
 class AdminRegister(BaseModel):
@@ -89,3 +95,103 @@ class PaginatedCustomers(BaseModel):
 
 class CustomerStatusUpdateRequest(BaseModel):
     status: str = Field(..., pattern="^(ACTIVE|SUSPENDED|DISABLED|PENDING)$")
+
+
+SupportActionType = Literal[
+    "NOTE_ONLY",
+    "REASSIGN_VENDOR",
+    "UNASSIGN_VENDOR",
+    "UNLOCK_EDITING",
+    "EXTEND_EXPIRY",
+    "OVERRIDE_STATUS",
+    "ESCALATE",
+]
+
+AdminTaskAction = Literal[
+    "UNASSIGN_VENDOR",
+    "EXTEND_EXPIRY",
+    "OVERRIDE_STATUS",
+    "UNLOCK_EDITING",
+    "REASSIGN_VENDOR",
+]
+
+
+class InternalNoteResponse(BaseModel):
+    note_id: str = Field(alias="noteId")
+    admin_id: str = Field(alias="adminId")
+    package_order_id: str | None = Field(default=None, alias="packageOrderId")
+    event_id: str | None = Field(default=None, alias="eventId")
+    task_id: str | None = Field(default=None, alias="taskId")
+    vendor_id: str | None = Field(default=None, alias="vendorId")
+    action_type: SupportActionType = Field(alias="actionType")
+    note: str
+    created_at: datetime = Field(alias="createdAt")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class InternalNoteCreateRequest(BaseModel):
+    package_order_id: str | None = Field(default=None, alias="packageOrderId")
+    event_id: str | None = Field(default=None, alias="eventId")
+    task_id: str | None = Field(default=None, alias="taskId")
+    vendor_id: str | None = Field(default=None, alias="vendorId")
+    action_type: SupportActionType = Field(alias="actionType")
+    note: str
+
+    @field_validator("note")
+    @classmethod
+    def validate_note(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("note must not be empty")
+        return trimmed
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class PaginatedInternalNotesResponse(BaseModel):
+    items: list[InternalNoteResponse]
+    next_cursor: str | None = Field(default=None, alias="nextCursor")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class PaginatedPackageOrdersResponse(BaseModel):
+    items: list[PackageOrderResponse]
+    next_cursor: str | None = Field(default=None, alias="nextCursor")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class PaginatedTasksResponse(BaseModel):
+    items: list[TaskResponse]
+    next_cursor: str | None = Field(default=None, alias="nextCursor")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class PaginatedFulfillmentRequestsResponse(BaseModel):
+    items: list[FulfillmentRequestResponse]
+    next_cursor: str | None = Field(default=None, alias="nextCursor")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class AdminTaskSupportActionRequest(BaseModel):
+    action: AdminTaskAction
+    assigned_vendor_id: str | None = Field(default=None, alias="assignedVendorId")
+    expires_at: datetime | None = Field(default=None, alias="expiresAt")
+    status: str | None = None
+    note: str | None = None
+
+    @field_validator("note")
+    @classmethod
+    def validate_optional_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("note must not be empty")
+        return trimmed
+
+    model_config = ConfigDict(populate_by_name=True)

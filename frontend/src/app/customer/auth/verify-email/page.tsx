@@ -5,18 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import Image from 'next/image';
 import { ROUTES } from '@/lib/routes';
-
-// Mock verification simulation
-const simulateEmailVerification = (token: string | null): Promise<boolean> => {
-  return new Promise((resolve) => {
-    // Simulate API delay (2 seconds)
-    setTimeout(() => {
-      // Mock logic: token must be present and follow pattern
-      const isValid: boolean = token ? token.startsWith('mock_') : false;
-      resolve(isValid);
-    }, 2000);
-  });
-};
+import { customerAuthService } from '@/services/customer/authServices';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -27,20 +16,20 @@ function VerifyEmailContent() {
     const token = searchParams.get('token');
     let redirectTimer: NodeJS.Timeout;
     
-    // Start verification simulation
-    simulateEmailVerification(token).then((isValid) => {
-      if (isValid) {
-        setStatus('success');
-        // Auto-redirect after 2 seconds
-        redirectTimer = setTimeout(() => {
-          router.push(ROUTES.VENDOR.PENDING_APPROVAL);
-        }, 2000);
-      } else {
-        setStatus('error');
-      }
-    });
+    if (!token) {
+      setStatus('error');
+      return;
+    }
 
-    // Cleanup function to clear timeout on unmount
+    customerAuthService.verifyEmail(token).then(() => {
+        setStatus('success');
+        redirectTimer = setTimeout(() => {
+          router.push(ROUTES.CUSTOMER.LOGIN);
+        }, 2000);
+      }).catch(() => {
+        setStatus('error');
+      });
+
     return () => {
       if (redirectTimer) clearTimeout(redirectTimer);
     };
@@ -72,7 +61,7 @@ function VerifyEmailContent() {
               </svg>
             </div>
             <p className="text-green-600 mb-3 md:mb-4 text-sm md:text-base font-semibold">Email verified successfully!</p>
-            <p className="text-[#5a6c7d] text-sm md:text-base">Redirecting to pending approval...</p>
+            <p className="text-[#5a6c7d] text-sm md:text-base">Redirecting to login...</p>
           </div>
         )}
         
@@ -85,7 +74,7 @@ function VerifyEmailContent() {
             </div>
             <p className="text-red-600 mb-3 md:mb-4 text-sm md:text-base font-semibold">Verification failed</p>
             <p className="text-[#5a6c7d] text-sm md:text-base mb-6">The verification link is invalid or expired. Please try registering again.</p>
-            <a href={ROUTES.VENDOR.REGISTER} className="inline-block bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium px-6 md:px-8 py-3 md:py-4 text-base md:text-lg rounded-lg transition-colors duration-200">
+            <a href={ROUTES.CUSTOMER.REGISTER} className="inline-block bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium px-6 md:px-8 py-3 md:py-4 text-base md:text-lg rounded-lg transition-colors duration-200">
               Back to Registration
             </a>
           </div>
