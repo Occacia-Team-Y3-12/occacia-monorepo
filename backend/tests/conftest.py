@@ -9,7 +9,6 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
-# ── Environment must be set before any app imports ───────────────────
 os.environ.update({
     "SKIP_DB_STARTUP": "1",
     "LANGFLOW_URL": "http://localhost:7860/api/v1/run/test-flow",
@@ -37,6 +36,7 @@ from app.core.security import create_access_token, get_password_hash
 from app.main import app  # noqa: E402
 from app.models import registry  # noqa: F401
 from app.models.chat_model import ChatMessage
+from app.models.chat_session import ChatSession
 from app.models.customer import Customer
 from app.models.event import Event
 from app.models.event_chat_message import EventChatMessage
@@ -55,7 +55,6 @@ from app.models.vendor import Vendor
 from app.services.google_calendar_service import google_calendar_service
 
 
-# ── Create all tables once ───────────────────────────────────────────
 @pytest.fixture(scope="session", autouse=True)
 def create_tables():
     Base.metadata.drop_all(bind=engine)
@@ -64,7 +63,6 @@ def create_tables():
     Base.metadata.drop_all(bind=engine)
 
 
-# ── Clean all tables between tests ───────────────────────────────────
 @pytest.fixture(autouse=True)
 def clean_tables():
     yield
@@ -74,6 +72,7 @@ def clean_tables():
             ChatMessage,
             EventChatMessage,
             Notification,
+            ChatSession,
             PackageExecutionRequest,
             TaskRequest,
             PackageItem,
@@ -97,14 +96,12 @@ def clean_tables():
         db.close()
 
 
-# ── Base test client ─────────────────────────────────────────────────
 @pytest.fixture()
 def client():
     with TestClient(app) as c:
         yield c
 
 
-# ── Helper: create and activate a customer ───────────────────────────
 @pytest.fixture()
 def active_customer():
     db = SessionLocal()
@@ -125,13 +122,11 @@ def active_customer():
     return customer
 
 
-# ── Helper: auth token for a customer ────────────────────────────────
 @pytest.fixture()
 def auth_token(active_customer):
     return create_access_token(data={"sub": active_customer.email})
 
 
-# ── Helper: authenticated client ─────────────────────────────────────
 @pytest.fixture()
 def auth_client(client, auth_token):
     client.headers.update({"Authorization": f"Bearer {auth_token}"})
@@ -141,16 +136,14 @@ def auth_client(client, auth_token):
 @pytest.fixture(autouse=True)
 def mock_google_calendar(monkeypatch):
     monkeypatch.setattr(
-        google_calendar_service,
-        "build_google_auth_url",
+        google_calendar_service, "build_google_auth_url",
         lambda *, state, redirect_uri: (
             "https://accounts.google.com/o/oauth2/v2/auth"
             f"?state={state}&redirect_uri={redirect_uri}"
         ),
     )
     monkeypatch.setattr(
-        google_calendar_service,
-        "exchange_google_code",
+        google_calendar_service, "exchange_google_code",
         lambda *, code, redirect_uri: {
             "access_token": "google-access-token",
             "refresh_token": "google-refresh-token",
@@ -160,37 +153,32 @@ def mock_google_calendar(monkeypatch):
         },
     )
     monkeypatch.setattr(
-        google_calendar_service,
-        "get_google_account_profile",
+        google_calendar_service, "get_google_account_profile",
         lambda *, access_token: {
             "email": "calendar-user@example.com",
             "calendar_id": "primary",
         },
     )
     monkeypatch.setattr(
-        google_calendar_service,
-        "create_google_event",
+        google_calendar_service, "create_google_event",
         lambda *, access_token, calendar_id, payload: {
             "id": "google-event-123",
             "htmlLink": "https://calendar.google.com/event?eid=google-event-123",
         },
     )
     monkeypatch.setattr(
-        google_calendar_service,
-        "update_google_event",
+        google_calendar_service, "update_google_event",
         lambda *, access_token, calendar_id, event_id, payload: {
             "id": event_id,
             "htmlLink": f"https://calendar.google.com/event?eid={event_id}",
         },
     )
     monkeypatch.setattr(
-        google_calendar_service,
-        "delete_google_event",
+        google_calendar_service, "delete_google_event",
         lambda *, access_token, calendar_id, event_id: None,
     )
     monkeypatch.setattr(
-        google_calendar_service,
-        "refresh_google_access_token",
+        google_calendar_service, "refresh_google_access_token",
         lambda *, refresh_token: {
             "access_token": "google-access-token-refreshed",
             "expires_in": 3600,
@@ -200,7 +188,6 @@ def mock_google_calendar(monkeypatch):
     )
 
 
-# ── Helper: create a verified vendor with packages ───────────────────
 @pytest.fixture()
 def vendor_with_packages():
     db = SessionLocal()

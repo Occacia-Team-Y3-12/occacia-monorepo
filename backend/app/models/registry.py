@@ -23,6 +23,7 @@ from app.models.task_recommendation import TaskRecommendation
 from app.models.task_request import TaskRequest
 from app.models.user import User
 from app.models.vendor import Vendor
+from app.models.chat_session import ChatSession 
 
 __all__ = [
     "Admin",
