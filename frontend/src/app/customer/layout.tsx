@@ -1,35 +1,25 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import CustomerSidebar from '@/components/features/customer/CustomerSidebar';
 import CustomerHeader from '@/components/features/customer/CustomerHeader';
 import { CustomerAuthProvider } from '@/app/context/AuthContext';
-import { customerAuthService } from '@/services/customer/authServices';
 
 function CustomerLayoutInner({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
   const isAuthPage = pathname?.startsWith('/customer/auth');
+  const authChecked = true;
+  const isAuthenticated = true;
 
-  useEffect(() => {
-    if (isAuthPage) {
-      setAuthChecked(true);
-      return;
-    }
-
-    const hasToken = customerAuthService.isAuthenticated();
-    setIsAuthenticated(hasToken);
-    setAuthChecked(true);
-
-    if (!hasToken) {
-      router.replace('/customer/auth/login');
-    }
-  }, [isAuthPage, pathname, router]);
+  // Authentication temporarily disabled for development
+  // useEffect(() => {
+  //   if (!isAuthPage && !customerAuthService.isAuthenticated()) {
+  //     router.replace('/customer/auth/login');
+  //   }
+  // }, [isAuthPage, router]);
 
   if (isAuthPage) return <div className="customer-portal-font">{children}</div>;
   if (!authChecked || !isAuthenticated) return null;
