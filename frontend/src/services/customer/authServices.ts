@@ -25,7 +25,39 @@ export const customerAuthService = {
   },
 
   login: async (data: LoginFormData): Promise<LoginResponse> => {
-    const response = await api.post('/auth/login', data);
-    return response.data;
+    const response = await api.post('/auth/customer/login', data);
+    const result: LoginResponse = response.data;
+    if (result.token) {
+      localStorage.setItem('customerToken', result.token);
+    }
+    if (result.refreshToken) {
+      localStorage.setItem('customerRefreshToken', result.refreshToken);
+    }
+    if (result.user) {
+      localStorage.setItem('customerUser', JSON.stringify(result.user));
+    }
+    return result;
+  },
+
+  logout: (): void => {
+    localStorage.removeItem('customerToken');
+    localStorage.removeItem('customerRefreshToken');
+    localStorage.removeItem('customerUser');
+  },
+
+  getToken: (): string | null => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('customerToken');
+  },
+
+  getUser: () => {
+    if (typeof window === 'undefined') return null;
+    const stored = localStorage.getItem('customerUser');
+    return stored ? JSON.parse(stored) : null;
+  },
+
+  isAuthenticated: (): boolean => {
+    if (typeof window === 'undefined') return false;
+    return !!localStorage.getItem('customerToken');
   },
 };

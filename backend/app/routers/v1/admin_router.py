@@ -66,6 +66,27 @@ def admin_login(
     """Admin login."""
     return admin_service.login_admin(db, form_data.username, form_data.password)
 
+@router.get("/vendors", response_model=list[VendorAdminView])
+def list_vendors(
+    approval_status: str | None = None,
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    """List vendors for admin management."""
+    _ = current_admin
+    return admin_service.list_vendors(db, approval_status=approval_status, status=status)
+
+@router.get("/vendors/{vendor_id}", response_model=VendorAdminView)
+def get_vendor_detail(
+    vendor_id: int,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    """Get vendor detail for admin management."""
+    _ = current_admin
+    return admin_service.get_vendor(db, vendor_id=vendor_id)
+
 @router.post("/vendors/{vendor_id}/approve", response_model=VendorAdminView)
 def approve_vendor(
     vendor_id: int,
@@ -74,12 +95,6 @@ def approve_vendor(
 ):
     """Approve vendor registration."""
     vendor = admin_service.approve_vendor(db, vendor_id=vendor_id, admin_email=current_admin.email)
-    # Sync is_verified so approved vendors appear in AI venue matching
-    if hasattr(vendor, "is_verified") and not vendor.is_verified:
-        vendor.is_verified = True
-        db.add(vendor)
-        db.commit()
-        db.refresh(vendor)
     _send_approval_email(vendor)
     return vendor
 

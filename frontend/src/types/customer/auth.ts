@@ -32,6 +32,7 @@ export interface LoginResponse {
   status: string;
   message?: string;
   token?: string;
+  refreshToken?: string;
   user?: {
     id: string;
     email: string;

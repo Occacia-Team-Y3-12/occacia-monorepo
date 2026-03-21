@@ -1,19 +1,24 @@
 'use client';
 
-import React, { useState } from 'react';
-import { usePathname } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import CustomerSidebar from '@/components/features/customer/CustomerSidebar';
 import CustomerHeader from '@/components/features/customer/CustomerHeader';
+import { CustomerAuthProvider } from '@/app/context/AuthContext';
+import { customerAuthService } from '@/services/customer/authServices';
 
-export default function CustomerLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function CustomerLayoutInner({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const isAuthPage = pathname?.startsWith('/customer/auth');
+
+  useEffect(() => {
+    if (!isAuthPage && !customerAuthService.isAuthenticated()) {
+      router.replace('/customer/auth/login');
+    }
+  }, [isAuthPage, router]);
 
   if (isAuthPage) return <div className="customer-portal-font">{children}</div>;
 
@@ -41,5 +46,13 @@ export default function CustomerLayout({
         {children}
       </main>
     </div>
+  );
+}
+
+export default function CustomerLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <CustomerAuthProvider>
+      <CustomerLayoutInner>{children}</CustomerLayoutInner>
+    </CustomerAuthProvider>
   );
 }

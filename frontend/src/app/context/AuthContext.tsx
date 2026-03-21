@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, createElement } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { customerAuthService } from '@/services/customer/authServices';
 
@@ -38,10 +38,10 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  return createElement(
-    AuthContext.Provider,
-    { value: { isAuthenticated, user, logout } },
-    children
+  return (
+    <AuthContext.Provider value={{ isAuthenticated, user, logout }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 

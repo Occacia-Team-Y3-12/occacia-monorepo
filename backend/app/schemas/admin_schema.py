@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class AdminRegister(BaseModel):
@@ -30,8 +30,6 @@ class VendorAdminView(BaseModel):
     approval_status: str
     is_verified: bool
     approved_at: Optional[datetime]
-    # Spec: AccountStatus — ACTIVE / SUSPENDED / DISABLED
-    # Falls back to None if the column doesn't exist on older DB rows
     status: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
