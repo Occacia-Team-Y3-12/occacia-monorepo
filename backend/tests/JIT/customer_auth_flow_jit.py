@@ -45,7 +45,7 @@ def test_whenCustomerRegistersAndVerifies_loginAndRefresh_success(client):
     customer = _get_customer(email)
     assert customer is not None
     assert customer.verification_token is not None
-    assert customer.status == "PENDING_VERIFICATION"
+    assert customer.status == "PENDING"
 
     verify_response = client.get(
         "/api/v1/auth/customer/verify-email",

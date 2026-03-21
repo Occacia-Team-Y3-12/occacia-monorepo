@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin as get_current_admin_user
 from app.models.admin import Admin
-from app.schemas.vendor_schema import (
+from app.schemas.organization_schema import (
     OrganizationResponse, OrganizationDetailResponse, OrganizationListResponse,
     OrganizationStatusUpdate,
     OrganizationFilter, OrganizationStatus
@@ -17,10 +17,12 @@ from app.services.organization_service import OrganizationService
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
+
 def get_vendor_service(db: Session = Depends(get_db)):
     return OrganizationService(db)
 
 # ==================== ORGANIZATION ENDPOINTS ====================
+
 
 @router.get("/organizations", response_model=OrganizationListResponse)
 async def list_organizations(
@@ -39,17 +41,18 @@ async def list_organizations(
         status=status,
         search=search
     )
-    
+
     organizations, total = vendor_service.get_organizations(
         skip=skip, limit=limit, filters=filters
     )
-    
+
     return OrganizationListResponse(
         items=[OrganizationResponse.model_validate(o) for o in organizations],
         total=total,
         page=skip // limit + 1,
         page_size=limit
     )
+
 
 @router.get("/organizations/{org_id}", response_model=OrganizationDetailResponse)
 async def get_organization(
@@ -69,6 +72,7 @@ async def get_organization(
         )
     return OrganizationDetailResponse.model_validate(org)
 
+
 @router.put("/organizations/{org_id}/status", response_model=OrganizationResponse)
 async def update_organization_status(
     org_id: int,
@@ -86,6 +90,7 @@ async def update_organization_status(
         reviewed_by=current_admin.id
     )
     return OrganizationResponse.model_validate(org)
+
 
 @router.delete("/organizations/{org_id}")
 async def delete_organization(

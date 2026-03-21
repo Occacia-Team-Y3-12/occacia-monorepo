@@ -17,7 +17,8 @@ class RecommendationPackage(Base):
     package_total_price = Column(Float, nullable=False)
     currency = Column(String, nullable=False)
     is_customized = Column(Boolean, default=False, nullable=False)
+    base_package_id = Column(String, nullable=True)
+    created_by_customer_id = Column(String, nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
     generated_at = Column(DateTime(timezone=True), default=now_utc, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False)
-

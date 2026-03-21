@@ -14,10 +14,22 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin, get_current_vendor
 from app.models.admin import Admin
+from app.models.task import Task
+from app.models.task_request import TaskRequest
 from app.models.vendor import Vendor
 from app.schemas.admin_schema import VendorAdminView
+from app.schemas.event_planning_schema import TaskResponse
+from app.schemas.package_schema import FulfillmentRequestResponse
 from app.schemas.package_schema import PackageCreate, PackageUpdate, PackageResponse
-from app.schemas.vendor_schema import VendorResponse, VendorUpdate
+from app.schemas.vendor_schema import (
+    PaginatedFulfillmentRequestsResponse,
+    PaginatedVendorTasksResponse,
+    RespondFulfillmentRequestRequest,
+    RespondFulfillmentRequestResponse,
+    VendorResponse,
+    VendorTaskUpdateRequest,
+    VendorUpdate,
+)
 from app.services.vendor_service import AdminVendorService, vendor_service
 
 logger = logging.getLogger(__name__)
@@ -41,6 +53,49 @@ def require_approved_vendor(vendor: Vendor = Depends(get_current_vendor)) -> Ven
 
 def get_vendor_service(db: Session = Depends(get_db)):
     return AdminVendorService(db)
+
+
+def _task_response(task: Task) -> TaskResponse:
+    return TaskResponse(
+        taskId=task.task_id,
+        eventId=task.event_id,
+        name=task.name,
+        description=task.description,
+        quantity=task.quantity,
+        needsVendor=bool(task.needs_vendor),
+        vendorCategory=task.needs_vendor,
+        budgetMin=task.budget_min,
+        budgetMax=task.budget_max,
+        currency=task.currency,
+        status=task.status,
+        selectedOfferingId=task.selected_offering_id,
+        assignedVendorId=task.assigned_vendor_id,
+        confirmedAt=task.confirmed_at,
+        lockedAt=task.locked_at,
+        dueAt=task.due_at,
+        expiresAt=task.expires_at,
+        rejectedAt=task.rejected_at,
+        rejectionReason=task.rejection_reason,
+        statusUpdatedAt=task.status_updated_at,
+        createdAt=task.created_at,
+        updatedAt=task.updated_at,
+    )
+
+
+def _fulfillment_request_response(request: TaskRequest) -> FulfillmentRequestResponse:
+    return FulfillmentRequestResponse(
+        fulfillmentRequestId=request.request_id,
+        packageOrderId=request.package_order_id,
+        taskId=request.task_id,
+        vendorId=request.vendor_id,
+        offeringId=request.offering_id,
+        status=request.status,
+        requestedAt=request.requested_at,
+        respondBy=request.respond_by,
+        respondedAt=request.responded_at,
+        responseNote=request.response_note,
+        attemptNo=request.attempt_no,
+    )
 
 
 @admin_router.get("/vendors", response_model=list[VendorAdminView])
@@ -115,6 +170,115 @@ def update_my_profile(
     """Update current vendor profile."""
     # Add by_alias=True to the model_dump call
     return vendor_service.update_profile(db, vendor, body.model_dump(exclude_unset=True, by_alias=True))
+
+
+@router.get("/fulfillment-requests", response_model=PaginatedFulfillmentRequestsResponse)
+def list_fulfillment_requests(
+    status: str | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None),
+    vendor: Vendor = Depends(require_approved_vendor),
+    db: Session = Depends(get_db),
+):
+    items, next_cursor = vendor_service.list_fulfillment_requests(
+        db,
+        vendor_id=vendor.vendor_id,
+        status_filter=status,
+        limit=limit,
+        cursor=cursor,
+    )
+    return PaginatedFulfillmentRequestsResponse(
+        items=[_fulfillment_request_response(item) for item in items],
+        nextCursor=next_cursor,
+    )
+
+
+@router.get("/fulfillment-requests/{fulfillment_request_id}", response_model=FulfillmentRequestResponse)
+def get_fulfillment_request_detail(
+    fulfillment_request_id: str,
+    vendor: Vendor = Depends(require_approved_vendor),
+    db: Session = Depends(get_db),
+):
+    request = vendor_service.get_fulfillment_request_detail(
+        db,
+        vendor_id=vendor.vendor_id,
+        fulfillment_request_id=fulfillment_request_id,
+    )
+    return _fulfillment_request_response(request)
+
+
+@router.post(
+    "/fulfillment-requests/{fulfillment_request_id}/response",
+    response_model=RespondFulfillmentRequestResponse,
+)
+def respond_to_fulfillment_request(
+    fulfillment_request_id: str,
+    body: RespondFulfillmentRequestRequest,
+    vendor: Vendor = Depends(require_approved_vendor),
+    db: Session = Depends(get_db),
+):
+    request, task = vendor_service.respond_to_fulfillment_request(
+        db,
+        vendor_id=vendor.vendor_id,
+        fulfillment_request_id=fulfillment_request_id,
+        decision=body.decision,
+        response_note=body.response_note,
+    )
+    return RespondFulfillmentRequestResponse(
+        fulfillmentRequest=_fulfillment_request_response(request),
+        task=_task_response(task),
+    )
+
+
+@router.get("/tasks", response_model=PaginatedVendorTasksResponse)
+def list_vendor_tasks(
+    status: str | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None),
+    vendor: Vendor = Depends(require_approved_vendor),
+    db: Session = Depends(get_db),
+):
+    items, next_cursor = vendor_service.list_vendor_tasks(
+        db,
+        vendor_id=vendor.vendor_id,
+        status_filter=status,
+        limit=limit,
+        cursor=cursor,
+    )
+    return PaginatedVendorTasksResponse(
+        items=[_task_response(item) for item in items],
+        nextCursor=next_cursor,
+    )
+
+
+@router.get("/tasks/{task_id}", response_model=TaskResponse)
+def get_vendor_task(
+    task_id: str,
+    vendor: Vendor = Depends(require_approved_vendor),
+    db: Session = Depends(get_db),
+):
+    task = vendor_service.get_vendor_task(
+        db,
+        vendor_id=vendor.vendor_id,
+        task_id=task_id,
+    )
+    return _task_response(task)
+
+
+@router.put("/tasks/{task_id}", response_model=TaskResponse)
+def update_vendor_task(
+    task_id: str,
+    body: VendorTaskUpdateRequest,
+    vendor: Vendor = Depends(require_approved_vendor),
+    db: Session = Depends(get_db),
+):
+    task = vendor_service.update_vendor_task_status(
+        db,
+        vendor_id=vendor.vendor_id,
+        task_id=task_id,
+        next_status=body.status,
+    )
+    return _task_response(task)
 
 
 # --- Packages Routes ---

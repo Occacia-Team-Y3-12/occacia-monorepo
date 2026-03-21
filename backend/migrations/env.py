@@ -39,6 +39,7 @@ from app.core.database import Base
 from app.models.customer import Customer 
 from app.models.vendor import Vendor
 from app.models.chat_model import ChatMessage
+from app.models.task_models import VendorTask, VendorTaskMessage
 
 # If you have a 'Plan' model, uncomment the line below:
 # from app.models.planning import Plan 

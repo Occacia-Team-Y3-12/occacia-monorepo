@@ -1,7 +1,11 @@
 from __future__ import annotations
+
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
 from pydantic import BaseModel, ConfigDict
+
+from app.schemas.event_planning_schema import TaskResponse
 
 
 class PackageCreate(BaseModel):
@@ -60,3 +64,46 @@ class PackageOrderResponse(BaseModel):
 class PaginatedPackageOrdersResponse(BaseModel):
     items: List[PackageOrderResponse]
     nextCursor: Optional[str] = None
+
+
+class FulfillmentRequestResponse(BaseModel):
+    fulfillmentRequestId: str
+    packageOrderId: str
+    taskId: str
+    vendorId: str
+    offeringId: str
+    status: str
+    requestedAt: datetime
+    respondBy: Optional[datetime] = None
+    respondedAt: Optional[datetime] = None
+    responseNote: Optional[str] = None
+    attemptNo: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PackageOrderDetailsResponse(BaseModel):
+    packageOrder: PackageOrderResponse
+    tasks: List[TaskResponse]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConfirmPackageOrderResponse(BaseModel):
+    packageOrder: PackageOrderResponse
+    tasks: List[TaskResponse]
+    fulfillmentRequests: List[FulfillmentRequestResponse]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReassignTaskRequest(BaseModel):
+    offeringId: str
+    note: Optional[str] = None
+
+
+class ReassignTaskResponse(BaseModel):
+    task: TaskResponse
+    fulfillmentRequest: FulfillmentRequestResponse
+
+    model_config = ConfigDict(from_attributes=True)

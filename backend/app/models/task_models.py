@@ -18,8 +18,8 @@ class TaskPriority(str, enum.Enum):
     MEDIUM = "medium"
     LOW = "low"
 
-class Task(Base):
-    __tablename__ = "tasks"
+class VendorTask(Base):
+    __tablename__ = "vendor_tasks"
     
     id = Column(Integer, primary_key=True, index=True)
     vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False, index=True)
@@ -49,22 +49,28 @@ class Task(Base):
     responded_at = Column(DateTime, nullable=True)  # When vendor accepted/rejected
     
     # Relationships
-    vendor = relationship("Vendor", back_populates="tasks")
-    customer = relationship("Customer", back_populates="tasks")
+    vendor = relationship("Vendor", back_populates="vendor_tasks")
+    customer = relationship("Customer", back_populates="vendor_tasks")
     event = relationship("Event", back_populates="tasks")
     offering = relationship("Offering", back_populates="tasks")
-    messages = relationship("TaskMessage", back_populates="task", cascade="all, delete-orphan")
+    messages = relationship("VendorTaskMessage", back_populates="task", cascade="all, delete-orphan")
     
     def __repr__(self):
-        return f"<Task(id={self.id}, title={self.title}, status={self.status})>"
+        return f"<VendorTask(id={self.id}, title={self.title}, status={self.status})>"
 
-class TaskMessage(Base):
-    __tablename__ = "task_messages"
+# Backward compatibility alias
+Task = VendorTask
+
+class VendorTaskMessage(Base):
+    __tablename__ = "vendor_task_messages"
     
     id = Column(Integer, primary_key=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    task_id = Column(Integer, ForeignKey("vendor_tasks.id"), nullable=False)
     sender_type = Column(String(20), nullable=False)  # 'vendor', 'customer', 'system'
     message = Column(Text, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     
-    task = relationship("Task", back_populates="messages")
+    task = relationship("VendorTask", back_populates="messages")
+
+# Backward compatibility alias
+TaskMessage = VendorTaskMessage

@@ -9,6 +9,7 @@ from app.models.customer import Customer
 from app.models.event import Event
 from app.models.event_chat_message import EventChatMessage
 from app.models.event_persona import EventPersona
+from app.models.notification import Notification
 from app.models.offering import Offering
 from app.models.organization import Organization
 from app.models.package import Package
@@ -18,6 +19,7 @@ from app.models.persona import Persona
 from app.models.recommendation_package import RecommendationPackage
 from app.models.support_note import SupportNote
 from app.models.task import Task
+from app.models.task_models import VendorTask, VendorTaskMessage
 from app.models.task_recommendation import TaskRecommendation
 from app.models.task_request import TaskRequest
 from app.models.user import User
@@ -29,6 +31,7 @@ __all__ = [
     "Event",
     "EventChatMessage",
     "EventPersona",
+    "Notification",
     "Offering",
     "Organization",
     "Package",
@@ -38,6 +41,8 @@ __all__ = [
     "RecommendationPackage",
     "SupportNote",
     "Task",
+    "VendorTask",
+    "VendorTaskMessage",
     "TaskRecommendation",
     "TaskRequest",
     "User",

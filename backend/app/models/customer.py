@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy.orm import relationship
 
 from app.common.utils import generate_prefixed_id
 from app.core.database import Base
@@ -22,7 +23,7 @@ class Customer(Base):
     password_hash = Column(String, nullable=False)
     address = Column(String, nullable=True)
     email_verified = Column(Boolean, default=False, nullable=False)
-    status = Column(String, default="PENDING_VERIFICATION", nullable=False)
+    status = Column(String, default="PENDING", nullable=False)
     verification_token = Column(String, nullable=True)
     verification_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     calendar_provider = Column(String, nullable=True)
@@ -36,3 +37,6 @@ class Customer(Base):
     calendar_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     calendar_token_scope = Column(String, nullable=True)
     calendar_token_type = Column(String, nullable=True)
+
+    # Relationships
+    vendor_tasks = relationship("VendorTask", back_populates="customer", cascade="all, delete-orphan")

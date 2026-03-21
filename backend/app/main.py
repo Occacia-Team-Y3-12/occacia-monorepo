@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import OperationalError
 
 from app.core.database import engine
+from app.core.config import settings
 from app.core.exceptions import add_exception_handlers
 from app.routers import api_router
 from app.scripts.seed import seed_data
@@ -22,9 +23,20 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    notification_task = None
+    if settings.NOTIFICATION_WORKER_ENABLED:
+        notification_task = asyncio.create_task(_run_notification_worker())
+        logger.info("Notification worker started.")
+
     if os.getenv("SKIP_DB_STARTUP") == "1":
         logger.info("SKIP_DB_STARTUP=1 set. Skipping DB startup checks and seeding.")
         yield
+        if notification_task:
+            notification_task.cancel()
+            try:
+                await notification_task
+            except asyncio.CancelledError:
+                pass
         return
 
     from app.models import registry  # noqa: F401
@@ -66,6 +78,12 @@ async def lifespan(_: FastAPI):
         await cleanup_task
     except asyncio.CancelledError:
         pass
+    if notification_task:
+        notification_task.cancel()
+        try:
+            await notification_task
+        except asyncio.CancelledError:
+            pass
 
 async def _run_cleanup_job():
     """Delete chat messages older than 30 days once every 24 hours."""
@@ -80,6 +98,28 @@ async def _run_cleanup_job():
             db.close()
         except Exception as e:
             logger.error("Cleanup job error: %s", e)
+
+
+async def _run_notification_worker():
+    from app.core.database import SessionLocal
+    from app.services.notification_service import notification_service
+
+    while True:
+        await asyncio.sleep(settings.NOTIFICATION_POLL_INTERVAL_SECONDS)
+        db = SessionLocal()
+        try:
+            notification_service.process_pending_notifications(
+                db,
+                batch_size=settings.NOTIFICATION_BATCH_SIZE,
+            )
+        except OperationalError as exc:
+            logger.debug("Notification worker skipped: %s", exc)
+            db.rollback()
+        except Exception as exc:
+            logger.error("Notification worker error: %s", exc)
+            db.rollback()
+        finally:
+            db.close()
 
 def create_app() -> FastAPI:
     application = FastAPI(
