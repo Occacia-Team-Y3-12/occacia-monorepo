@@ -48,10 +48,12 @@ from app.models.package_execution_request import PackageExecutionRequest
 from app.models.package_item import PackageItem
 from app.models.persona import Persona
 from app.models.recommendation_package import RecommendationPackage
+from app.models.support_note import SupportNote
 from app.models.task import Task
 from app.models.task_recommendation import TaskRecommendation
 from app.models.task_request import TaskRequest
 from app.models.vendor import Vendor
+from app.models.admin import Admin
 from app.services.google_calendar_service import google_calendar_service
 
 
@@ -74,6 +76,7 @@ def clean_tables():
             ChatMessage,
             EventChatMessage,
             Notification,
+            SupportNote,
             PackageExecutionRequest,
             TaskRequest,
             PackageItem,
@@ -87,6 +90,7 @@ def clean_tables():
             Package,
             Vendor,
             Customer,
+            Admin,
         ):
             try:
                 db.query(model).delete()
