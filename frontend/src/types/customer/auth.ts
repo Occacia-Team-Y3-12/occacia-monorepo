@@ -32,7 +32,10 @@ export interface LoginResponse {
   status: string;
   message?: string;
   token?: string;
+  accessToken?: string;
+  access_token?: string;
   refreshToken?: string;
+  refresh_token?: string;
   user?: {
     id: string;
     email: string;

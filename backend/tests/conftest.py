@@ -35,6 +35,7 @@ from app.core.database import Base, SessionLocal, engine
 from app.core.security import create_access_token, get_password_hash
 from app.main import app  # noqa: E402
 from app.models import registry  # noqa: F401
+from app.models.admin import Admin
 from app.models.chat_model import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.customer import Customer
@@ -48,6 +49,7 @@ from app.models.package_execution_request import PackageExecutionRequest
 from app.models.package_item import PackageItem
 from app.models.persona import Persona
 from app.models.recommendation_package import RecommendationPackage
+from app.models.support_note import SupportNote
 from app.models.task import Task
 from app.models.task_recommendation import TaskRecommendation
 from app.models.task_request import TaskRequest
@@ -72,6 +74,7 @@ def clean_tables():
             ChatMessage,
             EventChatMessage,
             Notification,
+            SupportNote,
             ChatSession,
             PackageExecutionRequest,
             TaskRequest,
@@ -86,6 +89,7 @@ def clean_tables():
             Package,
             Vendor,
             Customer,
+            Admin,
         ):
             try:
                 db.query(model).delete()
