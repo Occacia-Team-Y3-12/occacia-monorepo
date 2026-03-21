@@ -13,13 +13,30 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.core.database import Base, engine
-import app.models
+from app.models import registry  # noqa: F401
 
-print("Loading all database models...")
-# Dynamically import all models so SQLAlchemy registers them on Base.metadata
-for _, module_name, _ in pkgutil.iter_modules(app.models.__path__):
-    importlib.import_module(f"app.models.{module_name}")
+import sys
+from sqlalchemy import inspect
 
-print("Running auto-heal: executing CREATE TABLE IF NOT EXISTS for all models...")
-Base.metadata.create_all(engine)
-print("Auto-heal complete! All missing tables restored.")
+print("Checking database for missing ORM tables...")
+inspector = inspect(engine)
+existing_tables = set(inspector.get_table_names())
+expected_tables = set(Base.metadata.tables.keys())
+missing_tables = sorted(expected_tables - existing_tables)
+
+if missing_tables:
+    print(
+        "Missing tables detected: "
+        + ", ".join(missing_tables)
+        + ". Rebuilding missing schema objects using SQLAlchemy models..."
+    )
+    try:
+        Base.metadata.create_all(engine)
+        print("Auto-heal complete! Missing tables restored.")
+        sys.exit(2)
+    except Exception as e:
+        print(f"Error during create_all: {e}")
+        sys.exit(1)
+else:
+    print("Database schema appears intact. Skipping auto-heal.")
+    sys.exit(0)
