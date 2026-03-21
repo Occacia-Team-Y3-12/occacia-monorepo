@@ -54,6 +54,7 @@ async def _parse_login_payload(request: Request) -> LoginRequest | SimpleNamespa
 
 # --- Vendor Routes ---
 
+
 @router.post("/vendor/register", response_model=VendorResponse, status_code=201)
 def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(get_db)):
     if vendor_service.get_vendor_by_email(db, email=vendor_data.email):
@@ -67,14 +68,27 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
     auth_service.register_vendor_verification(db, vendor)
     return vendor
 
+
 @router.post("/vendor/login", tags=["Authentication"])
 async def login_vendor(request: Request, db: Session = Depends(get_db)):
     payload = await _parse_login_payload(request)
     return auth_service.login_vendor(db, payload)
 
+
 @router.get("/vendor/verify-email")
 def verify_vendor_email(token: str = Query(...), db: Session = Depends(get_db)):
     return auth_service.verify_vendor_email(db, token)
+
+
+
+@router.post("/vendor/password/forgot", response_model=AuthMessageResponse, tags=["Authentication"])
+def forgot_vendor_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    return auth_service.request_vendor_password_reset(db, request)
+
+
+@router.post("/vendor/password/reset", response_model=AuthMessageResponse, tags=["Authentication"])
+def reset_vendor_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    return auth_service.reset_vendor_password(db, request)
 
 
 # --- Customer Routes ---
@@ -99,9 +113,11 @@ async def login_customer(request: Request, db: Session = Depends(get_db)):
 def refresh_customer_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
     return auth_service.refresh_customer_token(db, payload)
 
+
 @router.get("/customer/verify-email")
 def verify_customer_email(token: str = Query(...), db: Session = Depends(get_db)):
     return auth_service.verify_customer_email(db, token)
+
 
 @router.post("/customer/email-verification/resend", response_model=AuthMessageResponse)
 def resend_customer_verification_email(
@@ -110,9 +126,11 @@ def resend_customer_verification_email(
 ):
     return auth_service.resend_customer_verification_email(db, payload)
 
+
 @router.post("/customer/password/forgot", response_model=AuthMessageResponse)
 def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
     return auth_service.request_password_reset(db, request)
+
 
 @router.post("/customer/password/reset", response_model=AuthMessageResponse)
 def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
