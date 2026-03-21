@@ -206,6 +206,8 @@ jobs:
               occacia-nginx \
               occacia-backup \
               occacia-radar || true
+            sudo docker builder prune -a -f
+            sudo docker system prune -f
             sudo docker compose build --no-cache backend frontend
             sudo docker compose up -d db redis backend
 
