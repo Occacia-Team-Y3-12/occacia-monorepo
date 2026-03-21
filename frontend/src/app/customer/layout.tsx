@@ -14,11 +14,12 @@ function CustomerLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isAuthPage = pathname?.startsWith('/customer/auth');
 
-  useEffect(() => {
-    if (!isAuthPage && !customerAuthService.isAuthenticated()) {
-      router.replace('/customer/auth/login');
-    }
-  }, [isAuthPage, router]);
+  // Authentication temporarily disabled for development
+  // useEffect(() => {
+  //   if (!isAuthPage && !customerAuthService.isAuthenticated()) {
+  //     router.replace('/customer/auth/login');
+  //   }
+  // }, [isAuthPage, router]);
 
   if (isAuthPage) return <div className="customer-portal-font">{children}</div>;
 
