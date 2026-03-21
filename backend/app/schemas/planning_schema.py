@@ -3,7 +3,7 @@ app/schemas/planning_schema.py
 """
 from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 
 class PlanRequest(BaseModel):
@@ -17,8 +17,8 @@ class VenueDisplay(BaseModel):
         extra="ignore",
         populate_by_name=True,
     )
-    # str instead of int so AI-generated IDs like "AI-VENUE-1" work too
-    id: Optional[str] = None
+    # Union[int, str] so DB integer IDs and AI-generated string IDs (AI-VENUE-1) both work
+    id: Optional[Union[int, str]] = None
     name: str
     description: Optional[str] = None
     price_per_head: Optional[float] = Field(default=None, alias="pricePerHead")
@@ -42,8 +42,8 @@ class GiftDisplay(BaseModel):
         extra="ignore",
         populate_by_name=True,
     )
-    # str instead of int so AI-generated IDs like "AI-GIFT-1" work too
-    id: Optional[str] = None
+    # Union[int, str] so DB integer IDs and AI-generated string IDs (AI-GIFT-1) both work
+    id: Optional[Union[int, str]] = None
     name: str
     description: Optional[str] = None
     price_per_head: Optional[float] = Field(default=None, alias="pricePerHead")
