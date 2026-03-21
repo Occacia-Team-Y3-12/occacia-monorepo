@@ -26,6 +26,20 @@ src/app/
 3. **Clear Separation**: Auth pages vs protected pages
 4. **Scalable**: Easy to add more vendor features under `/vendors/`
 
+## Vendor Activities Module
+
+The vendor task management flow is available at:
+
+- `/vendor/activities` - Main activities dashboard with tabs and filters
+- `/vendor/activities/[id]` - Intended task detail route for a selected activity
+
+The activities page uses React Query for loading grouped task lists:
+
+- `pending_response`
+- `assigned`
+- `completed`
+- `rejected_expired`
+
 ## 📋 Changes Made
 
 ### Created Files
