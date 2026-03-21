@@ -74,19 +74,19 @@ export default function RegisterPage() {
 
   // Registration Form Screen
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/images/customer/background.jpeg')" }}>
-      <div className="w-full max-w-4xl bg-white/95 backdrop-blur rounded-xl shadow-xl flex overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-4xl bg-white/95 backdrop-blur rounded-xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         
         {/* Left Section - Form */}
-        <div className="flex-1 p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <img src="/images/customer/logo.png" alt="Occacia" className="h-12 w-auto" />
-            <span className="text-2xl font-bold" style={{ color: '#1562CC' }}>OCCACIA</span>
+        <div className="flex-1 p-6 sm:p-8">
+          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+            <img src="/images/customer/logo.png" alt="Occacia" className="h-10 sm:h-12 w-auto" />
+            <span className="text-xl sm:text-2xl font-bold" style={{ color: '#1562CC' }}>Occacia</span>
           </div>
 
-          <div className="mb-6">
-            <h1 className="text-2xl font-semibold text-gray-900 mb-1">Create an account</h1>
-            <p className="text-gray-500 text-sm">Let's create magic together.</p>
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-1">Create an account</h1>
+            <p className="text-gray-500 text-xs sm:text-sm">Let's create magic together.</p>
           </div>
 
           <RegisterForm onSubmit={onSubmit} isLoading={isLoading} />
@@ -95,7 +95,7 @@ export default function RegisterPage() {
             <SocialLoginButtons />
           </div>
 
-          <p className="text-sm text-center text-gray-500 mt-4">
+          <p className="text-xs sm:text-sm text-center text-gray-500 mt-4">
             Already have an account?{' '}
             <Link href="/customer/auth/login" className="text-blue-600 cursor-pointer hover:underline">
               Login
