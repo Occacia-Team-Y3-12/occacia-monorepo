@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <defs>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EC4899;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="180" height="180" rx="40" fill="url(#grad2)"/>
+  
+  <!-- Letter O -->
+  <circle cx="90" cy="90" r="50" fill="none" stroke="white" stroke-width="12"/>
+  
+  <!-- Celebration elements -->
+  <path d="M90 25 L94 38 L90 51 L86 38 Z" fill="white" opacity="0.9"/>
+  <path d="M129 51 L116 55 L103 51 L116 47 Z" fill="white" opacity="0.9"/>
+  <path d="M155 90 L142 94 L155 98 L142 86 Z" fill="white" opacity="0.8"/>
+  <path d="M51 129 L55 116 L59 129 L47 116 Z" fill="white" opacity="0.8"/>
+</svg>
