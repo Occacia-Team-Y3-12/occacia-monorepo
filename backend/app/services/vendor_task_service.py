@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
 from app.repositories.task_repository import TaskRepository
-from app.models.task_models import Task, TaskStatus
+from app.models.task_models import Task, TaskPriority, TaskStatus
 from app.schemas.vendor_task_schema import (
     TaskListResponse, 
     TaskListItem, 
@@ -28,7 +28,7 @@ class VendorTaskService:
     
     def _is_urgent(self, task: Task) -> bool:
         """Determine if task needs urgent attention"""
-        if task.priority == TaskStatus.PENDING_RESPONSE:
+        if task.priority == TaskPriority.HIGH:
             return True
         if task.due_date and (task.due_date - datetime.utcnow()).days <= 1:
             return True
