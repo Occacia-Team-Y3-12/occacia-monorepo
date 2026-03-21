@@ -7,6 +7,7 @@ import {
   isVendorFinalValid,
   validateVendorField,
 } from '@/lib/validation';
+import { featureFlags } from '@/config/featureFlags';
 import { vendorAuthService } from '@/services/vendor/authService';
 
 type VendorStep = 'account' | 'organization';
@@ -140,7 +141,15 @@ export const useVendorRegister = () => {
       });
 
       if (ok && data.status === 'pending_verification') {
-        const mockToken = data.data?.token || `mock_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+        const mockToken = featureFlags.useVendorAuthMock
+          ? data.data?.token || `mock_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+          : data.data?.token;
+
+        if (!mockToken) {
+          router.push(ROUTES.VENDOR.PENDING_APPROVAL);
+          return;
+        }
+
         router.push(`${ROUTES.VENDOR.VERIFY_EMAIL}?token=${mockToken}`);
       } else {
         setSubmitError(data.message || 'Registration failed. Please try again.');

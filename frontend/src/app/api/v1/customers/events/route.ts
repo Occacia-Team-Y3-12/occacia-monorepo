@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { proxyApiRequest, shouldUseCustomerPlanningMockApi } from '@/app/api/v1/_proxy';
 import { CreateCustomerEventPayload, CreateCustomerEventResponse } from '@/types/customer';
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 export async function POST(request: NextRequest): Promise<NextResponse<CreateCustomerEventResponse>> {
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, '/customers/events') as Promise<NextResponse<CreateCustomerEventResponse>>;
+  }
+
   try {
     const body = (await request.json()) as CreateCustomerEventPayload;
 

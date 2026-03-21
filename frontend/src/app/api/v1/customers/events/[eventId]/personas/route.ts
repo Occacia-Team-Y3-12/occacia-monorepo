@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { proxyApiRequest, shouldUseCustomerPlanningMockApi } from '@/app/api/v1/_proxy';
 import { UpdateEventPersonasPayload, UpdateEventPersonasResponse } from '@/types/customer';
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
@@ -12,6 +13,10 @@ export async function PUT(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<UpdateEventPersonasResponse>> {
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${params.eventId}/personas`) as Promise<NextResponse<UpdateEventPersonasResponse>>;
+  }
+
   try {
     const { eventId } = params;
 
