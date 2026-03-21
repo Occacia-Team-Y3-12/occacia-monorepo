@@ -16,7 +16,7 @@ from app.models.admin import Admin
 from app.models.vendor import Vendor
 from app.schemas.admin_schema import (
     AdminRegister, AdminResponse, NotificationResponse, PaginatedNotificationsResponse,
-    VendorAdminView, VendorRejectRequest
+    VendorAdminView, VendorRejectRequest, CustomerAdminView, PaginatedCustomers, CustomerStatusUpdateRequest
 )
 from app.services.admin_service import admin_service 
 from app.services.notification_service import notification_service
@@ -137,4 +137,42 @@ def list_notifications(
     return PaginatedNotificationsResponse(
         items=[NotificationResponse.model_validate(item) for item in items],
         next_cursor=next_cursor,
+    )
+
+@router.get("/customers", response_model=PaginatedCustomers)
+def list_customers(
+    status: str | None = None,
+    limit: int = 20,
+    cursor: str | None = None,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    """List customers for admin management."""
+    _ = current_admin
+    customers, next_cursor = admin_service.list_customers(db, status=status, limit=limit, cursor=cursor)
+    return PaginatedCustomers(
+        items=[CustomerAdminView.model_validate(c) for c in customers],
+        nextCursor=next_cursor,
+    )
+
+@router.get("/customers/{customer_id}", response_model=CustomerAdminView)
+def get_customer_detail(
+    customer_id: str,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    """Get customer detail for admin management."""
+    _ = current_admin
+    return admin_service.get_customer(db, customer_id=customer_id)
+
+@router.put("/customers/{customer_id}/status", response_model=CustomerAdminView)
+def update_customer_status(
+    customer_id: str,
+    body: CustomerStatusUpdateRequest,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    """Update customer account status."""
+    return admin_service.update_customer_status(
+        db, customer_id=customer_id, new_status=body.status, admin_email=current_admin.email
     )

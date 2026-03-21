@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.security import get_password_hash, verify_password, SECRET_KEY, ALGORITHM
 from app.models.admin import Admin
 from app.models.vendor import Vendor
+from app.models.customer import Customer
 
 logger = logging.getLogger(__name__)
 
@@ -111,5 +112,42 @@ class AdminService:
         
         logger.info("Admin %s rejected vendor %s", admin_email, vendor.vendor_id)
         return vendor
+
+    def list_customers(self, db: Session, status: Optional[str] = None, limit: int = 20, cursor: Optional[str] = None) -> tuple[list[Customer], Optional[str]]:
+        query = db.query(Customer)
+        if status:
+            query = query.filter(Customer.status == status.upper())
+        
+        if cursor:
+            cursor_customer = db.query(Customer).filter(Customer.customer_id == cursor).first()
+            if cursor_customer:
+                query = query.filter(Customer.id < cursor_customer.id)
+        
+        customers = query.order_by(Customer.id.desc()).limit(limit + 1).all()
+        
+        next_cursor = None
+        if len(customers) > limit:
+            next_cursor = customers[limit - 1].customer_id
+            customers = customers[:limit]
+        
+        return customers, next_cursor
+
+    def get_customer(self, db: Session, customer_id: str) -> Customer:
+        customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Customer not found.")
+        return customer
+
+    def update_customer_status(self, db: Session, customer_id: str, new_status: str, admin_email: str) -> Customer:
+        if not new_status or new_status.upper() not in ("ACTIVE", "SUSPENDED", "DISABLED", "PENDING"):
+            raise HTTPException(status_code=400, detail="status must be ACTIVE, SUSPENDED, DISABLED, or PENDING")
+        
+        customer = self.get_customer(db, customer_id)
+        customer.status = new_status.upper()
+        
+        db.commit()
+        db.refresh(customer)
+        logger.info("Admin %s set customer %s status to %s", admin_email, customer_id, new_status)
+        return customer
 
 admin_service = AdminService()

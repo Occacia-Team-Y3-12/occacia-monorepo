@@ -70,3 +70,22 @@ class NotificationResponse(BaseModel):
 class PaginatedNotificationsResponse(BaseModel):
     items: list[NotificationResponse]
     next_cursor: str | None = None
+
+
+class CustomerAdminView(BaseModel):
+    customer_id: str
+    email: str
+    full_name: str
+    phone: Optional[str] = None
+    locale: Optional[str] = None
+    status: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedCustomers(BaseModel):
+    items: list[CustomerAdminView]
+    nextCursor: Optional[str] = None
+
+
+class CustomerStatusUpdateRequest(BaseModel):
+    status: str = Field(..., pattern="^(ACTIVE|SUSPENDED|DISABLED|PENDING)$")
