@@ -99,8 +99,6 @@ class TestStructuredPersonaContext:
     """_build_structured_persona_context() must produce a prompt that maps
     preference fields to concrete package tags."""
 
-    from app.services.ai_service import _build_structured_persona_context  # type: ignore
-
     # Import inside each method to avoid module-level failures when app not installed
     def _fn(self):
         from app.services.ai_service import _build_structured_persona_context

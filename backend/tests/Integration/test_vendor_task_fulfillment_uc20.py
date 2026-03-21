@@ -53,15 +53,20 @@ def _create_vendor_offering(
     description: str,
     price: float,
 ) -> tuple[Vendor, Offering]:
-    vendor = Vendor(
-        business_name=display_name,
-        display_name=display_name,
-        email=f"{display_name.lower().replace(' ', '-')}-{int(price)}@uc20.test",
-        approval_status="APPROVED",
-        is_verified=True,
-    )
-    db.add(vendor)
-    db.flush()
+    email = f"{display_name.lower().replace(' ', '-')}-{int(price)}@uc20.test"
+
+    # get-or-create: avoids UNIQUE constraint on vendors.email across test runs
+    vendor = db.query(Vendor).filter(Vendor.email == email).first()
+    if not vendor:
+        vendor = Vendor(
+            business_name=display_name,
+            display_name=display_name,
+            email=email,
+            approval_status="APPROVED",
+            is_verified=True,
+        )
+        db.add(vendor)
+        db.flush()
 
     offering = Offering(
         vendor_id=vendor.vendor_id,
@@ -235,7 +240,9 @@ def test_vendor_reject_request_marks_task_rejected(auth_client):
         headers=_vendor_headers(flowers_vendor["email"]),
     )
     assert rejected_list_response.status_code == 200, rejected_list_response.text
-    assert [item["taskId"] for item in rejected_list_response.json()["items"]] == [reject_body["task"]["taskId"]]
+    assert [item["taskId"] for item in rejected_list_response.json()["items"]] == [
+        reject_body["task"]["taskId"]
+    ]
 
 
 def test_vendor_expired_request_is_materialized_on_read_and_cannot_be_accepted(auth_client):
