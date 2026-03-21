@@ -5,6 +5,9 @@ set -euo pipefail
 # This tells Linux exactly where to find alembic and uvicorn without needing Poetry.
 export PATH="/app/.venv/bin:$PATH"
 
+echo "Auto-healing missing database tables (if any)..."
+python auto_heal.py
+
 echo "Running Database Migrations..."
 alembic upgrade heads
 
