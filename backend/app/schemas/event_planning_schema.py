@@ -48,7 +48,7 @@ class SuggestedTaskDraftResponse(BaseModel):
 
 
 class VenueDisplay(BaseModel):
-    """Vendor package/offering matched by the AI planning engine."""
+    """Vendor package matched by the AI planning engine."""
     id: int | None = None
     name: str
     description: str | None = None
@@ -63,6 +63,29 @@ class VenueDisplay(BaseModel):
     vendor_location: str | None = Field(default=None, alias="vendorLocation")
     vendor_email: str | None = Field(default=None, alias="vendorEmail")
     is_verified: bool = Field(default=False, alias="isVerified")
+    # Set when this is a fallback match — explains what differs from the request
+    tweak_note: str | None = Field(default=None, alias="tweakNote")
+
+    model_config = {"populate_by_name": True, "from_attributes": True, "extra": "ignore"}
+
+
+class GiftDisplay(BaseModel):
+    """
+    One of the 3 gift recommendations shown alongside venue packages.
+    estimated_price is calculated from (total_budget * 0.25) split across guests.
+    """
+    id: int | None = None
+    name: str
+    description: str | None = None
+    price_per_head: float | None = Field(default=None, alias="pricePerHead")
+    # Total estimated gift cost = gift_budget_per_head * guest_count
+    estimated_price: float | None = Field(default=None, alias="estimatedPrice")
+    tags: list[str] = Field(default_factory=list)
+    location: str | None = None
+    vendor_name: str | None = Field(default=None, alias="vendorName")
+    match_score_label: str | None = Field(default=None, alias="matchScoreLabel")
+    # Set when this is a fallback match
+    tweak_note: str | None = Field(default=None, alias="tweakNote")
 
     model_config = {"populate_by_name": True, "from_attributes": True, "extra": "ignore"}
 
@@ -79,8 +102,8 @@ class ChatSendResponse(BaseModel):
     Extended fields  (additive — not in OpenAPI spec)
     -------------------------------------------------
     These carry the AI planning engine's full output so the frontend
-    can update persona state, show vendor matches, and track missing
-    planning info without a second request.
+    can update persona state, show vendor matches, track missing planning
+    info, and handle bookings without a second request.
     Clients that only consume reply + suggestedTasks are unaffected.
     """
 
@@ -102,14 +125,24 @@ class ChatSendResponse(BaseModel):
     guest_count: int | None = Field(default=None, alias="guestCount")
     venue_tags: list[str] = Field(default_factory=list, alias="venueTags")
     missing_info: list[str] = Field(default_factory=list, alias="missingInfo")
+
+    # 3 venue package recommendations
     matched_venues: list[VenueDisplay] = Field(default_factory=list, alias="matchedVenues")
+    # 3 gift recommendations (priced from 25% of total budget)
+    matched_gifts: list[GiftDisplay] = Field(default_factory=list, alias="matchedGifts")
+    # Legacy generated packages (kept for backward compat)
     matched_packages: List[Dict[str, Any]] = Field(default_factory=list, alias="matchedPackages")
+
     venue_match_tier: int | None = Field(default=None, alias="venueMatchTier")
 
     # ── Persona flow flags ────────────────────────────────────────────────────
     ask_save_persona: bool = Field(default=False, alias="askSavePersona")
     persona_saved: bool = Field(default=False, alias="personaSaved")
     persona_confirmed: bool = Field(default=False, alias="personaConfirmed")
+
+    # ── Booking — set when user selects a package and booking is created ──────
+    booking_created: bool = Field(default=False, alias="bookingCreated")
+    booking_id: str | None = Field(default=None, alias="bookingId")
 
     model_config = {"populate_by_name": True}
 

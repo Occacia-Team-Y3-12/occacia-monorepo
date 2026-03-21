@@ -51,15 +51,20 @@ def _create_vendor_offering(
     description: str,
     price: float,
 ) -> Offering:
-    vendor = Vendor(
-        business_name=display_name,
-        display_name=display_name,
-        email=f"{display_name.lower().replace(' ', '-')}-{price}@test.com",
-        approval_status="APPROVED",
-        is_verified=True,
-    )
-    db.add(vendor)
-    db.flush()
+    email = f"{display_name.lower().replace(' ', '-')}-{price}@test.com"
+
+    # get-or-create: avoids UNIQUE constraint on vendors.email across test runs
+    vendor = db.query(Vendor).filter(Vendor.email == email).first()
+    if not vendor:
+        vendor = Vendor(
+            business_name=display_name,
+            display_name=display_name,
+            email=email,
+            approval_status="APPROVED",
+            is_verified=True,
+        )
+        db.add(vendor)
+        db.flush()
 
     offering = Offering(
         vendor_id=vendor.vendor_id,
@@ -129,7 +134,10 @@ def test_confirm_package_creates_order_updates_tasks_and_creates_fulfillment_req
     assert all(task["selectedOfferingId"] for task in body["tasks"])
     assert all(task["assignedVendorId"] for task in body["tasks"])
     assert all(task["lockedAt"] is not None for task in body["tasks"])
-    assert all(request["packageOrderId"] == body["packageOrder"]["packageOrderId"] for request in body["fulfillmentRequests"])
+    assert all(
+        request["packageOrderId"] == body["packageOrder"]["packageOrderId"]
+        for request in body["fulfillmentRequests"]
+    )
     assert all(request["status"] == "SENT" for request in body["fulfillmentRequests"])
 
     db = SessionLocal()
@@ -289,26 +297,22 @@ def test_customer_package_order_list_and_detail_only_return_customer_orders(clie
         db.add(other_order)
         db.flush()
 
-        db.add(
-            TaskRequest(
-                package_order_id=own_order.execution_request_id,
-                task_id=own_task.task_id,
-                vendor_id="VEN-001",
-                offering_id="OFF-001",
-                status="SENT",
-                attempt_no=1,
-            )
-        )
-        db.add(
-            TaskRequest(
-                package_order_id=other_order.execution_request_id,
-                task_id=other_task.task_id,
-                vendor_id="VEN-002",
-                offering_id="OFF-002",
-                status="SENT",
-                attempt_no=1,
-            )
-        )
+        db.add(TaskRequest(
+            package_order_id=own_order.execution_request_id,
+            task_id=own_task.task_id,
+            vendor_id="VEN-001",
+            offering_id="OFF-001",
+            status="SENT",
+            attempt_no=1,
+        ))
+        db.add(TaskRequest(
+            package_order_id=other_order.execution_request_id,
+            task_id=other_task.task_id,
+            vendor_id="VEN-002",
+            offering_id="OFF-002",
+            status="SENT",
+            attempt_no=1,
+        ))
         db.commit()
         own_package_order_id = own_order.execution_request_id
         other_package_order_id = other_order.execution_request_id
@@ -317,7 +321,6 @@ def test_customer_package_order_list_and_detail_only_return_customer_orders(clie
         db.close()
 
     list_response = client.get("/api/v1/customers/package-orders", headers=auth_header)
-
     assert list_response.status_code == 200, list_response.text
     list_body = list_response.json()
     assert len(list_body["items"]) == 1

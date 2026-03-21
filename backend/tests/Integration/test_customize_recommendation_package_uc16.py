@@ -44,15 +44,20 @@ def _create_vendor_offering(
     description: str,
     price: float,
 ) -> Offering:
-    vendor = Vendor(
-        business_name=display_name,
-        display_name=display_name,
-        email=f"{display_name.lower().replace(' ', '-')}-{price}@test.com",
-        approval_status="APPROVED",
-        is_verified=True,
-    )
-    db.add(vendor)
-    db.flush()
+    email = f"{display_name.lower().replace(' ', '-')}-{price}@test.com"
+
+    # get-or-create: avoids UNIQUE constraint on vendors.email across test runs
+    vendor = db.query(Vendor).filter(Vendor.email == email).first()
+    if not vendor:
+        vendor = Vendor(
+            business_name=display_name,
+            display_name=display_name,
+            email=email,
+            approval_status="APPROVED",
+            is_verified=True,
+        )
+        db.add(vendor)
+        db.flush()
 
     offering = Offering(
         vendor_id=vendor.vendor_id,
@@ -131,12 +136,7 @@ def test_create_custom_package_replaces_vendor_and_removes_task(auth_client):
         f"/api/v1/customers/events/{event_id}/packages",
         json={
             "basePackageId": package_id,
-            "items": [
-                {
-                    "taskId": cake_task_id,
-                    "offeringId": replacement_cake_id,
-                }
-            ],
+            "items": [{"taskId": cake_task_id, "offeringId": replacement_cake_id}],
         },
     )
 
@@ -176,9 +176,7 @@ def test_update_custom_package_recalculates_total(auth_client):
         f"/api/v1/customers/events/{event_id}/packages",
         json={
             "basePackageId": package_id,
-            "items": [
-                {"taskId": cake_task_id, "offeringId": cake_shortlist[0]["offeringId"]},
-            ],
+            "items": [{"taskId": cake_task_id, "offeringId": cake_shortlist[0]["offeringId"]}],
         },
     )
     custom_package_id = create_response.json()["packageId"]
@@ -210,20 +208,14 @@ def test_invalid_customization_keeps_package_unchanged(auth_client):
         f"/api/v1/customers/events/{event_id}/packages",
         json={
             "basePackageId": package_id,
-            "items": [
-                {"taskId": cake_task_id, "offeringId": cake_shortlist[0]["offeringId"]},
-            ],
+            "items": [{"taskId": cake_task_id, "offeringId": cake_shortlist[0]["offeringId"]}],
         },
     )
     custom_package_id = create_response.json()["packageId"]
 
     invalid_response = auth_client.put(
         f"/api/v1/customers/events/{event_id}/packages/{custom_package_id}",
-        json={
-            "items": [
-                {"taskId": cake_task_id, "offeringId": "OFF-NOT-IN-SHORTLIST"},
-            ],
-        },
+        json={"items": [{"taskId": cake_task_id, "offeringId": "OFF-NOT-IN-SHORTLIST"}]},
     )
 
     assert invalid_response.status_code == 400, invalid_response.text
@@ -244,15 +236,12 @@ def test_delete_custom_package(auth_client):
         f"/api/v1/customers/events/{event_id}/packages",
         json={
             "basePackageId": package_id,
-            "items": [
-                {"taskId": cake_task_id, "offeringId": cake_shortlist[0]["offeringId"]},
-            ],
+            "items": [{"taskId": cake_task_id, "offeringId": cake_shortlist[0]["offeringId"]}],
         },
     )
     custom_package_id = create_response.json()["packageId"]
 
     delete_response = auth_client.delete(f"/api/v1/customers/events/{event_id}/packages/{custom_package_id}")
-
     assert delete_response.status_code == 204, delete_response.text
 
     get_response = auth_client.get(f"/api/v1/customers/events/{event_id}/packages/{custom_package_id}")
