@@ -36,14 +36,14 @@ export default function VendorLoginForm() {
             <p className="text-base font-medium tracking-[0.2em] text-[#666666] md:text-lg">
               VENDOR PORTAL
             </p>
-            <span className="mt-6 rounded-full border border-[#CCCCCC] bg-[#FFFFFF] px-4 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#34A853]">
+            <span className="mt-6 rounded-full border border-[#CCCCCC] bg-[#FFFFFF] px-4 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#4285F4]">
               Secure Access
             </span>
           </div>
 
           <div className="w-full md:w-3/5 p-6 md:p-12 flex flex-col justify-center">
             <h2 className="mb-2 text-center text-2xl font-semibold text-[#0D47A1] md:text-3xl">
-              VENDOR SIGN IN
+              SIGN IN
             </h2>
             <p className="mb-6 text-center text-sm text-[#666666] md:mb-8">
               Welcome back. Sign in to manage your vendor workspace.
@@ -95,7 +95,7 @@ export default function VendorLoginForm() {
                 Don&apos;t have an account?{" "}
                 <Link
                   href={ROUTES.VENDOR.REGISTER}
-                  className="font-medium text-[#34A853] hover:text-[#0D47A1] hover:underline"
+                  className="font-medium text-[#4285F4] hover:text-[#0D47A1] hover:underline"
                 >
                   Register
                 </Link>

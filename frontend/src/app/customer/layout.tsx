@@ -10,17 +10,29 @@ import { customerAuthService } from '@/services/customer/authServices';
 function CustomerLayoutInner({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const isAuthPage = pathname?.startsWith('/customer/auth');
 
   useEffect(() => {
-    if (!isAuthPage && !customerAuthService.isAuthenticated()) {
+    if (isAuthPage) {
+      setAuthChecked(true);
+      return;
+    }
+
+    const hasToken = customerAuthService.isAuthenticated();
+    setIsAuthenticated(hasToken);
+    setAuthChecked(true);
+
+    if (!hasToken) {
       router.replace('/customer/auth/login');
     }
-  }, [isAuthPage, router]);
+  }, [isAuthPage, pathname, router]);
 
   if (isAuthPage) return <div className="customer-portal-font">{children}</div>;
+  if (!authChecked || !isAuthenticated) return null;
 
   return (
     <div className="customer-portal-font min-h-screen overflow-x-hidden bg-[#F7F7FA]">

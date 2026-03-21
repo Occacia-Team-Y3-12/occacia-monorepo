@@ -51,7 +51,7 @@ export default function VendorRegisterForm() {
             <p className="text-base font-medium tracking-[0.2em] text-[#666666] md:text-lg">
               VENDOR PORTAL
             </p>
-            <span className="mt-6 rounded-full border border-[#CCCCCC] bg-[#FFFFFF] px-4 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#34A853]">
+            <span className="mt-6 rounded-full border border-[#CCCCCC] bg-[#FFFFFF] px-4 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#4285F4]">
               Build Your Storefront
             </span>
           </div>
@@ -373,7 +373,7 @@ export default function VendorRegisterForm() {
                   <button
                     type="submit"
                     disabled={!isFinalValid || submitting}
-                    className="w-full rounded-xl bg-[#34A853] px-8 py-3 font-medium text-[#FFFFFF] shadow-[0_10px_20px_-12px_rgba(52,168,83,0.85)] transition-all duration-200 hover:bg-[#0D47A1] hover:shadow-[0_16px_30px_-14px_rgba(13,71,161,0.7)] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                    className="w-full rounded-xl bg-[#0D47A1] px-8 py-3 font-medium text-[#FFFFFF] shadow-[0_10px_20px_-12px_rgba(13,71,161,0.85)] transition-all duration-200 hover:bg-[#4285F4] hover:shadow-[0_16px_30px_-14px_rgba(66,133,244,0.7)] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                   >
                     {submitting ? "Creating..." : "Create vendor account"}
                   </button>
