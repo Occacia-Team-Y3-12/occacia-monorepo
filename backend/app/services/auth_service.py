@@ -15,8 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import (
-    ALGORITHM, 
-    SECRET_KEY, 
+    ALGORITHM,
+    SECRET_KEY,
     get_password_hash,
     verify_password,
     create_access_token,
@@ -24,7 +24,7 @@ from app.core.security import (
     decode_token
 )
 from app.models.customer import Customer
-from app.models.vendor import Vendor
+from app.models.vendor import Vendor, VendorStatus
 from app.schemas.auth_schema import (
     AuthResponse,
     CustomerRegister,
@@ -99,6 +99,21 @@ def _build_password_reset_email(email: str, token: str) -> tuple[str, str]:
     return subject, body
 
 
+def _build_vendor_password_reset_email(email: str, token: str) -> tuple[str, str]:
+    """Builds the subject and body for a vendor password reset email."""
+    link = f"https://app.occacia.com/vendor-reset-password?token={token}"
+    subject = "Reset your Occacia Vendor Password"
+    body = (
+        f"Hello,\n\n"
+        f"A password reset was requested for your Occacia vendor account associated with this email.\n"
+        f"Please click the link below to set a new password. This link will expire in {PASSWORD_RESET_TTL_MINUTES} minutes.\n\n"
+        f"{link}\n\n"
+        f"If you did not request this, please ignore this email.\n\n"
+        f"Thanks,\nThe Occacia Team"
+    )
+    return subject, body
+
+
 # --- AuthService ---
 
 class AuthService:
@@ -106,9 +121,11 @@ class AuthService:
     # --- Customer Registration & Login ---
 
     def register_customer(self, db: Session, payload: CustomerRegister) -> dict[str, str]:
-        existing = db.query(Customer).filter(Customer.email == str(payload.email)).first()
+        existing = db.query(Customer).filter(
+            Customer.email == str(payload.email)).first()
         if existing:
-            raise HTTPException(status_code=400, detail="This email is already registered.")
+            raise HTTPException(
+                status_code=400, detail="This email is already registered.")
 
         verification_token, expires_at = self._create_verification_token_internal(
             str(payload.email),
@@ -141,33 +158,36 @@ class AuthService:
 
     def login_customer(self, db: Session, payload: LoginRequest | OAuth2PasswordRequestForm) -> dict:
         # 🚨 DEVSECOPS FIX: Dynamically grab email whether from JSON (.email) or Swagger Form (.username)
-        email = getattr(payload, "email", None) or getattr(payload, "username", None)
+        email = getattr(payload, "email", None) or getattr(
+            payload, "username", None)
         password = payload.password
 
         customer = customer_service.get_customer_by_email(db, email=str(email))
-        
+
         if not customer or not customer.password_hash or not verify_password(password, customer.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-            
+
         if os.getenv("SKIP_EMAIL_VERIFICATION") != "true" and not customer.email_verified:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified.")
-            
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified.")
+
         if customer.status != "ACTIVE":
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Customer account is not active.")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Customer account is not active.")
 
         access_token = create_access_token(
-            data={"sub": customer.email, "role": "CUSTOMER"}, 
+            data={"sub": customer.email, "role": "CUSTOMER"},
             expires_delta=timedelta(minutes=60)
         )
         refresh_token = create_refresh_token(
-            data={"sub": customer.email, "role": "CUSTOMER"}, 
+            data={"sub": customer.email, "role": "CUSTOMER"},
             expires_delta=timedelta(days=7)
         )
-        
+
         # 🚨 DEVSECOPS FIX: Return a "Dual-Compatibility" Dictionary
         return {
             "access_token": access_token,      # Required for Swagger UI Padlock
@@ -183,7 +203,8 @@ class AuthService:
         }
 
     def refresh_customer_token(self, db: Session, payload: RefreshTokenRequest) -> dict:
-        exc = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token.")
+        exc = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid or expired refresh token.")
         try:
             claims = decode_token(payload.refresh_token)
         except PyJWTError:
@@ -199,19 +220,19 @@ class AuthService:
         customer = customer_service.get_customer_by_email(db, email=email)
         if not customer or customer.status != "ACTIVE":
             raise exc
-            
+
         if os.getenv("SKIP_EMAIL_VERIFICATION") != "true" and not customer.email_verified:
             raise exc
 
         access_token = create_access_token(
-            data={"sub": customer.email, "role": "CUSTOMER"}, 
+            data={"sub": customer.email, "role": "CUSTOMER"},
             expires_delta=timedelta(minutes=60)
         )
         refresh_token = create_refresh_token(
-            data={"sub": customer.email, "role": "CUSTOMER"}, 
+            data={"sub": customer.email, "role": "CUSTOMER"},
             expires_delta=timedelta(days=7)
         )
-        
+
         return {
             "access_token": access_token,
             "token_type": "bearer",
@@ -226,18 +247,21 @@ class AuthService:
         }
 
     def verify_customer_email(self, db: Session, token: str) -> dict[str, str]:
-        claims = self._decode_verification_token(token, expected_type="verify_customer_email")
+        claims = self._decode_verification_token(
+            token, expected_type="verify_customer_email")
         email = claims.get("sub")
 
         customer = db.query(Customer).filter(Customer.email == email).first()
         if not customer:
-            raise HTTPException(status_code=400, detail="Invalid verification token.")
+            raise HTTPException(
+                status_code=400, detail="Invalid verification token.")
 
         if customer.email_verified:
             return {"message": "Email already verified"}
 
         if customer.verification_token != token:
-            raise HTTPException(status_code=400, detail="Invalid verification token.")
+            raise HTTPException(
+                status_code=400, detail="Invalid verification token.")
 
         customer.email_verified = True
         customer.status = "ACTIVE"
@@ -253,12 +277,15 @@ class AuthService:
         db: Session,
         payload: ResendVerificationRequest,
     ) -> dict[str, str]:
-        customer = db.query(Customer).filter(Customer.email == str(payload.email)).first()
+        customer = db.query(Customer).filter(
+            Customer.email == str(payload.email)).first()
         if not customer:
-            raise HTTPException(status_code=400, detail="Customer account not found.")
+            raise HTTPException(
+                status_code=400, detail="Customer account not found.")
 
         if customer.email_verified or customer.status == "ACTIVE":
-            raise HTTPException(status_code=400, detail="Email already verified.")
+            raise HTTPException(
+                status_code=400, detail="Email already verified.")
 
         if customer.status not in {"PENDING", "PENDING_VERIFICATION"}:
             raise HTTPException(
@@ -300,28 +327,33 @@ class AuthService:
 
     def login_vendor(self, db: Session, payload: LoginRequest | OAuth2PasswordRequestForm) -> dict:
         # 🚨 DEVSECOPS FIX: Dynamically grab email whether from JSON (.email) or Swagger Form (.username)
-        email = getattr(payload, "email", None) or getattr(payload, "username", None)
+        email = getattr(payload, "email", None) or getattr(
+            payload, "username", None)
         password = payload.password
-        
+
         vendor = vendor_service.get_vendor_by_email(db, email=str(email))
-        
+
         if not vendor:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password", headers={"WWW-Authenticate": "Bearer"})
-            
-        vendor_password = getattr(vendor, 'password_hash', None) or getattr(vendor, 'hashed_password', None)
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                detail="Incorrect email or password", headers={"WWW-Authenticate": "Bearer"})
+
+        vendor_password = getattr(vendor, 'password_hash', None) or getattr(
+            vendor, 'hashed_password', None)
         if not vendor_password or not verify_password(password, vendor_password):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password", headers={"WWW-Authenticate": "Bearer"})
-            
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                detail="Incorrect email or password", headers={"WWW-Authenticate": "Bearer"})
+
         if os.getenv("SKIP_EMAIL_VERIFICATION") != "true":
             if not getattr(vendor, 'email_verified', True) and not getattr(vendor, 'is_verified', True):
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified.")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified.")
 
         access_token = create_access_token(
-            data={"sub": vendor.email, "role": "VENDOR"}, 
+            data={"sub": vendor.email, "role": "VENDOR"},
             expires_delta=timedelta(minutes=60)
         )
         refresh_token = create_refresh_token(
-            data={"sub": vendor.email, "role": "VENDOR"}, 
+            data={"sub": vendor.email, "role": "VENDOR"},
             expires_delta=timedelta(days=7)
         )
 
@@ -340,12 +372,14 @@ class AuthService:
         }
 
     def verify_vendor_email(self, db: Session, token: str) -> dict[str, str]:
-        claims = self._decode_verification_token(token, expected_type="verify_vendor_email")
+        claims = self._decode_verification_token(
+            token, expected_type="verify_vendor_email")
         email = claims.get("sub")
 
         vendor = db.query(Vendor).filter(Vendor.email == email).first()
         if not vendor:
-            raise HTTPException(status_code=400, detail="Invalid verification token.")
+            raise HTTPException(
+                status_code=400, detail="Invalid verification token.")
 
         if vendor.is_verified:
             return {"message": "Email already verified"}
@@ -358,10 +392,12 @@ class AuthService:
     # --- Password Reset ---
 
     def request_password_reset(self, db: Session, payload: ForgotPasswordRequest) -> dict[str, str]:
-        customer = db.query(Customer).filter(Customer.email == str(payload.email)).first()
+        customer = db.query(Customer).filter(
+            Customer.email == str(payload.email)).first()
 
         if not customer:
-            logger.info("Reset requested for non-existent email: %s", payload.email)
+            logger.info(
+                "Reset requested for non-existent email: %s", payload.email)
             return {"message": "If this email is registered, a reset link has been sent."}
 
         token, _ = self._create_verification_token_internal(
@@ -379,7 +415,8 @@ class AuthService:
         return {"message": "If this email is registered, a reset link has been sent."}
 
     def confirm_password_reset(self, db: Session, payload: ResetPasswordRequest) -> dict[str, str]:
-        claims = self._decode_verification_token(payload.token, expected_type="password_reset")
+        claims = self._decode_verification_token(
+            payload.token, expected_type="password_reset")
         email = claims.get("sub")
 
         customer = db.query(Customer).filter(Customer.email == email).first()
@@ -393,13 +430,70 @@ class AuthService:
         logger.info("Password successfully reset for: %s", email)
         return {"message": "Password updated successfully"}
 
+    # --- Vendor Password Reset ---
+
+    def request_vendor_password_reset(self, db: Session, payload: ForgotPasswordRequest) -> dict[str, str]:
+        vendor = vendor_service.get_vendor_by_email(
+            db, email=str(payload.email))
+
+        if not vendor:
+            logger.info(
+                "Password reset requested for non-existent vendor email: %s", payload.email)
+            # ret a generic message to avoid leaking information about registered emails.
+            return {"message": "If this email is registered, a password reset link has been sent."}
+
+        # stop password resets for non-active accounts
+        if vendor.status not in [VendorStatus.ACTIVE, VendorStatus.PENDING_ADMIN]:
+            logger.warning(
+                "Password reset attempted for vendor with status: %s", vendor.status)
+            return {"message": "Password reset is not allowed for this account's status."}
+
+        token, _ = self._create_verification_token_internal(
+            str(payload.email),
+            token_type="vendor_password_reset",
+            minutes=PASSWORD_RESET_TTL_MINUTES,
+        )
+
+        #  func needs to be created to build the vendor-specif email.
+        subject, body = _build_vendor_password_reset_email(
+            str(payload.email), token)
+
+        # you should have an email sending service to send this email.
+        # foor now, i'il log it.
+        logger.info("Password reset email sent to %s", payload.email)
+        logger.debug("Reset token for %s: %s",
+                     payload.email, token)  # For testing
+
+        return {"message": "If this email is registered, a password reset link has been sent."}
+
+    def reset_vendor_password(self, db: Session, request: ResetPasswordRequest) -> dict[str, str]:
+        claims = self._decode_verification_token(
+            request.token, expected_type="vendor_password_reset")
+        email = claims.get("sub")
+
+        vendor = vendor_service.get_vendor_by_email(db, email)
+        if not vendor:
+            raise HTTPException(
+                status_code=400, detail="Invalid password reset token.")
+
+        hashed_password = hash_password(request.new_password)
+        vendor.hashed_password = hashed_password
+        db.add(vendor)
+        db.commit()
+
+        # Here you would invalidate the token if it's stored, but since it's a stateless JWT,
+        # its expiration is handled by the 'exp' claim.
+
+        return {"message": "Password has been reset successfully."}
+
     # --- Internal Token Helpers ---
 
     @staticmethod
     def _create_verification_token_internal(
         email: str, token_type: str, hours: int = 0, minutes: int = 0
     ) -> tuple[str, datetime]:
-        expires_at = datetime.now(UTC) + timedelta(hours=hours, minutes=minutes)
+        expires_at = datetime.now(
+            UTC) + timedelta(hours=hours, minutes=minutes)
         payload = {"sub": email, "type": token_type, "exp": expires_at}
         token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
         return token, expires_at
@@ -418,7 +512,8 @@ class AuthService:
             ) from exc
 
         if claims.get("type") != expected_type:
-            raise HTTPException(status_code=400, detail="Invalid verification token.")
+            raise HTTPException(
+                status_code=400, detail="Invalid verification token.")
         return claims
 
 
