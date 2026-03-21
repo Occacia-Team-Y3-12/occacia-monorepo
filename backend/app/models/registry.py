@@ -47,4 +47,6 @@ __all__ = [
     "TaskRequest",
     "User",
     "Vendor",
+    "VendorTask",
+    "VendorTaskMessage",
 ]
