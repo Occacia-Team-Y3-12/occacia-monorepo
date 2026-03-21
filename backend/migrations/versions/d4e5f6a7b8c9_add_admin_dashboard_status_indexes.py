@@ -8,6 +8,7 @@ Create Date: 2026-03-21 08:15:00.000000
 from collections.abc import Sequence
 
 from alembic import op
+import sqlalchemy as sa
 
 revision: str = "d4e5f6a7b8c9"
 down_revision: str | Sequence[str] | None = "f3c1b7a9d2e4"
@@ -15,20 +16,35 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+def _index_exists(table_name: str, index_name: str) -> bool:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    return any(index["name"] == index_name for index in inspector.get_indexes(table_name))
+
+
+def _create_index_if_missing(index_name: str, table_name: str, columns: list[str]) -> None:
+    if not _index_exists(table_name, index_name):
+        op.create_index(index_name, table_name, columns, unique=False)
+
+
+def _drop_index_if_exists(index_name: str, table_name: str) -> None:
+    if _index_exists(table_name, index_name):
+        op.drop_index(index_name, table_name=table_name)
+
+
 def upgrade() -> None:
-    op.create_index("ix_users_status", "users", ["status"], unique=False)
-    op.create_index("ix_vendors_approval_status", "vendors", ["approval_status"], unique=False)
-    op.create_index("ix_events_status", "events", ["status"], unique=False)
-    op.create_index(
+    _create_index_if_missing("ix_users_status", "users", ["status"])
+    _create_index_if_missing("ix_vendors_approval_status", "vendors", ["approval_status"])
+    _create_index_if_missing("ix_events_status", "events", ["status"])
+    _create_index_if_missing(
         "ix_package_execution_requests_status",
         "package_execution_requests",
         ["status"],
-        unique=False,
     )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_package_execution_requests_status", table_name="package_execution_requests")
-    op.drop_index("ix_events_status", table_name="events")
-    op.drop_index("ix_vendors_approval_status", table_name="vendors")
-    op.drop_index("ix_users_status", table_name="users")
+    _drop_index_if_exists("ix_package_execution_requests_status", "package_execution_requests")
+    _drop_index_if_exists("ix_events_status", "events")
+    _drop_index_if_exists("ix_vendors_approval_status", "vendors")
+    _drop_index_if_exists("ix_users_status", "users")
