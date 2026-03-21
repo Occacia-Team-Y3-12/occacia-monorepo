@@ -59,6 +59,14 @@ const Component: FC<Props> = () => {
 
 - const Toast: React.FC<ToastProps> = ({
 + const Toast: FC<ToastProps> = ({
+
+  useEffect(() => {
+    if (isVisible && duration > 0) {
+      const timer = setTimeout(onClose, duration);
+      return () => clearTimeout(timer);
+    }
++   return undefined; // Fix: All code paths must return a value
+  }, [isVisible, duration, onClose]);
 ```
 
 ## 🎯 Why This Works
