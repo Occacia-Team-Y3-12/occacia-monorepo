@@ -5,16 +5,15 @@ Revises: b13e35cade5d
 Create Date: 2026-03-15 16:20:00.000000
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision: str = "6d7a1c9f3b42"
-down_revision: Union[str, None] = "b13e35cade5d"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "b13e35cade5d"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -74,8 +73,15 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_event_chat_messages_id"), "event_chat_messages", ["id"], unique=False)
-    op.create_index(op.f("ix_event_chat_messages_message_id"), "event_chat_messages", ["message_id"], unique=True)
-    op.create_index(op.f("ix_event_chat_messages_event_id"), "event_chat_messages", ["event_id"], unique=False)
+    op.create_index(
+        op.f("ix_event_chat_messages_message_id"),
+        "event_chat_messages",
+        ["message_id"],
+        unique=True,
+    )
+    op.create_index(
+        op.f("ix_event_chat_messages_event_id"), "event_chat_messages", ["event_id"], unique=False
+    )
 
     op.create_table(
         "offerings",
@@ -141,9 +147,21 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_recommendation_packages_id"), "recommendation_packages", ["id"], unique=False)
-    op.create_index(op.f("ix_recommendation_packages_package_id"), "recommendation_packages", ["package_id"], unique=True)
-    op.create_index(op.f("ix_recommendation_packages_event_id"), "recommendation_packages", ["event_id"], unique=False)
+    op.create_index(
+        op.f("ix_recommendation_packages_id"), "recommendation_packages", ["id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_recommendation_packages_package_id"),
+        "recommendation_packages",
+        ["package_id"],
+        unique=True,
+    )
+    op.create_index(
+        op.f("ix_recommendation_packages_event_id"),
+        "recommendation_packages",
+        ["event_id"],
+        unique=False,
+    )
 
     op.create_table(
         "task_recommendations",
@@ -157,11 +175,27 @@ def upgrade() -> None:
         sa.Column("generated_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_task_recommendations_id"), "task_recommendations", ["id"], unique=False)
-    op.create_index(op.f("ix_task_recommendations_recommendation_id"), "task_recommendations", ["recommendation_id"], unique=True)
-    op.create_index(op.f("ix_task_recommendations_event_id"), "task_recommendations", ["event_id"], unique=False)
-    op.create_index(op.f("ix_task_recommendations_task_id"), "task_recommendations", ["task_id"], unique=False)
-    op.create_index(op.f("ix_task_recommendations_offering_id"), "task_recommendations", ["offering_id"], unique=False)
+    op.create_index(
+        op.f("ix_task_recommendations_id"), "task_recommendations", ["id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_task_recommendations_recommendation_id"),
+        "task_recommendations",
+        ["recommendation_id"],
+        unique=True,
+    )
+    op.create_index(
+        op.f("ix_task_recommendations_event_id"), "task_recommendations", ["event_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_task_recommendations_task_id"), "task_recommendations", ["task_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_task_recommendations_offering_id"),
+        "task_recommendations",
+        ["offering_id"],
+        unique=False,
+    )
 
     op.create_table(
         "package_items",
@@ -179,8 +213,12 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_package_items_id"), "package_items", ["id"], unique=False)
-    op.create_index(op.f("ix_package_items_package_item_id"), "package_items", ["package_item_id"], unique=True)
-    op.create_index(op.f("ix_package_items_package_id"), "package_items", ["package_id"], unique=False)
+    op.create_index(
+        op.f("ix_package_items_package_item_id"), "package_items", ["package_item_id"], unique=True
+    )
+    op.create_index(
+        op.f("ix_package_items_package_id"), "package_items", ["package_id"], unique=False
+    )
 
     op.create_table(
         "package_execution_requests",
@@ -197,11 +235,33 @@ def upgrade() -> None:
         sa.Column("status_updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_package_execution_requests_id"), "package_execution_requests", ["id"], unique=False)
-    op.create_index(op.f("ix_package_execution_requests_execution_request_id"), "package_execution_requests", ["execution_request_id"], unique=True)
-    op.create_index(op.f("ix_package_execution_requests_event_id"), "package_execution_requests", ["event_id"], unique=False)
-    op.create_index(op.f("ix_package_execution_requests_package_id"), "package_execution_requests", ["package_id"], unique=False)
-    op.create_index(op.f("ix_package_execution_requests_idempotency_key"), "package_execution_requests", ["idempotency_key"], unique=True)
+    op.create_index(
+        op.f("ix_package_execution_requests_id"), "package_execution_requests", ["id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_package_execution_requests_execution_request_id"),
+        "package_execution_requests",
+        ["execution_request_id"],
+        unique=True,
+    )
+    op.create_index(
+        op.f("ix_package_execution_requests_event_id"),
+        "package_execution_requests",
+        ["event_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_package_execution_requests_package_id"),
+        "package_execution_requests",
+        ["package_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_package_execution_requests_idempotency_key"),
+        "package_execution_requests",
+        ["idempotency_key"],
+        unique=True,
+    )
 
     op.create_table(
         "task_requests",
@@ -221,10 +281,16 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_task_requests_id"), "task_requests", ["id"], unique=False)
-    op.create_index(op.f("ix_task_requests_request_id"), "task_requests", ["request_id"], unique=True)
+    op.create_index(
+        op.f("ix_task_requests_request_id"), "task_requests", ["request_id"], unique=True
+    )
     op.create_index(op.f("ix_task_requests_task_id"), "task_requests", ["task_id"], unique=False)
-    op.create_index(op.f("ix_task_requests_vendor_id"), "task_requests", ["vendor_id"], unique=False)
-    op.create_index(op.f("ix_task_requests_offering_id"), "task_requests", ["offering_id"], unique=False)
+    op.create_index(
+        op.f("ix_task_requests_vendor_id"), "task_requests", ["vendor_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_task_requests_offering_id"), "task_requests", ["offering_id"], unique=False
+    )
 
 
 def downgrade() -> None:
@@ -235,10 +301,20 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_task_requests_id"), table_name="task_requests")
     op.drop_table("task_requests")
 
-    op.drop_index(op.f("ix_package_execution_requests_idempotency_key"), table_name="package_execution_requests")
-    op.drop_index(op.f("ix_package_execution_requests_package_id"), table_name="package_execution_requests")
-    op.drop_index(op.f("ix_package_execution_requests_event_id"), table_name="package_execution_requests")
-    op.drop_index(op.f("ix_package_execution_requests_execution_request_id"), table_name="package_execution_requests")
+    op.drop_index(
+        op.f("ix_package_execution_requests_idempotency_key"),
+        table_name="package_execution_requests",
+    )
+    op.drop_index(
+        op.f("ix_package_execution_requests_package_id"), table_name="package_execution_requests"
+    )
+    op.drop_index(
+        op.f("ix_package_execution_requests_event_id"), table_name="package_execution_requests"
+    )
+    op.drop_index(
+        op.f("ix_package_execution_requests_execution_request_id"),
+        table_name="package_execution_requests",
+    )
     op.drop_index(op.f("ix_package_execution_requests_id"), table_name="package_execution_requests")
     op.drop_table("package_execution_requests")
 
@@ -250,12 +326,16 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_task_recommendations_offering_id"), table_name="task_recommendations")
     op.drop_index(op.f("ix_task_recommendations_task_id"), table_name="task_recommendations")
     op.drop_index(op.f("ix_task_recommendations_event_id"), table_name="task_recommendations")
-    op.drop_index(op.f("ix_task_recommendations_recommendation_id"), table_name="task_recommendations")
+    op.drop_index(
+        op.f("ix_task_recommendations_recommendation_id"), table_name="task_recommendations"
+    )
     op.drop_index(op.f("ix_task_recommendations_id"), table_name="task_recommendations")
     op.drop_table("task_recommendations")
 
     op.drop_index(op.f("ix_recommendation_packages_event_id"), table_name="recommendation_packages")
-    op.drop_index(op.f("ix_recommendation_packages_package_id"), table_name="recommendation_packages")
+    op.drop_index(
+        op.f("ix_recommendation_packages_package_id"), table_name="recommendation_packages"
+    )
     op.drop_index(op.f("ix_recommendation_packages_id"), table_name="recommendation_packages")
     op.drop_table("recommendation_packages")
 

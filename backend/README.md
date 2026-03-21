@@ -121,14 +121,28 @@ poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Open Windows PowerShell after Python 3.11 is installed, then continue here.
 
-1. Create the virtual environment.
+1. Install Poetry globally.
+
+```powershell
+(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
+```
+
+Add Poetry to your PATH (replace `C:\Users\yourusername` with your actual username):
+
+```powershell
+[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\Users\yourusername\AppData\Roaming\Python\Scripts", "User")
+```
+
+Restart PowerShell or run `$env:Path += ";C:\Users\yourusername\AppData\Roaming\Python\Scripts"` in the current session.
+
+2. Create the virtual environment.
 
 ```powershell
 cd backend
 py -3.11 -m venv .venv
 ```
 
-2. Activate it.
+3. Activate it.
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -154,25 +168,23 @@ No activation:
 
 ```powershell
 .\.venv\Scripts\python -m pip install --upgrade pip
-.\.venv\Scripts\python -m pip install poetry
-.\.venv\Scripts\poetry sync --no-root
-```
-
-3. If activation worked, install dependencies.
-
-```powershell
-python -m pip install --upgrade pip
-pip install poetry
 poetry sync --no-root
 ```
 
-4. Create the local env file.
+4. If activation worked, install dependencies.
+
+```powershell
+python -m pip install --upgrade pip
+poetry sync --no-root
+```
+
+5. Create the local env file.
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-5. Update `backend/.env` with at least:
+6. Update `backend/.env` with at least:
 
 - `SECRET_KEY`
 - `DB_PASSWORD`
@@ -183,13 +195,13 @@ Generate a secret if needed:
 python -c "import secrets; print(secrets.token_urlsafe(64))"
 ```
 
-6. Start Postgres.
+7. Start Postgres.
 
 ```powershell
 docker compose -f docker-compose-local.yml up -d
 ```
 
-7. Run migrations.
+8. Run migrations.
 
 Activated venv:
 
@@ -200,10 +212,10 @@ poetry run alembic upgrade head
 No activation:
 
 ```powershell
-.\.venv\Scripts\poetry run alembic upgrade head
+poetry run alembic upgrade head
 ```
 
-8. Start the API.
+9. Start the API.
 
 Activated venv:
 
@@ -214,7 +226,7 @@ poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 No activation:
 
 ```powershell
-.\.venv\Scripts\poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Configuration

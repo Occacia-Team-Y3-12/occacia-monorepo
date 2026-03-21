@@ -154,6 +154,7 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           LANGFLOW_URL: ${{ secrets.LANGFLOW_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           LANGFLOW_ORG_ID: ${{ secrets.LANGFLOW_ORG_ID }}
           LANGFLOW_TOKEN: ${{ secrets.LANGFLOW_TOKEN }}
           DB_USER: ${{ secrets.DB_USER }}

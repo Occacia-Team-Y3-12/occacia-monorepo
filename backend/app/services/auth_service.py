@@ -7,7 +7,6 @@ import logging
 import os
 from datetime import UTC, datetime, timedelta
 
-import httpx
 import jwt
 from fastapi import HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -32,9 +31,11 @@ from app.schemas.auth_schema import (
     ForgotPasswordRequest,
     LoginRequest,
     RefreshTokenRequest,
+    ResendVerificationRequest,
     ResetPasswordRequest
 )
 from app.services.customer_service import customer_service
+from app.services.notification_service import notification_service
 from app.services.vendor_service import vendor_service
 
 logger = logging.getLogger(__name__)
@@ -43,42 +44,20 @@ EMAIL_VERIFICATION_TTL_HOURS = 24
 PASSWORD_RESET_TTL_MINUTES = 15
 
 
-# --- Email Utility (Resend) ---
+# --- Email Utility (legacy direct-send wrapper used by a few existing flows) ---
 
 def _send_email(to: str, subject: str, text_body: str) -> bool:
-    api_key = os.environ.get("SENDGRID_API_KEY", "")
-    from_email = os.environ.get("FROM_EMAIL", "onboarding@resend.dev")
-
-    if not api_key:
-        logger.warning("No API key set - email not sent. Set SENDGRID_API_KEY in .env")
-        logger.info("DEV MOCK | To: %s | Subject: %s", to, subject)
-        return False
-
-    try:
-        response = httpx.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "from": f"Occacia <{from_email}>",
-                "to": [to],
-                "subject": subject,
-                "text": text_body,
-            },
-            timeout=10,
-        )
-        response.raise_for_status()
-        logger.info("Email sent to %s via Resend | Status: %s", to, response.status_code)
-        return True
-    except Exception as e:
-        logger.error("Failed to send email to %s: %s", to, str(e))
-        return False
+    result = notification_service._send_email(
+        to=to,
+        subject=subject,
+        text_body=text_body,
+        html_body=None,
+    )
+    return result.success
 
 
 def _build_customer_verification_email(email: str, token: str) -> tuple[str, str]:
-    link = f"https://app.occacia.com/verify?token={token}"
+    link = f"https://app.occacia.com/customers/register/verify-email?token={token}"
     subject = "Verify your Occacia account"
     body = (
         "Welcome to Occacia!\n\n"
@@ -142,20 +121,23 @@ class AuthService:
             email=str(payload.email),
             password_hash=get_password_hash(payload.password),
             phone=payload.phone,
-            address=payload.address,
             locale=getattr(payload, "locale", None),
             email_verified=False,
-            status="PENDING_VERIFICATION",
+            status="PENDING",
             verification_token=verification_token,
             verification_token_expires_at=expires_at,
         )
         db.add(customer)
         db.commit()
 
-        subject, body = _build_customer_verification_email(str(payload.email), verification_token)
-        _send_email(str(payload.email), subject, body)
+        db.refresh(customer)
+        notification_service.queue_customer_verification(
+            db,
+            customer=customer,
+            verification_token=verification_token,
+        )
 
-        return {"message": "Verification email sent", "email": str(payload.email)}
+        return {"message": "Registration successful. Please verify your email."}
 
     def login_customer(self, db: Session, payload: LoginRequest | OAuth2PasswordRequestForm) -> dict:
         # 🚨 DEVSECOPS FIX: Dynamically grab email whether from JSON (.email) or Swagger Form (.username)
@@ -266,16 +248,55 @@ class AuthService:
 
         return {"message": "Email verified successfully"}
 
+    def resend_customer_verification_email(
+        self,
+        db: Session,
+        payload: ResendVerificationRequest,
+    ) -> dict[str, str]:
+        customer = db.query(Customer).filter(Customer.email == str(payload.email)).first()
+        if not customer:
+            raise HTTPException(status_code=400, detail="Customer account not found.")
+
+        if customer.email_verified or customer.status == "ACTIVE":
+            raise HTTPException(status_code=400, detail="Email already verified.")
+
+        if customer.status not in {"PENDING", "PENDING_VERIFICATION"}:
+            raise HTTPException(
+                status_code=400,
+                detail="Customer account is not pending email verification.",
+            )
+
+        verification_token, expires_at = self._create_verification_token_internal(
+            str(payload.email),
+            token_type="verify_customer_email",
+            hours=EMAIL_VERIFICATION_TTL_HOURS,
+        )
+        customer.verification_token = verification_token
+        customer.verification_token_expires_at = expires_at
+        db.add(customer)
+        db.commit()
+
+        db.refresh(customer)
+        notification_service.queue_customer_verification(
+            db,
+            customer=customer,
+            verification_token=verification_token,
+        )
+        return {"message": "Verification email resent successfully."}
+
     # --- Vendor Registration & Login ---
 
-    def register_vendor_verification(self, email: str) -> None:
+    def register_vendor_verification(self, db: Session, vendor: Vendor) -> None:
         verification_token, _ = self._create_verification_token_internal(
-            email,
+            vendor.email,
             token_type="verify_vendor_email",
             hours=EMAIL_VERIFICATION_TTL_HOURS,
         )
-        subject, body = _build_vendor_verification_email(email, verification_token)
-        _send_email(email, subject, body)
+        notification_service.queue_vendor_verification(
+            db,
+            vendor=vendor,
+            verification_token=verification_token,
+        )
 
     def login_vendor(self, db: Session, payload: LoginRequest | OAuth2PasswordRequestForm) -> dict:
         # 🚨 DEVSECOPS FIX: Dynamically grab email whether from JSON (.email) or Swagger Form (.username)
@@ -349,8 +370,11 @@ class AuthService:
             minutes=PASSWORD_RESET_TTL_MINUTES,
         )
 
-        subject, body = _build_password_reset_email(str(payload.email), token)
-        _send_email(str(payload.email), subject, body)
+        notification_service.queue_password_reset(
+            db,
+            customer=customer,
+            token=token,
+        )
 
         return {"message": "If this email is registered, a reset link has been sent."}
 

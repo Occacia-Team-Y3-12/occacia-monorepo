@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict, List
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -103,6 +103,7 @@ class ChatSendResponse(BaseModel):
     venue_tags: list[str] = Field(default_factory=list, alias="venueTags")
     missing_info: list[str] = Field(default_factory=list, alias="missingInfo")
     matched_venues: list[VenueDisplay] = Field(default_factory=list, alias="matchedVenues")
+    matched_packages: List[Dict[str, Any]] = Field(default_factory=list, alias="matchedPackages")
     venue_match_tier: int | None = Field(default=None, alias="venueMatchTier")
 
     # ── Persona flow flags ────────────────────────────────────────────────────

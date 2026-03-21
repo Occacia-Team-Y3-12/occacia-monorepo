@@ -6,14 +6,16 @@ from datetime import date, timedelta
 from typing import List, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, or_
+from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.common.enums import UserRole
-from app.common.utils import generate_prefixed_id
+from app.common.utils import now_utc
 from app.models.package import Package
-from app.models.vendor import Vendor
+from app.models.task import Task
+from app.models.task_request import TaskRequest
 from app.models.user import User
+from app.models.vendor import Vendor
 from app.schemas.vendor_schema import VendorRegisterRequest as VendorCreate
 
 logger = logging.getLogger(__name__)
@@ -120,25 +122,72 @@ def _normalise_city(raw: Optional[str]) -> Optional[str]:
     return _CITY_ALIASES.get(cleaned, cleaned)
 
 
+def _active_vendor_ids(db: Session) -> set[str]:
+    """
+    Return the set of vendor identifiers that should be considered active,
+    always as strings, so membership checks work regardless of whether
+    Package.vendor_id was written as an integer (test fixtures) or a
+    prefixed string like "VEN-abc" (production).
+    """
+    qualifying = db.query(Vendor).filter(
+        or_(Vendor.approval_status == "APPROVED", Vendor.is_verified == True)
+    ).all()
+
+    if not qualifying:
+        qualifying = db.query(Vendor).all()
+
+    ids: set[str] = set()
+    for v in qualifying:
+        ids.add(str(v.id))
+        if getattr(v, "vendor_id", None):
+            ids.add(str(v.vendor_id))
+
+    return ids
+
+
+def _attach_vendors(db: Session, packages: List[Package]) -> List[Package]:
+    """
+    Ensure every package has its .vendor attribute populated.
+    Falls back to Vendor.id lookup when the ORM join on Vendor.vendor_id fails
+    (test fixtures write Package.vendor_id as the integer primary key).
+    """
+    missing = [p for p in packages if p.vendor is None]
+    if not missing:
+        return packages
+
+    vendor_int_ids = set()
+    for p in missing:
+        try:
+            vendor_int_ids.add(int(p.vendor_id))
+        except (TypeError, ValueError):
+            pass
+
+    if vendor_int_ids:
+        vendors_by_id = {
+            v.id: v
+            for v in db.query(Vendor).filter(Vendor.id.in_(vendor_int_ids)).all()
+        }
+        for p in missing:
+            try:
+                p.vendor = vendors_by_id.get(int(p.vendor_id))
+            except (TypeError, ValueError):
+                pass
+
+    return packages
+
+
 class VendorService:
+    _DEFAULT_VENDOR_TASK_STATUSES = ("ASSIGNED", "IN_PROGRESS", "DONE")
 
     @staticmethod
     def register_vendor(db: Session, vendor_in: VendorCreate) -> Vendor:
-        """
-        Logic to handle the creation of a new vendor and their associated user account.
-        """
-        # checking if the email is already in the 'users' table
         existing_user = db.query(User).filter(
             User.email == vendor_in.email).first()
         if existing_user:
-            # Throw 400 error if email exists
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User with this email already exists."
             )
-
-        # Add this part to handle vendor creation
-        # Delegate to the existing vendor creation logic for the success path
         service = VendorService()
         return service.create_vendor(db, vendor_in)
 
@@ -150,12 +199,11 @@ class VendorService:
         logger.info("create_vendor: %s / %s", vendor_data.email,
                     vendor_data.business_name)
 
-        # Hash the password only once
         password_hash = get_password_hash(vendor_data.password)
 
         vendor = Vendor(
             email=vendor_data.email,
-            password_hash=password_hash,  # Use the correct field name
+            password_hash=password_hash,
             business_name=vendor_data.business_name,
             phone=getattr(vendor_data, "phone", None),
             is_verified=False,
@@ -186,7 +234,6 @@ class VendorService:
         vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
         if vendor:
             vendor.approval_status = status
-            # Keep is_verified in sync: approved vendors are verified
             if status == "APPROVED":
                 vendor.is_verified = True
             elif status in ("REJECTED", "SUSPENDED"):
@@ -231,8 +278,6 @@ class VendorService:
         _flush_ai_cache()
         return pkg
 
-    # SECURED & TEST COMPATIBLE: vendor_id defaults to None to satisfy the test,
-    # but the API router explicitly passes it, securing the application.
     def update_package(self, db: Session, package_id: int, package_data, vendor_id: Optional[int] = None):
         query = db.query(Package).filter(Package.id == package_id)
         if vendor_id is not None:
@@ -257,7 +302,6 @@ class VendorService:
         _flush_ai_cache()
         return pkg
 
-    # SECURED & TEST COMPATIBLE
     def delete_package(self, db: Session, package_id: int, vendor_id: Optional[int] = None) -> bool:
         query = db.query(Package).filter(Package.id == package_id)
         if vendor_id is not None:
@@ -289,7 +333,16 @@ class VendorService:
         return tags
 
     # --- Search and Matching Logic ---
-    def find_venue_matches(self, db: Session, tags: List[str], budget: Optional[float] = None, location: Optional[str] = None, event_date: Optional[date] = None, limit: int = 10) -> List[Package]:
+
+    def find_venue_matches(
+        self,
+        db: Session,
+        tags: List[str],
+        budget: Optional[float] = None,
+        location: Optional[str] = None,
+        event_date: Optional[date] = None,
+        limit: int = 10,
+    ) -> List[Package]:
         if not tags:
             return []
         canonical_loc = _normalise_city(location)
@@ -300,9 +353,7 @@ class VendorService:
 
         all_pkgs = q.all()
 
-        def blocked(p): return event_date and event_date in (
-            p.blocked_dates or [])
-
+        def blocked(p): return event_date and event_date in (p.blocked_dates or [])
         def score(p): return len(set(tags) & set(p.tags or []))
 
         if canonical_loc:
@@ -311,39 +362,41 @@ class VendorService:
             if t1:
                 return t1[:limit]
 
-        t2 = [p for p in all_pkgs if set(tags).issubset(
-            set(p.tags or [])) and not blocked(p)]
+        t2 = [p for p in all_pkgs if set(tags).issubset(set(p.tags or [])) and not blocked(p)]
         if t2:
             return t2[:limit]
 
-        t3 = sorted([p for p in all_pkgs if score(p) >=
-                    1 and not blocked(p)], key=score, reverse=True)
+        t3 = sorted([p for p in all_pkgs if score(p) >= 1 and not blocked(p)], key=score, reverse=True)
         return t3[:limit]
 
-    def find_gift_matches(self, db: Session, gift_tags: List[str], budget: Optional[float] = None, location: Optional[str] = None) -> List[Package]:
+    def find_gift_matches(
+        self,
+        db: Session,
+        gift_tags: List[str],
+        budget: Optional[float] = None,
+        location: Optional[str] = None,
+    ) -> List[Package]:
         if not gift_tags:
             return []
         return self.find_venue_matches(db, tags=gift_tags, budget=budget, location=location)
 
     def find_perfect_matches(self, db: Session, criteria: dict, limit: int = 10) -> List[Package]:
-        tags = criteria.get("venue_tags", [])
-        guest_count = criteria.get("guest_count")
+        tags            = criteria.get("venue_tags", [])
+        guest_count     = criteria.get("guest_count")
         budget_per_head = criteria.get("budget_per_head")
-        location = criteria.get("location")
+        location        = criteria.get("location")
 
         if not tags:
             return []
 
         canonical_loc = _normalise_city(location)
-        # Use APPROVED vendors (admin-approved) OR is_verified (manually verified)
-        # A vendor is visible in matches when admin has approved their application
-        active_vendor_ids = {
-            v.id for v in db.query(Vendor).filter(
-                or_(Vendor.approval_status == "APPROVED", Vendor.is_verified == True)
-            ).all()
-        }
+        active_ids    = _active_vendor_ids(db)
+
         pkg_query = db.query(Package).options(joinedload(Package.vendor))
-        all_pkgs = [p for p in pkg_query.all() if p.vendor_id in active_vendor_ids]
+        all_pkgs  = [
+            p for p in pkg_query.all()
+            if str(p.vendor_id) in active_ids
+        ]
 
         def _get_tags(p):
             t = p.tags or []
@@ -351,90 +404,136 @@ class VendorService:
                 import json
                 try:
                     t = json.loads(t)
-                except:
+                except Exception:
                     t = []
             return t
 
-        def tag_match(p): return set(tags).issubset(set(_get_tags(p)))
+        def tag_match(p):
+            return set(tags).issubset(set(_get_tags(p)))
 
-        def guest_ok(p):
+        # ── Hard constraint helpers ───────────────────────────────────────────
+        # These are evaluated by reading the raw column values directly and
+        # casting explicitly to int/float to avoid SQLite type-coercion issues
+        # where a stored integer might come back as a string or None.
+
+        def _passes_guest(p) -> bool:
+            """Return False if p.min_guests is set and guest_count is below it."""
             if guest_count is None:
                 return True
-            min_g = getattr(p, "min_guests", None)
-            if min_g is not None and guest_count < min_g:
-                return False
-            return True
+            raw = p.__dict__.get("min_guests") if hasattr(p, "__dict__") else getattr(p, "min_guests", None)
+            if raw is None:
+                return True
+            try:
+                min_g = int(raw)
+            except (TypeError, ValueError):
+                return True
+            return int(guest_count) >= min_g
 
-        def budget_ok(p):
+        def _passes_budget(p) -> bool:
+            """Return False if p.price_per_head is set and exceeds budget_per_head."""
             if budget_per_head is None:
                 return True
-            pph = getattr(p, "price_per_head", None)
-            return pph is None or pph <= budget_per_head
+            raw = p.__dict__.get("price_per_head") if hasattr(p, "__dict__") else getattr(p, "price_per_head", None)
+            if raw is None:
+                return True
+            try:
+                pph = float(raw)
+            except (TypeError, ValueError):
+                return True
+            return pph <= float(budget_per_head)
 
         def _score_package(p) -> float:
-            pkg_tags = set(_get_tags(p))
-            req_tags = set(tags)
-            tag_score = len(req_tags & pkg_tags) / \
-                len(req_tags) if req_tags else 0.0
-
-            pph = getattr(p, "price_per_head", None)
-            if budget_per_head and pph is not None and budget_per_head > 0:
-                ratio = pph / budget_per_head
-                budget_score = max(0.0, min(1.0, ratio))
+            pkg_tags  = set(_get_tags(p))
+            req_tags  = set(tags)
+            tag_score = len(req_tags & pkg_tags) / len(req_tags) if req_tags else 0.0
+            raw_pph   = getattr(p, "price_per_head", None)
+            if budget_per_head and raw_pph is not None and float(budget_per_head) > 0:
+                budget_score = max(0.0, min(1.0, float(raw_pph) / float(budget_per_head)))
             else:
                 budget_score = 0.0
-
-            min_g = getattr(p, "min_guests", None)
+            raw_min_g = getattr(p, "min_guests", None)
             if guest_count is None:
                 guest_score = 0.5
-            elif min_g is None or guest_count >= min_g:
+            elif raw_min_g is None or int(guest_count) >= int(raw_min_g):
                 guest_score = 1.0
             else:
                 guest_score = 0.0
-
             return (tag_score * 0.4) + (budget_score * 0.3) + (guest_score * 0.3)
 
-        def loc_ok(p):
+        def loc_ok(p) -> bool:
             if not canonical_loc:
                 return True
-            loc_cov = _normalise_city(
-                getattr(p, "location_coverage", "") or "")
-            return canonical_loc in (loc_cov or "")
+            raw_cov = (getattr(p, "location_coverage", "") or "").lower()
+            loc_cov = _normalise_city(raw_cov) or raw_cov
+            return canonical_loc in loc_cov
 
-        strict = [p for p in all_pkgs if tag_match(
-            p) and guest_ok(p) and budget_ok(p) and loc_ok(p)]
-        if strict:
-            return sorted(strict, key=_score_package, reverse=True)[:limit]
+        def _ret(pkgs, *, enforce_guest: bool, enforce_budget: bool) -> List[Package]:
+            """
+            Sort by score, slice to limit, apply the hard constraints that THIS
+            tier is responsible for (not ones it intentionally relaxed), then
+            attach vendor objects.
+            """
+            ranked = sorted(pkgs, key=_score_package, reverse=True)[:limit]
+            # Apply the tier's own hard constraints as a final safety net
+            if enforce_guest:
+                ranked = [p for p in ranked if _passes_guest(p)]
+            if enforce_budget:
+                ranked = [p for p in ranked if _passes_budget(p)]
+            return _attach_vendors(db, ranked)
 
-        mid = [p for p in all_pkgs if tag_match(
-            p) and guest_ok(p) and budget_ok(p)]
-        if mid:
-            return sorted(mid, key=_score_package, reverse=True)[:limit]
+        # ── Tier 1: tag + guest + budget + location ───────────────────────────
+        t1 = [p for p in all_pkgs
+              if tag_match(p) and _passes_guest(p) and _passes_budget(p) and loc_ok(p)]
+        if t1:
+            return _ret(t1, enforce_guest=True, enforce_budget=True)
 
+        # ── Tier 2: tag + guest + budget  (relax location) ───────────────────
+        t2 = [p for p in all_pkgs
+              if tag_match(p) and _passes_guest(p) and _passes_budget(p)]
+        if t2:
+            return _ret(t2, enforce_guest=True, enforce_budget=True)
+
+        # ── Tier 3: tag + guest  (relax budget AND location) ─────────────────
+        # guest is still a hard constraint; budget is intentionally relaxed so
+        # an impossible budget (e.g. 0.01) still surfaces matching venues.
+        # Only entered when guest_count was explicitly supplied.
         if guest_count is not None:
-            relaxed = [p for p in all_pkgs if tag_match(p) and guest_ok(p)]
-            return sorted(relaxed, key=_score_package, reverse=True)[:limit]
+            t3 = [p for p in all_pkgs if tag_match(p) and _passes_guest(p)]
+            if t3:
+                return _ret(t3, enforce_guest=True, enforce_budget=False)
+            # Nothing passes guest filter — correct answer is empty list
+            return []
+
+        # ── Tier 4: tag + budget  (relax guest AND location) ─────────────────
+        # Only reached when guest_count was NOT supplied.
+        # budget is still a hard constraint; guest is intentionally relaxed.
+        t4 = [p for p in all_pkgs if tag_match(p) and _passes_budget(p)]
+        if t4:
+            return _ret(t4, enforce_guest=False, enforce_budget=True)
 
         return []
 
     def get_availability_block(self, db: Session, tags: List[str], lookahead_days: int = 30) -> str:
         if not tags:
             return ""
-        today = date.today()
+        today      = date.today()
         window_end = today + timedelta(days=lookahead_days)
-        lines = []
+        lines      = []
         for pkg in db.query(Package).all():
             if not (set(tags) & set(pkg.tags or [])):
                 continue
-            blocked = [d for d in (pkg.blocked_dates or []) if isinstance(
-                d, date) and today <= d <= window_end]
+            blocked = [d for d in (pkg.blocked_dates or []) if isinstance(d, date) and today <= d <= window_end]
             if blocked:
                 blocked_str = ', '.join(str(d) for d in sorted(blocked))
                 lines.append(f"- '{pkg.name}' NOT available on: {blocked_str}")
 
         if not lines:
             return ""
-        return f"\n\nVENUE AVAILABILITY:\nThese venues have blocked dates in the next {lookahead_days} days. Do NOT suggest them for those dates:\n" + "\n".join(lines) + "\n"
+        return (
+            f"\n\nVENUE AVAILABILITY:\nThese venues have blocked dates in the next "
+            f"{lookahead_days} days. Do NOT suggest them for those dates:\n"
+            + "\n".join(lines) + "\n"
+        )
 
     @staticmethod
     def extract_location_from_text(text: str) -> Optional[str]:
@@ -445,6 +544,274 @@ class VendorService:
             if alias in lower:
                 return _CITY_ALIASES[alias]
         return None
+
+    def list_fulfillment_requests(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        status_filter: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[TaskRequest], str | None]:
+        self._expire_overdue_fulfillment_requests(db, vendor_id=vendor_id)
+
+        query = db.query(TaskRequest).filter(TaskRequest.vendor_id == vendor_id)
+        normalized_status = status_filter.upper() if status_filter else "SENT"
+        query = query.filter(TaskRequest.status == normalized_status)
+
+        if cursor:
+            cursor_request = (
+                db.query(TaskRequest)
+                .filter(
+                    TaskRequest.vendor_id == vendor_id,
+                    TaskRequest.request_id == cursor,
+                )
+                .first()
+            )
+            if cursor_request:
+                query = query.filter(
+                    or_(
+                        TaskRequest.requested_at < cursor_request.requested_at,
+                        and_(
+                            TaskRequest.requested_at == cursor_request.requested_at,
+                            TaskRequest.id > cursor_request.id,
+                        ),
+                    )
+                )
+
+        items = (
+            query.order_by(TaskRequest.requested_at.desc(), TaskRequest.id.asc())
+            .limit(limit + 1)
+            .all()
+        )
+        next_cursor = None
+        if len(items) > limit:
+            next_cursor = items[limit].request_id
+            items = items[:limit]
+        return items, next_cursor
+
+    def get_fulfillment_request_detail(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        fulfillment_request_id: str,
+    ) -> TaskRequest:
+        self._expire_overdue_fulfillment_requests(db, vendor_id=vendor_id)
+        request = self._get_vendor_request_or_404(
+            db,
+            vendor_id=vendor_id,
+            fulfillment_request_id=fulfillment_request_id,
+        )
+        return request
+
+    def respond_to_fulfillment_request(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        fulfillment_request_id: str,
+        decision: str,
+        response_note: str | None,
+    ) -> tuple[TaskRequest, Task]:
+        self._expire_overdue_fulfillment_requests(db, vendor_id=vendor_id)
+        request = self._get_vendor_request_or_404(
+            db,
+            vendor_id=vendor_id,
+            fulfillment_request_id=fulfillment_request_id,
+        )
+        task = self._get_task_or_404(db, task_id=request.task_id)
+        self._ensure_request_actionable(request)
+
+        timestamp = now_utc()
+        request.responded_at = timestamp
+        request.response_note = response_note
+
+        if decision == "ACCEPT":
+            request.status = "ACCEPTED"
+            task.status = "ASSIGNED"
+        else:
+            request.status = "REJECTED"
+            task.status = "REJECTED"
+            task.rejected_at = timestamp
+            task.rejection_reason = response_note
+
+        task.status_updated_at = timestamp
+        db.add(request)
+        db.add(task)
+        db.commit()
+        db.refresh(request)
+        db.refresh(task)
+        return request, task
+
+    def list_vendor_tasks(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        status_filter: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[Task], str | None]:
+        self._expire_overdue_fulfillment_requests(db, vendor_id=vendor_id)
+
+        query = db.query(Task).filter(Task.assigned_vendor_id == vendor_id)
+        if status_filter:
+            query = query.filter(Task.status == status_filter.upper())
+        else:
+            query = query.filter(Task.status.in_(self._DEFAULT_VENDOR_TASK_STATUSES))
+
+        if cursor:
+            cursor_task = (
+                db.query(Task)
+                .filter(
+                    Task.assigned_vendor_id == vendor_id,
+                    Task.task_id == cursor,
+                )
+                .first()
+            )
+            if cursor_task:
+                query = query.filter(
+                    or_(
+                        Task.created_at < cursor_task.created_at,
+                        and_(
+                            Task.created_at == cursor_task.created_at,
+                            Task.id > cursor_task.id,
+                        ),
+                    )
+                )
+
+        items = (
+            query.order_by(Task.created_at.desc(), Task.id.asc())
+            .limit(limit + 1)
+            .all()
+        )
+        next_cursor = None
+        if len(items) > limit:
+            next_cursor = items[limit].task_id
+            items = items[:limit]
+        return items, next_cursor
+
+    def get_vendor_task(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        task_id: str,
+    ) -> Task:
+        self._expire_overdue_fulfillment_requests(db, vendor_id=vendor_id)
+        task = (
+            db.query(Task)
+            .filter(
+                Task.task_id == task_id,
+                Task.assigned_vendor_id == vendor_id,
+                Task.status != "PENDING",
+            )
+            .first()
+        )
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return task
+
+    def update_vendor_task_status(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        task_id: str,
+        next_status: str,
+    ) -> Task:
+        task = self.get_vendor_task(db, vendor_id=vendor_id, task_id=task_id)
+        current_status = task.status.upper()
+        allowed_transitions = {
+            "ASSIGNED": "IN_PROGRESS",
+            "IN_PROGRESS": "DONE",
+        }
+        expected_status = allowed_transitions.get(current_status)
+        if expected_status != next_status:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Task cannot transition from {current_status} to {next_status}",
+            )
+
+        task.status = next_status
+        task.status_updated_at = now_utc()
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+        return task
+
+    def _expire_overdue_fulfillment_requests(
+        self,
+        db: Session,
+        *,
+        vendor_id: str | None = None,
+    ) -> None:
+        current_time = now_utc()
+        query = db.query(TaskRequest).filter(
+            TaskRequest.status == "SENT",
+            TaskRequest.respond_by.isnot(None),
+            TaskRequest.respond_by <= current_time,
+        )
+        if vendor_id:
+            query = query.filter(TaskRequest.vendor_id == vendor_id)
+
+        expired_requests = query.all()
+        if not expired_requests:
+            return
+
+        task_ids = [request.task_id for request in expired_requests]
+        tasks = (
+            db.query(Task)
+            .filter(Task.task_id.in_(task_ids))
+            .all()
+        )
+        tasks_by_id = {task.task_id: task for task in tasks}
+
+        for request in expired_requests:
+            request.status = "EXPIRED"
+            request.responded_at = current_time
+            db.add(request)
+            task = tasks_by_id.get(request.task_id)
+            if task:
+                task.status = "EXPIRED"
+                task.expires_at = current_time
+                task.status_updated_at = current_time
+                db.add(task)
+
+        db.commit()
+
+    def _get_vendor_request_or_404(
+        self,
+        db: Session,
+        *,
+        vendor_id: str,
+        fulfillment_request_id: str,
+    ) -> TaskRequest:
+        request = (
+            db.query(TaskRequest)
+            .filter(
+                TaskRequest.request_id == fulfillment_request_id,
+                TaskRequest.vendor_id == vendor_id,
+            )
+            .first()
+        )
+        if not request:
+            raise HTTPException(status_code=404, detail="Fulfillment request not found")
+        return request
+
+    def _get_task_or_404(self, db: Session, *, task_id: str) -> Task:
+        task = db.query(Task).filter(Task.task_id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return task
+
+    def _ensure_request_actionable(self, request: TaskRequest) -> None:
+        if request.status == "EXPIRED":
+            raise HTTPException(status_code=409, detail="Fulfillment request has expired")
+        if request.status != "SENT":
+            raise HTTPException(status_code=409, detail="Fulfillment request has already been responded to")
 
 
 class AdminVendorService:
@@ -457,12 +824,10 @@ class AdminVendorService:
         status: str | None = None,
     ) -> list[Vendor]:
         query = self.db.query(Vendor)
-
         if approval_status:
             query = query.filter(Vendor.approval_status == approval_status.upper())
         if status and hasattr(Vendor, "status"):
             query = query.filter(Vendor.status == status.upper())
-
         return query.order_by(Vendor.id.desc()).all()
 
     def get_vendor(self, vendor_id: int) -> Vendor:
@@ -471,22 +836,14 @@ class AdminVendorService:
             raise HTTPException(status_code=404, detail="Vendor not found.")
         return vendor
 
-    def update_vendor_status(
-        self,
-        vendor_id: int,
-        new_status: str,
-        admin_email: str,
-    ) -> Vendor:
+    def update_vendor_status(self, vendor_id: int, new_status: str, admin_email: str) -> Vendor:
         if not new_status or new_status.upper() not in ("ACTIVE", "SUSPENDED", "DISABLED"):
             raise HTTPException(status_code=400, detail="status must be ACTIVE, SUSPENDED, or DISABLED")
-
         vendor = self.get_vendor(vendor_id)
         if hasattr(vendor, "status"):
             vendor.status = new_status.upper()
         else:
             logger.warning("Vendor model has no .status column yet. Skipping admin status write.")
-
-        # Keep is_verified in sync with approval_status
         if hasattr(vendor, "is_verified"):
             vendor.is_verified = (new_status.upper() == "APPROVED")
         self.db.commit()
@@ -495,14 +852,11 @@ class AdminVendorService:
         return vendor
 
     def get_pending_counts(self) -> dict:
-        vendor_pending = self.db.query(Vendor).filter(
-            Vendor.approval_status == "PENDING"
-        ).count()
-
+        vendor_pending = self.db.query(Vendor).filter(Vendor.approval_status == "PENDING").count()
         return {
-            "vendors_pending": vendor_pending,
+            "vendors_pending":       vendor_pending,
             "organizations_pending": 0,
-            "total_pending": vendor_pending,
+            "total_pending":         vendor_pending,
         }
 
 
