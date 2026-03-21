@@ -9,10 +9,10 @@ import { CustomerAuthProvider } from '@/app/context/AuthContext';
 function CustomerLayoutInner({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith('/customer/auth');
+  const authChecked = true;
+  const isAuthenticated = true;
 
   // Authentication temporarily disabled for development
   // useEffect(() => {
