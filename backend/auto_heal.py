@@ -7,7 +7,6 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Load environment before initializing database
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -17,8 +16,6 @@ from sqlalchemy import inspect
 
 print("Checking database for missing ORM tables...")
 
-# Retry loop — guards against TCP timeout on first container boot
-# (Docker healthcheck can pass before postgres accepts remote connections)
 inspector = None
 for attempt in range(10):
     try:
