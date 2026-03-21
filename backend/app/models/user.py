@@ -15,7 +15,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False)
-    status = Column(String, nullable=False)
+    status = Column(String, nullable=False, index=True)
 
     created_at = Column(DateTime(timezone=True), default=now_utc, nullable=False)
     last_login_at = Column(DateTime(timezone=True), nullable=True)

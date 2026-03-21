@@ -336,6 +336,7 @@ export default function PendingRequestsPage() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
+  const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -356,8 +357,9 @@ export default function PendingRequestsPage() {
         };
 
         const response = await adminService.getVendors(params);
-        setVendors(response.items);
-        setPagination((prev) => ({ ...prev, total: response.total }));
+        const safeItems = Array.isArray(response.items) ? response.items : [];
+        setVendors(safeItems);
+        setPagination((prev) => ({ ...prev, total: response.total ?? safeItems.length }));
       } else {
         const params = {
           page: pagination.page,
@@ -374,8 +376,9 @@ export default function PendingRequestsPage() {
         };
 
         const response = await adminService.getOrganizations(params);
-        setOrganizations(response.items);
-        setPagination((prev) => ({ ...prev, total: response.total }));
+        const safeItems = Array.isArray(response.items) ? response.items : [];
+        setOrganizations(safeItems);
+        setPagination((prev) => ({ ...prev, total: response.total ?? safeItems.length }));
       }
     } catch (error) {
       toast.error('Failed to fetch data');
@@ -403,14 +406,15 @@ export default function PendingRequestsPage() {
           : OrganizationStatus.REJECTED;
 
       if (activeTab === 'vendors') {
-        await adminService.updateVendorStatus(selectedItem.id, {
-          status,
-          status_reason: reason,
-        });
+        if (approvalAction === 'approve') {
+          await adminService.approveVendor(selectedItem.id);
+        } else {
+          await adminService.rejectVendor(selectedItem.id, reason);
+        }
       } else {
         await adminService.updateOrganizationStatus(selectedItem.id, {
           status,
-          status_reason: reason,
+          reason,
         });
       }
 
@@ -436,6 +440,7 @@ export default function PendingRequestsPage() {
     setSelectedItem(item);
     setApprovalAction(action);
     setApprovalModalOpen(true);
+    setOpenActionMenuId(null);
   };
 
   const openDetailModal = (item: Vendor | Organization) => {
@@ -456,7 +461,7 @@ export default function PendingRequestsPage() {
     }
   };
 
-  const currentItems = activeTab === 'vendors' ? vendors : organizations;
+  const currentItems = activeTab === 'vendors' ? (vendors ?? []) : (organizations ?? []);
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6">
@@ -698,7 +703,7 @@ export default function PendingRequestsPage() {
                         {formatDate(item.created_at)}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="relative flex items-center justify-end gap-2">
                           <button
                             onClick={() => openDetailModal(item)}
                             className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
@@ -706,33 +711,40 @@ export default function PendingRequestsPage() {
                           >
                             <ExternalLink className="h-4 w-4" />
                           </button>
-                          
-                          {item.status === 'pending' && (
-                            <>
-                              <button
-                                onClick={() => openApprovalModal(item, 'approve')}
-                                className="rounded-lg bg-green-50 p-2 text-green-600 hover:bg-green-100"
-                                title="Approve"
-                              >
-                                <CheckCircle className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => openApprovalModal(item, 'reject')}
-                                className="rounded-lg bg-red-50 p-2 text-red-600 hover:bg-red-100"
-                                title="Reject"
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </button>
-                            </>
-                          )}
-                          
+
                           <button
+                            onClick={() =>
+                              setOpenActionMenuId((prev) =>
+                                prev === item.id ? null : item.id
+                              )
+                            }
                             className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                             aria-label="More actions"
                             title="More actions"
                           >
                             <MoreHorizontal className="h-4 w-4" />
                           </button>
+
+                          {openActionMenuId === item.id && (
+                            <div className="absolute right-0 top-10 z-20 w-36 rounded-xl border border-gray-200 bg-white p-1 shadow-lg">
+                              <button
+                                onClick={() => openApprovalModal(item, 'approve')}
+                                disabled={item.status !== 'pending'}
+                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-green-700 hover:bg-green-50 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => openApprovalModal(item, 'reject')}
+                                disabled={item.status !== 'pending'}
+                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
+                              >
+                                <XCircle className="h-4 w-4" />
+                                Reject
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </motion.tr>
@@ -748,7 +760,7 @@ export default function PendingRequestsPage() {
           <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
             <div className="text-sm text-gray-500">
               Page {pagination.page} of{' '}
-              {Math.ceil(pagination.total / pagination.pageSize)}
+              {Math.max(1, Math.ceil(pagination.total / pagination.pageSize))}
             </div>
             <div className="flex gap-2">
               <button

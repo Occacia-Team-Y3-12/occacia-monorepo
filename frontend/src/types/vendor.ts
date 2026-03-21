@@ -76,6 +76,7 @@ export interface OrganizationListResponse {
 export interface StatusUpdateRequest {
   status: VendorStatus | OrganizationStatus;
   status_reason?: string;
+  reason?: string;
 }
 
 export interface PendingStats {

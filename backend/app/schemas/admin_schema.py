@@ -195,3 +195,20 @@ class AdminTaskSupportActionRequest(BaseModel):
         return trimmed
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class DashboardMetricCounts(BaseModel):
+    total: int
+    active: int
+    pending: int
+
+
+class AdminDashboardResponse(BaseModel):
+    users: DashboardMetricCounts
+    users_table: DashboardMetricCounts = Field(alias="usersTable")
+    vendors: DashboardMetricCounts
+    events: DashboardMetricCounts
+    package_orders: DashboardMetricCounts = Field(alias="packageOrders")
+    generated_at: datetime = Field(alias="generatedAt")
+
+    model_config = ConfigDict(populate_by_name=True)

@@ -23,7 +23,7 @@ from app.schemas.admin_schema import (
     VendorAdminView, VendorRejectRequest, CustomerAdminView, PaginatedCustomers, CustomerStatusUpdateRequest,
     AdminTaskSupportActionRequest, InternalNoteCreateRequest, InternalNoteResponse,
     PaginatedFulfillmentRequestsResponse, PaginatedInternalNotesResponse, PaginatedPackageOrdersResponse,
-    PaginatedTasksResponse
+    PaginatedTasksResponse, AdminDashboardResponse
 )
 from app.schemas.event_planning_schema import TaskResponse
 from app.schemas.package_schema import (
@@ -32,6 +32,7 @@ from app.schemas.package_schema import (
     PackageOrderResponse,
 )
 from app.services.admin_service import admin_service 
+from app.services.admin_dashboard_service import admin_dashboard_aggregator
 from app.services.notification_service import notification_service
 from app.services.auth_service import _send_email
 
@@ -412,3 +413,12 @@ def get_task_fulfillment_requests(
         items=[_fulfillment_request_response(item) for item in items],
         nextCursor=None,
     )
+
+
+@router.get("/dashboard", response_model=AdminDashboardResponse)
+def get_admin_dashboard(
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    _ = current_admin
+    return admin_dashboard_aggregator.get_dashboard_metrics(db)

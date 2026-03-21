@@ -35,7 +35,7 @@ class Event(Base):
     external_calendar_event_id = Column(String, nullable=True)
     calendar_last_sync_at = Column(DateTime(timezone=True), nullable=True)
     calendar_last_sync_status = Column(String, nullable=True)
-    status = Column(String, nullable=False, default="DRAFT")
+    status = Column(String, nullable=False, default="DRAFT", index=True)
     confirmed_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=now_utc, nullable=False)
