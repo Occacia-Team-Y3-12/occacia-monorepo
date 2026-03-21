@@ -1,0 +1,21 @@
+{
+  "name": "Occacia - Give them the moment they deserve",
+  "short_name": "Occacia",
+  "description": "AI-Powered Occasion Planning Marketplace",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#8B5CF6",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "59x59",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "59x59",
+      "type": "image/png"
+    }
+  ]
+}
