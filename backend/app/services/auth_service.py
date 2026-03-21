@@ -476,7 +476,7 @@ class AuthService:
             raise HTTPException(
                 status_code=400, detail="Invalid password reset token.")
 
-        hashed_password = hash_password(request.new_password)
+        hashed_password = get_password_hash(request.new_password)
         vendor.hashed_password = hashed_password
         db.add(vendor)
         db.commit()
