@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEventTasks } from '@/hooks/customer/useEventTasks';
 import { Task, TaskDetails, TaskStatus } from '@/types/customer/task';

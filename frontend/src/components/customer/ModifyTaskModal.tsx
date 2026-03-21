@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState, FC } from 'react';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import { TaskDetails, VendorShortlist } from '@/types/customer/task';
@@ -13,7 +13,7 @@ interface ModifyTaskModalProps {
   onRemove: () => Promise<void>;
 }
 
-const ModifyTaskModal: React.FC<ModifyTaskModalProps> = ({
+const ModifyTaskModal: FC<ModifyTaskModalProps> = ({
   isOpen,
   onClose,
   task,

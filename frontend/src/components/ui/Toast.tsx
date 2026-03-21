@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import { useEffect, FC } from 'react';
 
 interface ToastProps {
   message: string;
@@ -10,7 +10,7 @@ interface ToastProps {
   duration?: number;
 }
 
-const Toast: React.FC<ToastProps> = ({
+const Toast: FC<ToastProps> = ({
   message,
   type = 'info',
   isVisible,
