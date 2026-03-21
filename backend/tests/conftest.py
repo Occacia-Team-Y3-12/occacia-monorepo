@@ -74,7 +74,6 @@ def clean_tables():
             ChatMessage,
             EventChatMessage,
             Notification,
-            SupportNote,
             ChatSession,
             PackageExecutionRequest,
             TaskRequest,

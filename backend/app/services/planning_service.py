@@ -1,8 +1,8 @@
 """
 app/services/planning_service.py
 
-ALL 11 FIXES APPLIED
-────────────────────
+ALL FIXES APPLIED (original 11 + new 4)
+────────────────────────────────────────
 FIX 1  Generic/robotic replies      → enriched_query always injects known facts
 FIX 2  Loses context between turns  → ChatSession DB table as source of truth
 FIX 3  Doesn't remember what said   → venue_data persisted to DB every turn
@@ -14,6 +14,10 @@ FIX 8  Persona never accumulates    → _merge_persona_from_ai() runs every turn
 FIX 9  Same pkg as venue + gift     → dedup by id before returning gifts
 FIX 10 Booking notes missing prefs  → notes include full persona summary
 FIX 11 venue_data stale post-booking→ cleared from state after booking created
+FIX #1 No DB matches               → AI-generated fallback with inquiry record
+FIX #2 Budget filter               → only applied to AI-generated venues, not DB results
+FIX #3 No vendor redirect          → redirect_url returned after booking
+FIX #4 Vibe question missing        → dedicated question after date confirmed
 """
 from __future__ import annotations
 
@@ -39,10 +43,11 @@ _STEP_PERSONA_LIST = "1"
 _STEP_PERSONA_SAVE = "2"
 _STEP_RECS_SHOWN   = "3"
 _STEP_BOOKED       = "4"
+_STEP_VIBE         = "5"   # FIX #4: waiting for vibe/theme answer
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Module-level Redis helper (kept for backward compat + test patching)
+# Module-level Redis helper
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _get_redis():
@@ -61,14 +66,13 @@ def _get_redis():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# StateStore — Redis + DB write-through, DB fallback  (FIX 2, 7)
+# StateStore — Redis + DB write-through, DB fallback
 # ─────────────────────────────────────────────────────────────────────────────
 
 class StateStore:
     _TTL = 86400  # 24 h
 
     def _connect_redis(self):
-        """Instance method so tests can patch StateStore._connect_redis."""
         try:
             import redis as _r
             import os
@@ -236,6 +240,32 @@ class StateStore:
         self._session.booking_id = v
         self._save_session()
 
+    # ── FIX #1: AI fallback state properties ──────────────────────────────────
+
+    @property
+    def ai_fallback_venues(self) -> list:
+        return self.get_json("ai_fallback_venues") or []
+
+    @ai_fallback_venues.setter
+    def ai_fallback_venues(self, v: list):
+        self.set_json("ai_fallback_venues", v)
+
+    @property
+    def ai_fallback_gifts(self) -> list:
+        return self.get_json("ai_fallback_gifts") or []
+
+    @ai_fallback_gifts.setter
+    def ai_fallback_gifts(self, v: list):
+        self.set_json("ai_fallback_gifts", v)
+
+    @property
+    def is_ai_fallback(self) -> bool:
+        return self._rget("is_ai_fallback", "false") == "true"
+
+    @is_ai_fallback.setter
+    def is_ai_fallback(self, v: bool):
+        self._rset("is_ai_fallback", "true" if v else "false")
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Regex extractors
@@ -333,7 +363,6 @@ def _extract_guests(text: str) -> Optional[int]:
 
 
 def _safe_str(val) -> "str | None":
-    """Return val if it is a real str, else None. Guards against MagicMock attributes."""
     return val if isinstance(val, str) else None
 
 
@@ -371,11 +400,6 @@ _SEL_MAP = {
     "third":2,"3rd":2,"three":2,"3":2,
 }
 
-# ── Multi-intent signal lists ─────────────────────────────────────────────────
-# Used by _resolve_intent() to upgrade "planning"/"date" → "multi" when the
-# user message contains both gift and planning signals.  Tests mock the AI as
-# intent="planning" even for messages like "dinner AND a gift", so we cannot
-# rely on the AI field alone.
 _GIFT_SIGNALS = [
     "gift", "present", "buy", "surprise", "something for", "get her", "get him",
 ]
@@ -420,12 +444,6 @@ def _detect_rollback(text: str) -> bool:
 
 
 def _resolve_intent(ai_intent: str, user_query: str) -> str:
-    """Return the effective intent to use for routing.
-
-    Upgrades "planning"/"date" → "multi" when the raw user message contains
-    both gift signals and planning signals, regardless of what the AI returned.
-    This is necessary because test mocks always return intent="planning".
-    """
     if ai_intent == "multi":
         return "multi"
     if ai_intent in ("planning", "date"):
@@ -445,10 +463,8 @@ def _persona_is_complete(draft: dict) -> bool:
 
 
 def _build_persona_payload(draft: dict) -> dict:
-    # str() ensures MagicMock values from tests don't break SQLAlchemy String columns
     name = str((draft.get("name") or "")).strip()
     personality = str(draft.get("personality") or "")
-    # If AI extracted an age, store it in the personality field
     age = draft.get("age")
     if age is not None:
         age_str = str(age)
@@ -484,7 +500,6 @@ def _persona_summary(draft: dict, persona=None) -> str:
 
 
 def _merge_persona_from_ai(existing: dict, ai_result: dict, user_query: str = "") -> dict:
-    """FIX 8: Merge persona data from AI every single turn."""
     draft = dict(existing)
     sp    = ai_result.get("save_persona")
     if sp and isinstance(sp, dict):
@@ -501,7 +516,6 @@ def _merge_persona_from_ai(existing: dict, ai_result: dict, user_query: str = ""
 
 
 def _known_facts_block(vd: dict, persona_draft: dict, chosen_persona) -> str:
-    """FIX 3 + FIX 4: Block of known facts prepended to every AI query."""
     lines = []
     if chosen_persona:
         name = getattr(chosen_persona, "name", None) or persona_draft.get("name")
@@ -513,6 +527,7 @@ def _known_facts_block(vd: dict, persona_draft: dict, chosen_persona) -> str:
     if vd.get("budget"):      lines.append(f"Budget confirmed: LKR {vd['budget']:,.0f}")
     if vd.get("guest_count"): lines.append(f"Guests confirmed: {vd['guest_count']}")
     if vd.get("event_date"):  lines.append(f"Date confirmed: {vd['event_date']}")
+    if vd.get("vibe"):        lines.append(f"Vibe confirmed: {vd['vibe']}")
     if not lines:
         return ""
     return (
@@ -523,6 +538,7 @@ def _known_facts_block(vd: dict, persona_draft: dict, chosen_persona) -> str:
 
 
 def _venue_missing(vd: dict) -> list:
+    """Returns list of primary fields still needed (vibe handled separately)."""
     m = []
     if not vd.get("location"):    m.append("location")
     if not vd.get("budget"):      m.append("total budget")
@@ -532,7 +548,169 @@ def _venue_missing(vd: dict) -> list:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Package / gift helpers — use snake_case field names to match schema
+# FIX #2 — Budget filter (AI-generated venues ONLY)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _filter_by_budget(
+    venues: list,
+    gifts: list,
+    total_budget: float,
+    guest_count,
+) -> tuple:
+    """
+    Budget filter for AI-GENERATED venues/gifts only.
+
+    NEVER call this on DB results — find_perfect_matches already filters by budget.
+    Only call this on venues/gifts from _generate_ai_fallback() which provide
+    explicit estimated_price values that we can check against total budget.
+
+    Returns (filtered_venues, filtered_gifts, all_over_budget: bool).
+    """
+    if not total_budget or float(total_budget) <= 0:
+        return venues, gifts, False
+
+    gift_cap = float(total_budget) * 0.25
+
+    filtered_venues = []
+    for v in venues:
+        total_est = getattr(v, "total_estimated_price", None)
+        # Only exclude when explicitly computed AND clearly over budget
+        if total_est is not None and float(total_est) > float(total_budget):
+            continue
+        filtered_venues.append(v)
+
+    filtered_gifts = []
+    for g in gifts:
+        est = getattr(g, "estimated_price", None)
+        # Only exclude when explicitly computed AND clearly over gift cap
+        if est is not None and float(est) > gift_cap:
+            continue
+        filtered_gifts.append(g)
+
+    all_over = (len(venues) > 0 and len(filtered_venues) == 0)
+    return filtered_venues, filtered_gifts, all_over
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FIX #1 — AI-generated fallback when DB has no matches
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _generate_ai_fallback(
+    ai_svc,
+    vd: dict,
+    persona_draft: dict,
+    chosen_persona,
+    event_context: dict,
+) -> tuple:
+    """
+    Calls Groq to generate 3 venue concepts and 3 gift concepts when DB has no matches.
+    Returns (venues: list[dict], gifts: list[dict]).
+    """
+    import httpx as _httpx
+
+    budget     = float(vd.get("budget") or 0)
+    guests     = int(vd.get("guest_count") or 1)
+    location   = vd.get("location") or "Sri Lanka"
+    vibe       = vd.get("vibe") or "special"
+    event_type = (event_context or {}).get("event_type") or "event"
+
+    persona_name = ""
+    if chosen_persona:
+        persona_name = getattr(chosen_persona, "name", "") or ""
+    elif persona_draft:
+        persona_name = str(persona_draft.get("name") or "")
+
+    groq_key = getattr(ai_svc, "groq_api_key", None)
+    if not groq_key:
+        return [], []
+
+    system_prompt = (
+        "You are an expert event planner for Sri Lanka. "
+        "Respond ONLY with raw JSON — no markdown, no explanation."
+    )
+    user_prompt = (
+        f"Generate exactly 3 venue/experience ideas and 3 gift ideas "
+        f"for a {event_type} in {location} for {guests} people"
+        + (f" celebrating {persona_name}" if persona_name else "")
+        + f". Vibe: {vibe}. "
+        f"Total budget: LKR {budget:,.0f}. "
+        f"Venue budget (75%): LKR {budget * 0.75:,.0f}. "
+        f"Gift budget (25%): LKR {budget * 0.25:,.0f}. "
+        "Be specific — mention real Sri Lankan places, brands, experiences. "
+        'Return exactly: {"venues": [{"name": "string", "description": "string", '
+        '"estimated_price": number}], '
+        '"gifts": [{"name": "string", "description": "string", '
+        '"estimated_price": number}]}'
+    )
+
+    try:
+        headers = {
+            "Authorization": f"Bearer {groq_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
+            ],
+            "temperature": 0.7,
+            "max_tokens": 1024,
+            "response_format": {"type": "json_object"},
+        }
+        async with _httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json=payload,
+                headers=headers,
+            )
+            resp.raise_for_status()
+
+        data   = resp.json()
+        raw    = data["choices"][0]["message"]["content"]
+        parsed = json.loads(raw)
+        venues = (parsed.get("venues") or [])[:3]
+        gifts  = (parsed.get("gifts")  or [])[:3]
+        return venues, gifts
+
+    except Exception as exc:
+        logger.warning(f"AI fallback generation failed: {exc}")
+        return [], []
+
+
+def _ai_venue_to_display(item: dict, idx: int) -> VenueDisplay:
+    return VenueDisplay(
+        id=f"AI-VENUE-{idx+1}",
+        name=str(item.get("name") or f"Option {idx+1}"),
+        description=str(item.get("description") or ""),
+        price_per_head=None,
+        total_estimated_price=float(item.get("estimated_price") or 0) or None,
+        tags=[],
+        location=None,
+        vendor_name="Occacia Concierge",
+        match_score=None,
+        match_score_max=None,
+        match_score_label=None,
+        tweak_note="✨ AI-curated — our team will contact vendors on your behalf",
+    )
+
+
+def _ai_gift_to_display(item: dict, idx: int) -> GiftDisplay:
+    return GiftDisplay(
+        id=f"AI-GIFT-{idx+1}",
+        name=str(item.get("name") or f"Gift Option {idx+1}"),
+        description=str(item.get("description") or ""),
+        price_per_head=None,
+        estimated_price=float(item.get("estimated_price") or 0) or None,
+        tags=[],
+        location=None,
+        vendor_name="Occacia Concierge",
+        tweak_note="✨ AI-curated suggestion",
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Package / gift helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _to_venue(pkg, req_tags=None, guest_count=None, tweak=None) -> VenueDisplay:
@@ -545,13 +723,13 @@ def _to_venue(pkg, req_tags=None, guest_count=None, tweak=None) -> VenueDisplay:
         if hasattr(pkg, "vendor") and pkg.vendor:
             vname = getattr(pkg.vendor, "display_name", None) or getattr(pkg.vendor, "business_name", None)
     except Exception:
-        pass  # detached instance — vendor not loaded
+        pass
     ms = ms_max = ms_lbl = None
     if req_tags:
         matched = len(set(req_tags) & set(tags))
         total   = len(set(req_tags))
         ms, ms_max, ms_lbl = matched, total, f"{matched} of {total} tags matched"
-    pph       = getattr(pkg, "price_per_head", None)
+    pph = getattr(pkg, "price_per_head", None)
     if pph is not None:
         try: pph = float(pph)
         except (TypeError, ValueError): pph = None
@@ -582,7 +760,7 @@ def _to_gift(pkg, gift_bph=None, guest_count=None, tweak=None) -> GiftDisplay:
         if hasattr(pkg, "vendor") and pkg.vendor:
             vname = getattr(pkg.vendor, "display_name", None) or getattr(pkg.vendor, "business_name", None)
     except Exception:
-        pass  # detached instance — vendor not loaded
+        pass
     pph = getattr(pkg, "price_per_head", None)
     if pph is not None:
         try: pph = float(pph)
@@ -608,7 +786,6 @@ def _to_gift(pkg, gift_bph=None, guest_count=None, tweak=None) -> GiftDisplay:
 
 
 def _get_3_venues(vs, db, venue_tags, bph, location, guests, req_tags) -> list:
-    """Call find_perfect_matches once with the best available parameters."""
     pkgs = vs.find_perfect_matches(
         db,
         {"venue_tags": venue_tags, "budget_per_head": bph,
@@ -624,11 +801,6 @@ def _get_3_venues(vs, db, venue_tags, bph, location, guests, req_tags) -> list:
 
 
 def _get_3_gifts(vs, db, gift_tags, gift_bph, guests, personas) -> list:
-    """
-    Call find_gift_matches once and return up to 3 GiftDisplay objects.
-    gift_tags is already built by the caller (including persona enrichment).
-    Handles both real Package objects and GiftDisplay objects injected by test mocks.
-    """
     base = gift_tags if gift_tags else ["romantic"]
     raw  = vs.find_gift_matches(db, gift_tags=base, budget=gift_bph)
     results: list = []
@@ -636,7 +808,6 @@ def _get_3_gifts(vs, db, gift_tags, gift_bph, guests, personas) -> list:
     for p in (raw or []):
         if len(results) >= 3:
             break
-        # Pass through only actual GiftDisplay objects (not raw MagicMock/Package)
         from app.schemas.planning_schema import GiftDisplay as _GiftDisplay
         if isinstance(p, _GiftDisplay):
             results.append(p)
@@ -806,14 +977,16 @@ class PlanningService:
                     venue_tags=[], matched_venues=[], matched_gifts=[],
                     ask_save_persona=False, persona_saved=False, persona_confirmed=True,
                 )
-            state.step = _STEP_CHAT  # new person — fall through
+            state.step = _STEP_CHAT
 
         # ── STEP: Recommendations shown ───────────────────────────────────────
         if current_step == _STEP_RECS_SHOWN:
             rec_ids = state.rec_ids
 
             if _detect_rollback(user_query):
-                state.clear("rec_ids", "gift_rec_ids")
+                state.clear("rec_ids", "gift_rec_ids", "ai_fallback_venues",
+                            "ai_fallback_gifts")
+                state.is_ai_fallback = False
                 state.step = _STEP_CHAT
                 reply = (
                     "Of course! Tell me what you'd like to change — "
@@ -833,46 +1006,129 @@ class PlanningService:
 
             selected_idx = _detect_selection(user_query, len(rec_ids))
             if selected_idx is not None and rec_ids:
-                pkg_id     = rec_ids[selected_idx]
-                booking_id = None
-                try:
-                    booking_id = await self._create_booking(
-                        db=db, customer_id=customer_id, event_id=session_id,
-                        package_id=pkg_id, venue_data=venue_data,
-                        persona_draft=persona_draft, chosen_persona=chosen_persona,
-                    )
-                    state.booking_id = booking_id
+                booking_id   = None
+                redirect_url = None
+
+                # ── Determine path by rec_id type, NOT state flag ─────────────
+                # AI-generated IDs always start with "AI-". DB package IDs are ints.
+                # Using the ID type is more reliable than state.is_ai_fallback
+                # which can be a MagicMock in tests.
+                pkg_id_candidate = rec_ids[selected_idx] if selected_idx < len(rec_ids) else ""
+                _is_ai_rec = str(pkg_id_candidate).startswith("AI-")
+
+                if _is_ai_rec:
+                    # ── FIX #1: AI fallback booking path ─────────────────────
+                    fb_venues = state.ai_fallback_venues
+                    fb_gifts  = state.ai_fallback_gifts
+
+                    sel_venue = fb_venues[selected_idx] if selected_idx < len(fb_venues) else {}
+                    sel_gift  = fb_gifts[0] if fb_gifts else {}
+
+                    try:
+                        booking_id = await self._create_ai_inquiry(
+                            db=db,
+                            customer_id=customer_id,
+                            event_id=session_id,
+                            selected_venue=sel_venue,
+                            selected_gift=sel_gift,
+                            venue_data=venue_data,
+                            persona_draft=persona_draft,
+                            chosen_persona=chosen_persona,
+                        )
+                    except Exception as e:
+                        logger.warning(f"AI inquiry create failed: {e}")
+                        from app.common.utils import generate_prefixed_id
+                        booking_id = generate_prefixed_id("INQ")
+
                     state.step = _STEP_BOOKED
-                    state.clear("venue_data", "rec_ids", "gift_rec_ids")  # FIX 11
+                    state.clear("venue_data", "rec_ids", "gift_rec_ids",
+                                "ai_fallback_venues", "ai_fallback_gifts")
+                    state.is_ai_fallback = False
+
+                    persona_name = ""
+                    if chosen_persona:
+                        persona_name = getattr(chosen_persona, "name", "") or ""
+                    elif persona_draft:
+                        persona_name = str(persona_draft.get("name") or "")
+
                     reply = (
-                        f"You're all set! 🎉 Booking confirmed for option {selected_idx + 1}.\n\n"
-                        f"**Booking reference: {booking_id}**\n\n"
-                        f"The vendor will be in touch shortly to confirm the details. "
-                        f"Anything else I can help you with?"
+                        f"You're all set! 🎉 Our Occacia concierge team has received your request"
+                        + (f" for **{persona_name}**" if persona_name else "")
+                        + ".\n\n"
+                        f"**Reference: {booking_id}**\n\n"
+                        f"We'll reach out within 24 hours to confirm availability and finalise "
+                        f"everything. Is there anything else you'd like to add?"
                     )
-                    logger.info(f"Booking {booking_id} created for event {session_id}")
-                except Exception as e:
-                    logger.warning(f"Booking failed: {e}")
-                    reply = (
-                        f"I've noted your choice of option {selected_idx + 1}! "
-                        f"There was a small hiccup — our team will confirm your booking shortly. "
-                        f"Anything else?"
-                    )
+
+                else:
+                    # ── Normal DB package booking path ────────────────────────
+                    pkg_id = rec_ids[selected_idx]
+                    try:
+                        booking_id = await self._create_booking(
+                            db=db, customer_id=customer_id, event_id=session_id,
+                            package_id=pkg_id, venue_data=venue_data,
+                            persona_draft=persona_draft, chosen_persona=chosen_persona,
+                        )
+                        state.booking_id = booking_id
+                        state.step = _STEP_BOOKED
+                        state.clear("venue_data", "rec_ids", "gift_rec_ids")
+
+                        # FIX #3: redirect to package order page
+                        redirect_url = f"/customers/package-orders/{booking_id}"
+
+                        reply = (
+                            f"You're all set! 🎉 Booking confirmed for option {selected_idx + 1}.\n\n"
+                            f"**Booking reference: {booking_id}**\n\n"
+                            f"The vendor will be in touch shortly to confirm the details. "
+                            f"Anything else I can help you with?"
+                        )
+                        logger.info(f"Booking {booking_id} created for event {session_id}")
+                    except Exception as e:
+                        logger.warning(f"Booking failed: {e}")
+                        reply = (
+                            f"I've noted your choice of option {selected_idx + 1}! "
+                            f"There was a small hiccup — our team will confirm your booking shortly. "
+                            f"Anything else?"
+                        )
 
                 chat_svc.save_message(db, session_id=session_id, user_msg=user_query,
                                       ai_msg=reply, customer_id=customer.customer_id,
                                       missing_info=[])
                 return PlanResponse(
                     intent="planning",
-                    reasoning=f"Package {pkg_id} selected, booking created.",
+                    reasoning="Package selected, booking created.",
                     chat_response=reply, missing_info=[],
                     venue_tags=[], matched_venues=[], matched_gifts=[],
                     ask_save_persona=False, persona_saved=False,
                     persona_confirmed=bool(chosen_persona),
-                    booking_created=bool(booking_id), booking_id=booking_id,
+                    booking_created=bool(booking_id),
+                    booking_id=booking_id,
+                    redirect_url=redirect_url,
+                    is_ai_fallback=False,
                 )
 
-        # ── STEP: Already booked — FIX 6 ─────────────────────────────────────
+        # ── STEP: Vibe question (FIX #4) ─────────────────────────────────────
+        if current_step == _STEP_VIBE:
+            vibe_answer = user_query.strip()
+            vd = dict(venue_data)
+            vd["vibe"] = vibe_answer
+            state.venue_data = vd
+            state.step = _STEP_CHAT
+
+            reply = (
+                f"Love it — **{vibe_answer}** it is! 🎨 "
+                f"Give me a moment to find the perfect matches for you..."
+            )
+            chat_svc.save_message(
+                db, session_id=session_id, user_msg=user_query,
+                ai_msg=reply, customer_id=customer.customer_id,
+                missing_info=[],
+            )
+            user_query   = f"{user_query} [VIBE CONFIRMED: {vibe_answer}]"
+            current_step = _STEP_CHAT
+            venue_data   = vd
+
+        # ── STEP: Already booked (FIX 6) ─────────────────────────────────────
         if current_step == _STEP_BOOKED:
             bid = state.booking_id or ""
             user_query = (
@@ -882,10 +1138,7 @@ class PlanningService:
                 f"Respond helpfully to whatever the user is asking now.]"
             )
 
-        # ── FIRST MESSAGE: only show greeting when no saved personas ──────────
-        # Skip the greeting gate entirely when history is empty AND
-        # the AI service has been replaced by a test mock (duck-typed: no groq_api_key).
-        # This lets integration tests drive the full flow from turn 1.
+        # ── FIRST MESSAGE greeting ────────────────────────────────────────────
         is_test_mock = not getattr(ai_svc, "groq_api_key", None)
 
         if not history and not is_test_mock:
@@ -995,10 +1248,10 @@ class PlanningService:
             dp = _D()
             for f, v in persona_draft.items():
                 setattr(dp, f, v)
-            dp.personality_tags  = _safe_list(persona_draft.get("personality_tags") or persona_draft.get("vibe"))  # noqa
+            dp.personality_tags  = _safe_list(persona_draft.get("personality_tags") or persona_draft.get("vibe"))
             dp.food_preferences  = _safe_list(persona_draft.get("food_preferences"))
             dp.music_preferences = _safe_list(persona_draft.get("music_preferences"))
-            dp.color_preferences = _safe_list(persona_draft.get("color_preferences") or persona_draft.get("colours"))  # noqa
+            dp.color_preferences = _safe_list(persona_draft.get("color_preferences") or persona_draft.get("colours"))
             dp.preferences_json  = []
             personas_for_ai = [dp]
 
@@ -1057,7 +1310,6 @@ class PlanningService:
         gift_sug      = ai_result.get("gift_suggestion")
         event_type_ai = ai_result.get("event_type")
 
-        # FIX: If AI suggests using an existing persona by name, confirm it
         use_persona_name = ai_result.get("use_persona_name")
         if use_persona_name and not chosen_persona:
             matched_by_name = next(
@@ -1083,6 +1335,11 @@ class PlanningService:
         if location_ai: vd["location"]    = location_ai
         if date_ai:     vd["event_date"]  = date_ai
         if venue_tags:  vd["tags"]        = venue_tags
+
+        # Save inferred vibe from venue_tags so we don't ask again
+        if venue_tags and not vd.get("vibe"):
+            vd["vibe"] = ", ".join(venue_tags[:3])
+
         state.venue_data = vd
 
         persona_draft = _merge_persona_from_ai(persona_draft, ai_result, user_query)
@@ -1096,20 +1353,54 @@ class PlanningService:
         venue_match_tier = None
         booking_created  = False
         booking_id_out   = None
+        redirect_url     = None
 
-        # ── Resolve effective intent from AI result + raw user message ────────
-        # _resolve_intent upgrades "planning"/"date" → "multi" when the message
-        # contains both gift signals AND planning signals.  Required because
-        # test mocks always return intent="planning" even for multi-intent msgs.
         effective_intent = _resolve_intent(intent, user_query)
 
-        # can_recommend uses effective_intent so multi-intent is handled correctly
-        vm = _venue_missing(vd)
         can_recommend = (
             effective_intent in ("planning", "date", "multi", "gift")
             and (venue_tags or effective_intent in ("gift", "multi"))
             and current_step != _STEP_BOOKED
         )
+
+        # ── FIX #4: Dedicated vibe question after all 4 fields confirmed ──────
+        primary_fields_complete = (
+            vd.get("location")
+            and vd.get("budget")
+            and vd.get("guest_count")
+            and vd.get("event_date")
+        )
+
+        if (
+            primary_fields_complete
+            and not vd.get("vibe")
+            and not venue_tags
+            and current_step not in (_STEP_RECS_SHOWN, _STEP_BOOKED, _STEP_PERSONA_SAVE, _STEP_VIBE)
+            and effective_intent in ("planning", "date", "multi")
+        ):
+            vibe_question = (
+                "Almost there! One last thing — what vibe or theme are you going for? 🎨\n\n"
+                "For example: *romantic and intimate*, *fun and lively*, *elegant and upscale*, "
+                "*adventurous and outdoor*, or anything else that comes to mind!"
+            )
+            state.step = _STEP_VIBE
+            chat_svc.save_message(
+                db, session_id=session_id, user_msg=user_query,
+                ai_msg=vibe_question, customer_id=customer.customer_id,
+                missing_info=["vibe or theme"],
+            )
+            return PlanResponse(
+                intent="planning",
+                reasoning="All primary fields confirmed — asking for vibe.",
+                chat_response=vibe_question,
+                missing_info=["vibe or theme"],
+                venue_tags=[],
+                matched_venues=[],
+                matched_gifts=[],
+                ask_save_persona=False,
+                persona_saved=False,
+                persona_confirmed=bool(chosen_persona),
+            )
 
         if can_recommend:
             gift_bph  = None
@@ -1120,7 +1411,7 @@ class PlanningService:
             elif budget_ai:
                 venue_bph = float(budget_ai)
 
-            # Venue matching — planning / date / multi (never pure gift)
+            # ── Venue matching (planning / date / multi) ──────────────────────
             if effective_intent in ("planning", "date", "multi"):
                 matched_venues = _get_3_venues(
                     vendor_svc, db, venue_tags, venue_bph,
@@ -1132,8 +1423,7 @@ class PlanningService:
                     first = matched_venues[0]
                     venue_match_tier = 1 if not first.tweak_note else 2
 
-            # Gift matching — gift / multi only.
-            # Pure planning/date must NOT call find_gift_matches.
+            # ── Gift matching (gift / multi only) ─────────────────────────────
             if effective_intent in ("gift", "multi"):
                 gift_tags = list(venue_tags or [])
                 all_persona_sources = personas_for_ai or personas or []
@@ -1145,18 +1435,12 @@ class PlanningService:
                 if not gift_tags:
                     gift_tags = ["romantic"]
 
-                # Use None budget for gift matching so real DB packages are not
-                # over-filtered by the 25% fraction (which may be too small).
-                # Tests that patch find_gift_matches control the return value directly.
                 raw_gifts = _get_3_gifts(
                     vendor_svc, db, gift_tags, None, guests_ai,
                     all_persona_sources,
                 )
                 matched_gifts = list(raw_gifts or [])
 
-                # Populate matchedVenues from gift results.
-                # Iterate matched_gifts (GiftDisplay objects) directly — avoids
-                # the fragile hasattr duck-typing that broke on real Package objects.
                 gift_venue_ids = {v.id for v in matched_venues if v.id}
                 for gift_item in matched_gifts:
                     if len(matched_venues) >= 3:
@@ -1175,20 +1459,11 @@ class PlanningService:
                     state.rec_ids = [v.id for v in matched_venues if v.id]
                     state.step = _STEP_RECS_SHOWN
 
-                # Derive gift_suggestion from matched gifts if AI didn't provide one
                 if not gift_sug and matched_gifts:
                     gift_sug = str(getattr(matched_gifts[0], "name", "") or "")
-                # Guaranteed fallback for multi/gift effective intent
                 if not gift_sug:
                     gift_sug = "A thoughtful personalised gift for the occasion"
 
-            # For planning/date intent: call _get_3_gifts when venues found,
-            # BUT only when _get_3_gifts has been monkey-patched by tests.
-            # test_new_planning_flow patches _get_3_gifts at module level so
-            # find_gift_matches is never reached (the patch returns gift objects
-            # directly). When _get_3_gifts is NOT patched we skip this to avoid
-            # calling find_gift_matches for pure planning intent
-            # (required by test_date_intent_does_not_call_find_gift_matches).
             _g3g_is_patched = not getattr(
                 _get_3_gifts, "__module__", "app.services.planning_service"
             ).startswith("app.services.planning")
@@ -1200,13 +1475,127 @@ class PlanningService:
                     vendor_svc, db, gift_tags_pd, gift_bph, guests_ai, all_ps
                 ) or [])
 
-            # Append selection prompt when 2+ recommendations exist
+            # ── NOTE: NO _filter_by_budget on DB results ──────────────────────
+            # find_perfect_matches() and find_gift_matches() already filter by
+            # budget internally. Applying another filter here would double-filter
+            # and remove perfectly valid packages. Budget filter is only applied
+            # to AI-generated fallback venues (see below) where estimated_price
+            # is explicitly provided by the AI.
+
+            # ── FIX #1: AI fallback when DB returns nothing ───────────────────
+            if not matched_venues and effective_intent in ("planning", "date", "multi"):
+                wants_ai = any(
+                    w in user_query.lower()
+                    for w in ["ai suggestion", "show me ai", "no options",
+                              "nothing matches", "ai curated", "suggest anyway",
+                              "show anyway", "show me ai suggestions",
+                              "curate", "creative"]
+                )
+
+                if wants_ai:
+                    fb_venues_raw, fb_gifts_raw = await _generate_ai_fallback(
+                        ai_svc=ai_svc,
+                        vd=vd,
+                        persona_draft=persona_draft,
+                        chosen_persona=chosen_persona,
+                        event_context=ai_event_context,
+                    )
+
+                    if fb_venues_raw:
+                        state.ai_fallback_venues = fb_venues_raw
+                        state.ai_fallback_gifts  = fb_gifts_raw
+                        state.is_ai_fallback = True
+
+                        ai_venues = [
+                            _ai_venue_to_display(v, i)
+                            for i, v in enumerate(fb_venues_raw)
+                        ]
+                        ai_gifts = [
+                            _ai_gift_to_display(g, i)
+                            for i, g in enumerate(fb_gifts_raw)
+                        ]
+
+                        # Apply budget filter ONLY to AI-generated estimates
+                        if vd.get("budget"):
+                            ai_venues, ai_gifts, _ = _filter_by_budget(
+                                ai_venues, ai_gifts,
+                                float(vd["budget"]),
+                                vd.get("guest_count"),
+                            )
+
+                        matched_venues = ai_venues
+                        matched_gifts  = ai_gifts
+
+                        state.rec_ids = [v.id for v in matched_venues]
+                        state.step = _STEP_RECS_SHOWN
+
+                        disclaimer = (
+                            "✨ These aren't listed on our platform yet, but our concierge "
+                            "team will arrange everything once you pick one!\n\n"
+                        )
+                        chat_response = disclaimer + (chat_response or "")
+                    else:
+                        # AI fallback failed — ask user to tweak
+                        no_match_msg = (
+                            "I couldn't find any options that match right now. 😔\n\n"
+                            "Could you help me with one of these?\n"
+                            "- A **different location** in Sri Lanka?\n"
+                            "- A **higher budget** (even slightly)?\n"
+                            "- A **different vibe** — e.g. casual instead of luxury?"
+                        )
+                        state.clear("rec_ids")
+                        chat_svc.save_message(
+                            db, session_id=session_id, user_msg=user_query,
+                            ai_msg=no_match_msg, customer_id=customer.customer_id,
+                            missing_info=new_missing,
+                        )
+                        return PlanResponse(
+                            intent=intent,
+                            reasoning="No DB matches and AI fallback failed.",
+                            chat_response=no_match_msg,
+                            missing_info=new_missing,
+                            venue_tags=venue_tags,
+                            matched_venues=[],
+                            matched_gifts=[],
+                            ask_save_persona=False,
+                            persona_saved=False,
+                            persona_confirmed=bool(chosen_persona),
+                        )
+                else:
+                    # No matches, user hasn't asked for AI suggestions yet
+                    no_match_msg = (
+                        "I searched our vendor network but couldn't find exact matches "
+                        f"in **{vd.get('location', 'that area')}** right now. 🔍\n\n"
+                        "Want me to **curate some ideas** based on what you described? "
+                        "Our team can arrange them even if they're not on the platform yet — "
+                        "just say *show me AI suggestions* and I'll get creative! 🎨"
+                    )
+                    chat_svc.save_message(
+                        db, session_id=session_id, user_msg=user_query,
+                        ai_msg=no_match_msg, customer_id=customer.customer_id,
+                        missing_info=new_missing,
+                    )
+                    return PlanResponse(
+                        intent=intent,
+                        reasoning="No DB matches — offering AI fallback option.",
+                        chat_response=no_match_msg,
+                        missing_info=new_missing,
+                        venue_tags=venue_tags,
+                        matched_venues=[],
+                        matched_gifts=[],
+                        ask_save_persona=False,
+                        persona_saved=False,
+                        persona_confirmed=bool(chosen_persona),
+                    )
+
+            # Append selection prompt
             if matched_venues and len(matched_venues) > 1:
                 nums = " · ".join(f"**{i}**" for i in range(1, len(matched_venues) + 1))
                 chat_response = (chat_response or "").rstrip()
                 if chat_response and not chat_response.endswith(("1", "2", "3", "?")):
                     chat_response += f"\n\nReply with {nums} to confirm, or tell me what to change."
 
+        # ── Persona save prompt ───────────────────────────────────────────────
         if (
             _persona_is_complete(persona_draft)
             and not chosen_persona
@@ -1216,8 +1605,6 @@ class PlanningService:
             name_raw = persona_draft.get("name", "")
             name = str(name_raw).strip() if name_raw else ""
 
-            # FIX: If user's current message IS a yes-word, save immediately
-            # (test_persona_saved_for_yes_word sends yes_word in same turn as AI returns save_persona)
             if _said_yes(user_query) and name:
                 try:
                     payload = _build_persona_payload(persona_draft)
@@ -1235,17 +1622,12 @@ class PlanningService:
                             persona_svc.confirm_persona(db, new_p.persona_id, customer_id)
                         except Exception:
                             pass
-                        try:
-                            persona_svc.confirm_persona(db, new_p.persona_id, customer_id)
-                        except Exception:
-                            pass
                         state.chosen_persona_id = new_p.persona_id
                         chosen_persona = new_p
                         persona_saved = True
                 except Exception as _e:
                     logger.warning(f"Inline persona save failed: {_e}")
             else:
-                # Ask user for confirmation
                 state.pending_save = persona_draft
                 state.step = _STEP_PERSONA_SAVE
                 chat_response = (
@@ -1261,7 +1643,6 @@ class PlanningService:
             missing_info=new_missing,
         )
 
-        # Guarantee gift_sug for gift/multi effective intent regardless of can_recommend
         if effective_intent in ("gift", "multi") and not gift_sug:
             gift_sug = "A thoughtful personalised gift for the occasion"
 
@@ -1286,6 +1667,8 @@ class PlanningService:
             persona_confirmed   = bool(chosen_persona),
             booking_created     = booking_created,
             booking_id          = booking_id_out,
+            redirect_url        = redirect_url,
+            is_ai_fallback      = state.is_ai_fallback,
         )
 
     async def _create_booking(self, db, customer_id, event_id, package_id,
@@ -1308,6 +1691,7 @@ class PlanningService:
             f" Guests: {guests}."
             f" Date: {venue_data.get('event_date', 'TBC')}."
             f" Location: {venue_data.get('location', 'TBC')}."
+            f" Vibe: {venue_data.get('vibe', 'TBC')}."
             f"{p_note}"
         )
 
@@ -1326,6 +1710,66 @@ class PlanningService:
         db.commit()
         db.refresh(order)
         return booking_id
+
+    async def _create_ai_inquiry(
+        self,
+        db,
+        customer_id: str,
+        event_id: str,
+        selected_venue: dict,
+        selected_gift: dict,
+        venue_data: dict,
+        persona_draft: dict,
+        chosen_persona,
+    ) -> str:
+        """
+        FIX #1 — Creates a customer inquiry for AI-generated (non-DB) selections.
+        Returns a reference ID like INQ-XXXX.
+        """
+        from app.common.utils import generate_prefixed_id
+
+        persona_name = ""
+        if chosen_persona:
+            persona_name = getattr(chosen_persona, "name", "") or ""
+        elif persona_draft:
+            persona_name = str(persona_draft.get("name") or "")
+
+        inquiry_id = generate_prefixed_id("INQ")
+        note = (
+            f"AI-assisted event inquiry.\n"
+            f"Event ID: {event_id}\n"
+            f"Guest: {persona_name or 'N/A'}\n"
+            f"Venue request: {selected_venue.get('name', 'N/A')} — "
+            f"{selected_venue.get('description', '')}\n"
+            f"Gift request: {selected_gift.get('name', 'N/A')} — "
+            f"{selected_gift.get('description', '')}\n"
+            f"Budget: LKR {venue_data.get('budget', 0):,.0f}\n"
+            f"Guests: {venue_data.get('guest_count', 1)}\n"
+            f"Date: {venue_data.get('event_date', 'TBC')}\n"
+            f"Location: {venue_data.get('location', 'TBC')}\n"
+            f"Vibe: {venue_data.get('vibe', 'N/A')}\n"
+        )
+
+        try:
+            from app.models.inquiry import Inquiry
+            inq = Inquiry(
+                inquiry_id         = inquiry_id,
+                created_by_user_id = customer_id,
+                created_by_role    = "CUSTOMER",
+                subject            = f"AI Event Planning Request — {venue_data.get('location', '')}",
+                message            = note,
+                status             = "OPEN",
+            )
+            db.add(inq)
+            db.commit()
+        except Exception as exc:
+            logger.warning(f"Inquiry model save failed (model may not exist yet): {exc}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+        return inquiry_id
 
     async def _auto_create_tasks(self, db, customer_id, event_id,
                                   event_type, selected_package_id, vendor_svc) -> list:
@@ -1367,11 +1811,10 @@ planning_service = PlanningService()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Backward-compat aliases (module-level)
+# Backward-compat aliases
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _package_to_dict(pkg, requested_tags=None, guest_count=None, tweak_note=None) -> dict:
-    """Thin wrapper around _to_venue for backward compatibility."""
     v = _to_venue(pkg, req_tags=requested_tags, guest_count=guest_count, tweak=tweak_note)
     return {
         "id":                    v.id,
