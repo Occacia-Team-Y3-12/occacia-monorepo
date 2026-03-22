@@ -43,7 +43,6 @@ line-length = 100
 lint.select = ["E", "F", "I", "UP", "S"]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
 testpaths = ["tests"]
 filterwarnings = [
     "ignore::DeprecationWarning:pytest_asyncio",

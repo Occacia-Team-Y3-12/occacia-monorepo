@@ -52,7 +52,6 @@ class SuggestedTaskDraftResponse(BaseModel):
 
 class VenueDisplay(BaseModel):
     """Vendor package matched by the AI planning engine."""
-    # Union[int, str] so DB integer IDs and AI-generated string IDs both work
     id: int | str | None = None
     name: str
     description: str | None = None
@@ -72,51 +71,20 @@ class VenueDisplay(BaseModel):
     model_config = {"populate_by_name": True, "from_attributes": True, "extra": "ignore"}
 
 
-class GiftDisplay(BaseModel):
-    """One of the 3 gift recommendations shown alongside venue packages."""
-    # Union[int, str] so DB integer IDs and AI-generated string IDs both work
-    id: int | str | None = None
-    name: str
-    description: str | None = None
-    price_per_head: float | None = Field(default=None, alias="pricePerHead")
-    estimated_price: float | None = Field(default=None, alias="estimatedPrice")
-    tags: list[str] = Field(default_factory=list)
-    location: str | None = None
-    vendor_name: str | None = Field(default=None, alias="vendorName")
-    match_score_label: str | None = Field(default=None, alias="matchScoreLabel")
-    tweak_note: str | None = Field(default=None, alias="tweakNote")
-
-    model_config = {"populate_by_name": True, "from_attributes": True, "extra": "ignore"}
-
-
 class ChatSendResponse(BaseModel):
     """
     Response for POST /customers/events/{eventId}/chat  (UC-13).
-
-    Spec-required fields
-    --------------------
-    reply           — the AI/system reply text to display in chat
-    suggestedTasks  — template-based task drafts for the customer to review
-
-    Extended fields  (additive — not in OpenAPI spec)
-    -------------------------------------------------
-    These carry the AI planning engine's full output so the frontend
-    can update persona state, show vendor matches, track missing planning
-    info, and handle bookings without a second request.
-    Clients that only consume reply + suggestedTasks are unaffected.
     """
-
-    # ── Spec fields ───────────────────────────────────────────────────────────
+    # Spec fields
     reply: str
     suggested_tasks: list[SuggestedTaskDraftResponse] = Field(
         default_factory=list, alias="suggestedTasks"
     )
 
-    # ── Planning engine — conversation state ──────────────────────────────────
+    # Planning engine — conversation state
     intent: str | None = None
     reasoning: str | None = None
     personality_profile: str | None = Field(default=None, alias="personalityProfile")
-    gift_suggestion: str | None = Field(default=None, alias="giftSuggestion")
     event_type: str | None = Field(default=None, alias="eventType")
     event_date: str | None = Field(default=None, alias="eventDate")
     location: str | None = None
@@ -125,29 +93,24 @@ class ChatSendResponse(BaseModel):
     venue_tags: list[str] = Field(default_factory=list, alias="venueTags")
     missing_info: list[str] = Field(default_factory=list, alias="missingInfo")
 
-    # 3 venue package recommendations
+    # Venue package recommendations
     matched_venues: list[VenueDisplay] = Field(default_factory=list, alias="matchedVenues")
-    # 3 gift recommendations (priced from 25% of total budget)
-    matched_gifts: list[GiftDisplay] = Field(default_factory=list, alias="matchedGifts")
-    # Legacy generated packages (kept for backward compat)
+    # Legacy generated packages (backward compat)
     matched_packages: List[Dict[str, Any]] = Field(default_factory=list, alias="matchedPackages")
 
     venue_match_tier: int | None = Field(default=None, alias="venueMatchTier")
 
-    # ── Persona flow flags ────────────────────────────────────────────────────
+    # Persona flow flags
     ask_save_persona: bool = Field(default=False, alias="askSavePersona")
     persona_saved: bool = Field(default=False, alias="personaSaved")
     persona_confirmed: bool = Field(default=False, alias="personaConfirmed")
 
-    # ── Booking ───────────────────────────────────────────────────────────────
+    # Booking
     booking_created: bool = Field(default=False, alias="bookingCreated")
     booking_id: str | None = Field(default=None, alias="bookingId")
 
-    # ── FIX #3 — redirect after booking ──────────────────────────────────────
+    # Redirect after booking
     redirect_url: str | None = Field(default=None, alias="redirectUrl")
-
-    # ── FIX #1 — AI fallback indicator ───────────────────────────────────────
-    is_ai_fallback: bool = Field(default=False, alias="isAiFallback")
 
     model_config = {"populate_by_name": True}
 

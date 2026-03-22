@@ -204,6 +204,7 @@ jobs:
             SMTP_PASSWORD=${SMTP_PASSWORD}
             SMTP_USE_TLS=${SMTP_USE_TLS:-false}
             SKIP_EMAIL_VERIFICATION=${SKIP_EMAIL_VERIFICATION:-false}
+            RUN_DB_SEED_ON_STARTUP=1
             EOF
 
             # Stop and remove all named containers first

@@ -29,7 +29,7 @@ from app.schemas.recommendation_schema import (
     TaskRecommendationResponse,
     UpdateCustomPackageRequest,
 )
-from app.services.ai_service import ai_service
+from app.services.groq_ai_service import groq_ai_service as ai_service
 from app.services.event_planning_service import event_planning_service
 
 logger = logging.getLogger(__name__)
