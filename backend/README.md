@@ -277,6 +277,14 @@ Useful endpoints:
 - Health: `http://localhost:8000/api/v1/health`
 - Swagger UI: `http://localhost:8000/api/docs`
 
+## Vendor Task Endpoints
+
+Recent vendor task APIs are available under `/api/v1/vendors`:
+
+- `GET /api/v1/vendors/tasks` - grouped vendor tasks with optional filters
+- `GET /api/v1/vendors/tasks/{task_id}` - task detail payload for vendor view
+- `GET /api/v1/vendors/tasks/stats/dashboard` - dashboard counts and urgent totals
+
 ## Common Commands
 
 - Install dependencies:

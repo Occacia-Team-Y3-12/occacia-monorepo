@@ -95,11 +95,6 @@ def get_authenticated_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
 ):
-    """
-    Accept any valid JWT — customer or vendor — for metadata endpoints.
-    Uses app.core.security.decode_token (PyJWT) for signature verification,
-    then looks up Customer first, Vendor second.
-    """
     from fastapi import HTTPException as _HTTPEx
     from app.core.security import decode_token as _decode
     from app.models.vendor import Vendor as _Vendor
@@ -133,7 +128,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Customer"])
 
 
-# --- Response Builders ---
+# ── Response Builders ─────────────────────────────────────────────────────────
 
 def _customer_response(customer: Customer) -> CustomerProfileResponse:
     return CustomerProfileResponse(
@@ -285,7 +280,7 @@ def _message_response(message) -> ChatMessageResponse:
     )
 
 
-# --- Customer Profile Routes ---
+# ── Customer Profile Routes ───────────────────────────────────────────────────
 
 @router.get("/customers/me", response_model=CustomerProfileResponse, response_model_by_alias=True)
 def get_customer_me(current_customer: Customer = Depends(get_current_customer)):
@@ -307,7 +302,7 @@ def update_customer_me(
     return _customer_response(updated_customer)
 
 
-# --- Customer Event Routes ---
+# ── Customer Event Routes ─────────────────────────────────────────────────────
 
 @router.get(
     "/customers/events",
@@ -412,7 +407,7 @@ def delete_customer_event(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-# --- Event Metadata Routes ---
+# ── Event Metadata Routes ─────────────────────────────────────────────────────
 
 @router.get("/event-types", response_model=StringListResponse)
 def list_event_types(_=Depends(get_authenticated_user)):
@@ -423,7 +418,7 @@ def list_event_templates(_=Depends(get_authenticated_user)):
     return StringListResponse(items=customer_service.list_event_templates())
 
 
-# --- Event Chat & Summary Routes ---
+# ── Event Chat & Summary Routes ───────────────────────────────────────────────
 
 @router.post(
     "/customers/events/{event_id}/chat",
@@ -452,10 +447,12 @@ async def send_event_chat_message(
          - Persona collection: name, vibe, food, music (in-memory via Redis)
          - After persona complete: asks to save profile
          - Venue collection: location, date, budget, guests
-         - Once all 4 venue fields known: shows 3 packages + 3 gifts
-         - 3 packages from find_perfect_matches() with tweak_note on fallbacks
-         - 3 gifts priced from 25% of total budget
-         - User selects 1/2/3: PackageExecutionRequest created immediately
+         - FIX #4: After all 4 fields confirmed → dedicated vibe/theme question
+         - Once all fields known: shows 3 packages + 3 gifts (within budget)
+         - FIX #2: Budget hard-filter applied before showing options
+         - FIX #1: AI fallback if DB has no matches
+         - User selects 1/2/3: booking created, redirect_url returned
+         - FIX #3: redirect_url = /customers/package-orders/{bookingId}
          - User rolls back: AI re-collects changed details, re-recommends
 
     AI reply from step 2 wins; rule-based reply from step 1 used only
@@ -538,12 +535,16 @@ async def send_event_chat_message(
         matchedPackages    = plan.matched_packages    if plan else [],
         venueMatchTier     = plan.venue_match_tier    if plan else None,
         # ── Persona flow flags ────────────────────────────────────────────────
-        askSavePersona  = plan.ask_save_persona  if plan else False,
-        personaSaved    = plan.persona_saved     if plan else False,
-        personaConfirmed= plan.persona_confirmed if plan else False,
+        askSavePersona   = plan.ask_save_persona  if plan else False,
+        personaSaved     = plan.persona_saved     if plan else False,
+        personaConfirmed = plan.persona_confirmed if plan else False,
         # ── Booking ───────────────────────────────────────────────────────────
-        bookingCreated  = plan.booking_created if plan else False,
-        bookingId       = plan.booking_id      if plan else None,
+        bookingCreated = plan.booking_created if plan else False,
+        bookingId      = plan.booking_id      if plan else None,
+        # ── FIX #3: Redirect URL after booking ───────────────────────────────
+        redirectUrl    = plan.redirect_url    if plan else None,
+        # ── FIX #1: AI fallback flag ──────────────────────────────────────────
+        isAiFallback   = plan.is_ai_fallback  if plan else False,
     )
 
 @router.post(
@@ -588,7 +589,7 @@ def list_event_messages(
     )
 
 
-# --- Event Task Routes ---
+# ── Event Task Routes ─────────────────────────────────────────────────────────
 
 @router.get(
     "/customers/events/{event_id}/tasks",
@@ -711,7 +712,7 @@ def reassign_event_task(
     )
 
 
-# --- Event Recommendation Package Routes ---
+# ── Event Recommendation Package Routes ───────────────────────────────────────
 
 @router.post(
     "/customers/events/{event_id}/recommendations",
@@ -933,7 +934,7 @@ def get_customer_package_order(
     )
 
 
-# --- Event Schedule & Reminders ---
+# ── Event Schedule & Reminders ────────────────────────────────────────────────
 
 @router.get(
     "/customers/events/{event_id}/schedule",
@@ -1034,7 +1035,7 @@ def list_event_occurrences(
     )
 
 
-# --- Calendar Sync Routes ---
+# ── Calendar Sync Routes ──────────────────────────────────────────────────────
 
 @router.get(
     "/customers/events/{event_id}/calendar-sync",

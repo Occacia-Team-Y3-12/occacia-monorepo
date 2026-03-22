@@ -41,7 +41,7 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+psycopg2://${DB_USER:-admin}:${DB_PASSWORD}@db:5432/${DB_NAME:-occacia_db}
-    command: ["sh", "-c", "alembic upgrade head"]
+    command: ["sh", "-c", "alembic upgrade heads"]
     restart: "no"
     profiles: ["tools"]
     logging: *default-logging

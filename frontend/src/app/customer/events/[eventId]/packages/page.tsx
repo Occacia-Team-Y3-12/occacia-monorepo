@@ -4,64 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Sparkles, CheckCircle2, Clock, RefreshCw } from 'lucide-react';
+import { featureFlags } from '@/config/featureFlags';
 import { ROUTES } from '@/lib/routes';
+import { MOCK_EVENT, createMockPackages } from '@/mocks/customerExperience';
 import { packageService } from '@/services/customer/packageService';
 import type { RecommendationPackage, PackageType } from '@/types/customer/package';
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const MOCK_EVENT = {
-  eventTitle: 'Annual Company Gala 2026',
-  eventType: 'Corporate Event',
-  confirmedTasks: [
-    { id: 't1', title: 'Venue Booking' },
-    { id: 't2', title: 'Catering Service' },
-    { id: 't3', title: 'Photography' },
-    { id: 't4', title: 'Entertainment / DJ' },
-  ],
-};
-
-const MOCK_PACKAGES: RecommendationPackage[] = [
-  {
-    packageId: 'pkg-budget',
-    type: 'BUDGET',
-    packageTotalPrice: 4200,
-    currency: 'USD',
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-    items: [
-      { taskId: 't1', taskName: 'VENUE BOOKING', offeringId: 'b-o1', offeringTitle: 'Standard Banquet Hall', offeringCategory: 'Venue', vendorName: 'CitySpace Halls', taskPrice: 1500 },
-      { taskId: 't2', taskName: 'CATERING SERVICE', offeringId: 'b-o2', offeringTitle: 'Buffet Package – Classic', offeringCategory: 'Catering', vendorName: 'QuickBite Co.', taskPrice: 1200 },
-      { taskId: 't3', taskName: 'PHOTOGRAPHY', offeringId: 'b-o3', offeringTitle: '4-Hour Coverage', offeringCategory: 'Photography', vendorName: 'SnapShot Studios', taskPrice: 800 },
-      { taskId: 't4', taskName: 'ENTERTAINMENT / DJ', offeringId: 'b-o4', offeringTitle: 'Basic DJ Set', offeringCategory: 'Entertainment', vendorName: 'BeatDrop DJs', taskPrice: 700 },
-    ],
-  },
-  {
-    packageId: 'pkg-recommended',
-    type: 'RECOMMENDED',
-    packageTotalPrice: 7850,
-    currency: 'USD',
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-    items: [
-      { taskId: 't1', taskName: 'VENUE BOOKING', offeringId: 'r-o1', offeringTitle: 'Premier Ballroom', offeringCategory: 'Venue', vendorName: 'Grand Horizon Hotel', taskPrice: 3000 },
-      { taskId: 't2', taskName: 'CATERING SERVICE', offeringId: 'r-o2', offeringTitle: "Seated Dinner – Chef's Menu", offeringCategory: 'Catering', vendorName: 'Savory & Fine', taskPrice: 2200 },
-      { taskId: 't3', taskName: 'PHOTOGRAPHY', offeringId: 'r-o3', offeringTitle: 'Full-Day + Drone Coverage', offeringCategory: 'Photography', vendorName: 'Lumen Collective', taskPrice: 1500 },
-      { taskId: 't4', taskName: 'ENTERTAINMENT / DJ', offeringId: 'r-o4', offeringTitle: 'DJ + MC Package', offeringCategory: 'Entertainment', vendorName: 'Vibe Nation', taskPrice: 1150 },
-    ],
-  },
-  {
-    packageId: 'pkg-highquality',
-    type: 'HIGH_QUALITY',
-    packageTotalPrice: 14500,
-    currency: 'USD',
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-    items: [
-      { taskId: 't1', taskName: 'VENUE BOOKING', offeringId: 'h-o1', offeringTitle: 'Exclusive Rooftop Terrace', offeringCategory: 'Venue', vendorName: 'The Ritz Venue', taskPrice: 5500 },
-      { taskId: 't2', taskName: 'CATERING SERVICE', offeringId: 'h-o2', offeringTitle: '7-Course Tasting Menu', offeringCategory: 'Catering', vendorName: 'Étoile Cuisine', taskPrice: 4200 },
-      { taskId: 't3', taskName: 'PHOTOGRAPHY', offeringId: 'h-o3', offeringTitle: 'Cinematic Photo + Video', offeringCategory: 'Photography', vendorName: 'ArtFrame Studios', taskPrice: 2800 },
-      { taskId: 't4', taskName: 'ENTERTAINMENT / DJ', offeringId: 'h-o4', offeringTitle: 'Live Band + DJ Fusion', offeringCategory: 'Entertainment', vendorName: 'Platinum Sounds', taskPrice: 2000 },
-    ],
-  },
-];
 
 // ─── Package Config ───────────────────────────────────────────────────────────
 
@@ -221,11 +168,14 @@ export default function CustomerEventPackagesPage() {
       setPhase('packages');
       toast.success('Packages generated successfully!');
     } catch {
+      if (!featureFlags.useCustomerPackagesMock) {
+        setPhase('ready');
+        toast.error('Failed to generate packages. Please try again.');
+        return;
+      }
+
       await new Promise(r => setTimeout(r, 2000));
-      const data = MOCK_PACKAGES.map(p => ({
-        ...p,
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-      }));
+      const data = createMockPackages();
       sessionStorage.setItem(`packages_${eventId}`, JSON.stringify(data));
       setPackages(data);
       setPhase('packages');

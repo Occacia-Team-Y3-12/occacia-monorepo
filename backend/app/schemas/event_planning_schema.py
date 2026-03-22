@@ -1,7 +1,10 @@
+"""
+app/schemas/event_planning_schema.py
+"""
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -49,7 +52,8 @@ class SuggestedTaskDraftResponse(BaseModel):
 
 class VenueDisplay(BaseModel):
     """Vendor package matched by the AI planning engine."""
-    id: int | None = None
+    # Union[int, str] so DB integer IDs and AI-generated string IDs both work
+    id: int | str | None = None
     name: str
     description: str | None = None
     price_per_head: float | None = Field(default=None, alias="pricePerHead")
@@ -63,28 +67,23 @@ class VenueDisplay(BaseModel):
     vendor_location: str | None = Field(default=None, alias="vendorLocation")
     vendor_email: str | None = Field(default=None, alias="vendorEmail")
     is_verified: bool = Field(default=False, alias="isVerified")
-    # Set when this is a fallback match — explains what differs from the request
     tweak_note: str | None = Field(default=None, alias="tweakNote")
 
     model_config = {"populate_by_name": True, "from_attributes": True, "extra": "ignore"}
 
 
 class GiftDisplay(BaseModel):
-    """
-    One of the 3 gift recommendations shown alongside venue packages.
-    estimated_price is calculated from (total_budget * 0.25) split across guests.
-    """
-    id: int | None = None
+    """One of the 3 gift recommendations shown alongside venue packages."""
+    # Union[int, str] so DB integer IDs and AI-generated string IDs both work
+    id: int | str | None = None
     name: str
     description: str | None = None
     price_per_head: float | None = Field(default=None, alias="pricePerHead")
-    # Total estimated gift cost = gift_budget_per_head * guest_count
     estimated_price: float | None = Field(default=None, alias="estimatedPrice")
     tags: list[str] = Field(default_factory=list)
     location: str | None = None
     vendor_name: str | None = Field(default=None, alias="vendorName")
     match_score_label: str | None = Field(default=None, alias="matchScoreLabel")
-    # Set when this is a fallback match
     tweak_note: str | None = Field(default=None, alias="tweakNote")
 
     model_config = {"populate_by_name": True, "from_attributes": True, "extra": "ignore"}
@@ -140,9 +139,15 @@ class ChatSendResponse(BaseModel):
     persona_saved: bool = Field(default=False, alias="personaSaved")
     persona_confirmed: bool = Field(default=False, alias="personaConfirmed")
 
-    # ── Booking — set when user selects a package and booking is created ──────
+    # ── Booking ───────────────────────────────────────────────────────────────
     booking_created: bool = Field(default=False, alias="bookingCreated")
     booking_id: str | None = Field(default=None, alias="bookingId")
+
+    # ── FIX #3 — redirect after booking ──────────────────────────────────────
+    redirect_url: str | None = Field(default=None, alias="redirectUrl")
+
+    # ── FIX #1 — AI fallback indicator ───────────────────────────────────────
+    is_ai_fallback: bool = Field(default=False, alias="isAiFallback")
 
     model_config = {"populate_by_name": True}
 

@@ -16,6 +16,8 @@ function resolveApiBaseUrl() {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+export { API_BASE_URL, resolveApiBaseUrl };
+
 export const authApi = {
   register: async (data: CustomerRegistrationData): Promise<Customer> => {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {

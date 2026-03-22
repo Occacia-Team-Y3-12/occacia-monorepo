@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy.orm import relationship
 
 from app.common.utils import generate_prefixed_id
 from app.core.database import Base
@@ -36,3 +37,6 @@ class Customer(Base):
     calendar_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     calendar_token_scope = Column(String, nullable=True)
     calendar_token_type = Column(String, nullable=True)
+
+    # Relationships
+    vendor_tasks = relationship("VendorTask", back_populates="customer", cascade="all, delete-orphan")

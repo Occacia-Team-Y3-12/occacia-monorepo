@@ -34,10 +34,13 @@ export const ROUTES = {
     PENDING_APPROVAL: '/vendors/pending-approval',
   },
   ADMIN: {
-    DASHBOARD: '/admin',
+    HOME: '/admin',
+    LOGIN: '/admin/login',
+    DASHBOARD: '/admin/dashboard',
     APPROVALS: '/admin/approvals',
     USERS: '/admin/users',
     CUSTOMERS: '/admin/customers',
+    PENDING_VENDORS: '/admin/vendors/pending',
     SETTINGS: '/admin/settings',
   },
 } as const;

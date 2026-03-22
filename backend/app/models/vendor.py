@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy.orm import relationship
 
 from app.common.utils import generate_prefixed_id
 from app.core.database import Base
@@ -15,7 +16,7 @@ class Vendor(Base):
     # EERD attributes
     display_name = Column(String, nullable=True)
     contact_phone = Column(String, nullable=True)
-    approval_status = Column(String, default="PENDING")
+    approval_status = Column(String, default="PENDING", index=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)
 
     # Legacy attributes used by current endpoints/services
@@ -25,5 +26,8 @@ class Vendor(Base):
     phone = Column(String, nullable=True)
     is_verified = Column(Boolean, default=False)
     password_hash = Column(String, nullable=True)
+
+    # Relationships
+    vendor_tasks = relationship("VendorTask", back_populates="vendor", cascade="all, delete-orphan")
 
 

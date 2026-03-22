@@ -2,10 +2,11 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'OCCACIA',
-  description: 'OCCACIA Application',
+  title: 'Occacia - Give them the moment they deserve',
+  description: 'AI-Powered Occasion Planning Marketplace - Give them the moment they deserve',
   icons: {
-    icon: '/images/customer/logo.png',
+    icon: '/favicon.png',
+    apple: '/apple-touch-icon.png',
   },
 };
 
