@@ -118,6 +118,10 @@ def get_current_admin(
     except JWTError:
         raise credentials_exception
 
+    # Reject blacklisted (logged-out) admin tokens
+    if _security.is_token_blacklisted(token):
+        raise credentials_exception
+
     admin = db.query(Admin).filter(Admin.admin_id == admin_id).first()
     if admin is None:
         raise credentials_exception
