@@ -1,5 +1,5 @@
-import CustomerCreateEvent from '@/components/features/customer/CustomerCreateEvent';
+import EventsPage from '@/components/events/EventsPage';
 
 export default function CustomerEventsPage() {
-  return <CustomerCreateEvent />;
+  return <EventsPage />;
 }
