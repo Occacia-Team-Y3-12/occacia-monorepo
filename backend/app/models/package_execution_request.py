@@ -17,7 +17,7 @@ class PackageExecutionRequest(Base):
     idempotency_key = Column(String, unique=True, index=True, nullable=False)
     currency = Column(String, nullable=False)
     package_total_price = Column(Float, nullable=False)
-    status = Column(String, nullable=False, default="CREATED")
+    status = Column(String, nullable=False, default="CREATED", index=True)
     notes = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=now_utc, nullable=False)

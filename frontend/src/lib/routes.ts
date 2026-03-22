@@ -5,6 +5,7 @@ export const ROUTES = {
     DASHBOARD: '/customer/dashboard',
     REGISTER: '/customer/register',
     EVENTS: '/customer/events',
+    EVENTS_NEW: '/customer/events/new',
     EVENT_CHAT: (eventId: string) => `/customer/events/${eventId}/chat`,
     EVENT_DRAFT_REVIEW: (eventId: string) => `/customer/events/${eventId}/draft`,
     EVENT_RECOMMENDATIONS: (eventId: string) => `/customer/events/${eventId}/recommendations`,
@@ -34,10 +35,13 @@ export const ROUTES = {
     PENDING_APPROVAL: '/vendors/pending-approval',
   },
   ADMIN: {
-    DASHBOARD: '/admin',
+    HOME: '/admin',
+    LOGIN: '/admin/login',
+    DASHBOARD: '/admin/dashboard',
     APPROVALS: '/admin/approvals',
     USERS: '/admin/users',
     CUSTOMERS: '/admin/customers',
+    PENDING_VENDORS: '/admin/vendors/pending',
     SETTINGS: '/admin/settings',
   },
 } as const;

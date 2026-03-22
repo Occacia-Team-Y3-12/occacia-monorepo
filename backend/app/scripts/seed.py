@@ -19,7 +19,7 @@ def seed_data():
         if missing_tables:
             logger.warning(
                 "Skipping seed because required tables are missing: %s. "
-                "Run `poetry run alembic upgrade head` first.",
+                "Run `poetry run alembic upgrade heads` first.",
                 ", ".join(sorted(missing_tables)),
             )
             return False

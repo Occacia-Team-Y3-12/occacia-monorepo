@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect
 from sqlalchemy.exc import OperationalError
 
 from app.core.database import engine
@@ -24,9 +25,6 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     notification_task = None
-    if settings.NOTIFICATION_WORKER_ENABLED:
-        notification_task = asyncio.create_task(_run_notification_worker())
-        logger.info("Notification worker started.")
 
     if os.getenv("SKIP_DB_STARTUP") == "1":
         logger.info("SKIP_DB_STARTUP=1 set. Skipping DB startup checks and seeding.")
@@ -65,6 +63,18 @@ async def lifespan(_: FastAPI):
         seed_data()
     except Exception as e:
         logger.warning("Seeding warning: %s", e)
+
+    if settings.NOTIFICATION_WORKER_ENABLED:
+        try:
+            if inspect(engine).has_table("notifications"):
+                notification_task = asyncio.create_task(_run_notification_worker())
+                logger.info("Notification worker started.")
+            else:
+                logger.warning(
+                    "Notification worker disabled because the notifications table is missing."
+                )
+        except Exception as exc:
+            logger.warning("Notification worker startup skipped: %s", exc)
 
     # Start long-running background jobs after startup completes.
     cleanup_task = asyncio.create_task(_run_cleanup_job())

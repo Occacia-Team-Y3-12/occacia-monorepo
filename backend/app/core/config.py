@@ -1,5 +1,4 @@
 from pathlib import Path
-
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -15,21 +14,20 @@ class Settings(BaseSettings):
     LANGFLOW_ORG_ID: str | None = None
     LANGFLOW_TOKEN: str | None = None
     GROQ_API_KEY: str | None = None
-    DATABASE_URL: str | None = None
 
+    DATABASE_URL: str | None = None
     DB_USER: str = "admin"
     DB_PASSWORD: str | None = None
     DB_NAME: str = "occacia_db"
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
+
     DOCKER_SOCKET: str = "N/A"
 
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
 
     model_config = SettingsConfigDict(
-        # Local development reads backend/.env when it exists.
-        # Production should inject environment variables directly.
         env_file=str(LOCAL_ENV_FILE) if LOCAL_ENV_FILE.exists() else None,
         env_file_encoding="utf-8",
         extra="ignore",
@@ -50,10 +48,8 @@ class Settings(BaseSettings):
     def assemble_database_url(self) -> "Settings":
         if self.DATABASE_URL:
             return self
-
         if not self.DB_PASSWORD:
             raise ValueError("DATABASE_URL is required when DB_PASSWORD is not set.")
-
         self.DATABASE_URL = (
             f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}"
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
@@ -62,12 +58,28 @@ class Settings(BaseSettings):
 
     REDIS_URL: str | None = "redis://redis:6379"
 
+    # ── Email / SMTP ──────────────────────────────────────────────────────────
+    # Legacy SendGrid key (unused — kept so existing .env files don't break)
     SENDGRID_API_KEY: str | None = None
+
     FROM_EMAIL: str = "noreply@occacia.com"
+
+    # SMTP settings — set these to enable real email delivery
+    # Port 587  → STARTTLS  (most common, works on all servers)
+    # Port 465  → SSL/TLS   (older but still widely supported)
+    # Port 25   → plain     (set SMTP_USE_TLS=false, usually blocked by ISPs)
+    SMTP_HOST: str | None = None          # e.g. "mail.yourdomain.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None          # e.g. "noreply@occacia.com"
+    SMTP_PASSWORD: str | None = None
+    SMTP_USE_TLS: bool = True             # enables STARTTLS on port 587
+
+    # ── Notification worker ───────────────────────────────────────────────────
     NOTIFICATION_WORKER_ENABLED: bool = True
     NOTIFICATION_POLL_INTERVAL_SECONDS: float = 0.2
     NOTIFICATION_BATCH_SIZE: int = 20
 
+    # ── Google Calendar ───────────────────────────────────────────────────────
     GOOGLE_CLIENT_ID: str | None = None
     GOOGLE_CLIENT_SECRET: str | None = None
     GOOGLE_REDIRECT_URI: str | None = None
@@ -77,7 +89,10 @@ class Settings(BaseSettings):
     )
     CALENDAR_TOKEN_ENCRYPTION_KEY: str | None = None
 
+    # ── Dev flags ─────────────────────────────────────────────────────────────
     SKIP_EMAIL_VERIFICATION: bool = False
     SKIP_DB_STARTUP: bool = False
+    DISABLE_ADMIN_REGISTER: bool = True
+
 
 settings = Settings()
