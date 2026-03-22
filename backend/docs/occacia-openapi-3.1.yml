@@ -545,7 +545,7 @@ paths:
         in: query
         required: false
         schema:
-          $ref: '#/components/schemas/VendorApprovalStatus'
+          $ref: '#/components/schemas/VendorStatus'
       - name: status
         in: query
         required: false
@@ -2243,12 +2243,16 @@ components:
       - PENDING
       - SUSPENDED
       - DISABLED
-    VendorApprovalStatus:
+    VendorStatus:
       type: string
       enum:
-      - PENDING
-      - APPROVED
-      - REJECTED
+        - ACTIVE
+        - PENDING_ADMIN
+        - PENDING
+        - APPROVED
+        - REJECTED
+        - SUSPENDED
+        - DISABLED
     OrganizationStatus:
       type: string
       enum:
@@ -2515,7 +2519,7 @@ components:
         contactPhone:
           type: string
         approvalStatus:
-          $ref: '#/components/schemas/VendorApprovalStatus'
+          $ref: '#/components/schemas/VendorStatus'
         organizationId:
           $ref: '#/components/schemas/UUID'
         approvedAt:
@@ -2599,7 +2603,7 @@ components:
         contactPhone:
           type: string
         approvalStatus:
-          $ref: '#/components/schemas/VendorApprovalStatus'
+          $ref: '#/components/schemas/VendorStatus'
         approvedAt:
           $ref: '#/components/schemas/ISODateTime'
         organizationId:

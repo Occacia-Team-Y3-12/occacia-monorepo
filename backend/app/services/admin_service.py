@@ -69,13 +69,7 @@ class AdminService:
             raise HTTPException(status_code=400, detail="status must be ACTIVE, SUSPENDED, or DISABLED")
             
         vendor = self.get_vendor(db, vendor_id)
-        
-        # Test Constraint: Putting the hasattr hack back because the test DB is missing this column
-        if hasattr(vendor, "status"):
-            vendor.status = new_status.upper()
-        else:
-            logger.warning("Vendor model has no .status column yet. Storing in approval_status as fallback.")
-            
+        vendor.status = new_status.upper()
         db.commit()
         db.refresh(vendor)
         logger.info("Admin %s set vendor %s status to %s", admin_email, vendor_id, new_status)
