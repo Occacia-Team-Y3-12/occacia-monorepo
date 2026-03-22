@@ -37,7 +37,6 @@ from app.main import app  # noqa: E402
 from app.models import registry  # noqa: F401
 from app.models.admin import Admin
 from app.models.chat_model import ChatMessage
-from app.models.chat_session import ChatSession
 from app.models.customer import Customer
 from app.models.event import Event
 from app.models.event_chat_message import EventChatMessage
@@ -75,7 +74,6 @@ def clean_tables():
             ChatMessage,
             EventChatMessage,
             Notification,
-            ChatSession,
             PackageExecutionRequest,
             TaskRequest,
             PackageItem,

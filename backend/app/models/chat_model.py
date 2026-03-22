@@ -7,7 +7,7 @@ class ChatMessage(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(String, index=True, nullable=False)
-    # 🚨 FIXED: Changed from Integer to String to support "CUS-xxxx" format
+    # FIXED: Changed from Integer to String to support "CUS-xxxx" format
     customer_id = Column(String, nullable=True, index=True) 
     user_message = Column(Text, nullable=True)
     ai_message = Column(Text, nullable=True)

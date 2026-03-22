@@ -34,7 +34,7 @@ for key, value in dummy_env.items():
 # =============================================================================
 from app.core.database import Base
 
-# 🚨 CRITICAL: EVERY MODEL GOES HERE!
+# CRITICAL: EVERY MODEL GOES HERE!
 # (Adjust the import paths if your files are named differently)
 from app.models.customer import Customer 
 from app.models.vendor import Vendor

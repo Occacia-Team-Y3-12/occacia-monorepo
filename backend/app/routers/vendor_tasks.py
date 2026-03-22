@@ -31,6 +31,7 @@ async def get_task_service(db: AsyncSession = Depends(get_db)) -> VendorTaskServ
 @router.get(
     "/tasks",
     response_model=TaskListResponse,
+    operation_id="vendors_list_tasks_async_router",
     summary="Get vendor's assigned activities",
     description="Retrieve all tasks assigned to the vendor, grouped by status"
 )
