@@ -26,11 +26,13 @@ export const ROUTES = {
     REGISTER: '/vendor/auth/register',
     VERIFY_EMAIL: '/vendor/auth/verify-email',
     DASHBOARD: '/vendor/dashboard',
+    ACTIVITIES: '/vendor/activities',
     PENDING_APPROVAL: '/vendor/auth/pending-approval',
     ACTIVATED: '/vendor/activated',
     PRODUCTS: '/vendor/products',
     ORDERS: '/vendor/orders',
     OFFERINGS: '/vendor/offerings',
+    TASKS: '/vendors/tasks',
   },
   VENDORS: {
     DASHBOARD: '/vendors/dashboard',
