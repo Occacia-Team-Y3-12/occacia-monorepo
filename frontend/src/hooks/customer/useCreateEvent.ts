@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { featureFlags } from '@/config/featureFlags';
 import { customerEventService } from '@/services/customer/eventServices';
 import { ROUTES } from '@/lib/routes';
 import { CreateCustomerEventPayload, CustomerPersonaOption, CustomerEventType, EventTypeOption } from '@/types/customer';
