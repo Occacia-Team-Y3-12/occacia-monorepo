@@ -5,12 +5,14 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from fastapi import APIRouter, Depends, Query
-from fastapi import HTTPException, Request, status
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi import HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.dependencies import get_current_customer, get_current_vendor
+from app.models.customer import Customer
 from app.models.vendor import Vendor
 from app.schemas.auth_schema import (
     AuthMessageResponse,
@@ -91,6 +93,27 @@ async def login_customer(request: Request, db: Session = Depends(get_db)):
     """Customer login — returns JWT access + refresh tokens."""
     payload = await _parse_login_payload(request)
     return auth_service.login_customer(db, payload)
+
+
+@router.post(
+    "/customer/logout",
+    response_model=AuthMessageResponse,
+    tags=["Authentication"],
+)
+def logout_customer(
+    request: Request,
+    db: Session = Depends(get_db),
+    _: Customer = Depends(get_current_customer),
+):
+    """
+    [E05] Customer session invalidation.
+    Blacklists the current access token in Redis so it cannot be reused.
+    The token TTL in Redis matches its remaining lifetime — no stale entries.
+    Returns 200 even if Redis is unavailable (best-effort invalidation).
+    """
+    return auth_service.logout_customer(
+        db, authorization=request.headers.get("Authorization")
+    )
 
 
 @router.post(
@@ -189,6 +212,27 @@ async def login_vendor(request: Request, db: Session = Depends(get_db)):
     return auth_service.login_vendor(db, payload)
 
 
+@router.post(
+    "/vendor/logout",
+    response_model=AuthMessageResponse,
+    tags=["Authentication"],
+)
+def logout_vendor(
+    request: Request,
+    db: Session = Depends(get_db),
+    _: Vendor = Depends(get_current_vendor),
+):
+    """
+    [E06] Vendor session invalidation.
+    Blacklists the current access token in Redis so it cannot be reused.
+    The token TTL in Redis matches its remaining lifetime — no stale entries.
+    Returns 200 even if Redis is unavailable (best-effort invalidation).
+    """
+    return auth_service.logout_vendor(
+        db, authorization=request.headers.get("Authorization")
+    )
+
+
 @router.get("/vendor/verify-email")
 def verify_vendor_email(token: str = Query(...), db: Session = Depends(get_db)):
     """
@@ -243,9 +287,59 @@ def vendor_reset_password(
 ):
     """
     Step 3 — Reset password.
-    Submit the reset token from Step 2 along with the new password.
+    Submit the reset token from Step 2 and the new password.
     """
     return auth_service.confirm_vendor_password_reset(db, payload.reset_token, payload.new_password)
+
+
+# ── Vendor token refresh ──────────────────────────────────────────────────────
+
+@router.post(
+    "/vendor/token/refresh",
+    response_model=AuthResponse,
+    response_model_by_alias=True,
+    tags=["Authentication"],
+)
+def refresh_vendor_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
+    """Refresh vendor access token using a refresh token."""
+    # Reuse customer refresh logic — claims carry role so it's safe
+    exc = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired refresh token.",
+    )
+    from jwt.exceptions import PyJWTError
+    from app.core.security import decode_token, create_access_token, create_refresh_token
+    from datetime import timedelta
+    try:
+        claims = decode_token(payload.refresh_token)
+    except PyJWTError:
+        raise exc
+    if claims.get("type") != "refresh" or claims.get("role") != "VENDOR":
+        raise exc
+    email = claims.get("sub")
+    if not email:
+        raise exc
+    vendor = vendor_service.get_vendor_by_email(db, email=email)
+    if not vendor:
+        raise exc
+    access_token  = create_access_token(
+        data={"sub": vendor.email, "role": "VENDOR"}, expires_delta=timedelta(minutes=60),
+    )
+    refresh_token = create_refresh_token(
+        data={"sub": vendor.email, "role": "VENDOR"}, expires_delta=timedelta(days=7),
+    )
+    return {
+        "access_token":  access_token,
+        "token_type":    "bearer",
+        "accessToken":   access_token,
+        "refreshToken":  refresh_token,
+        "user": {
+            "userId": getattr(vendor, "vendor_id", str(getattr(vendor, "id", ""))),
+            "email":  vendor.email,
+            "role":   "VENDOR",
+            "status": getattr(vendor, "status", "ACTIVE"),
+        },
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -19,11 +19,11 @@ from app.core.config import settings
 from app.core.security import (
     ALGORITHM,
     SECRET_KEY,
-    get_password_hash,
-    verify_password,
     create_access_token,
     create_refresh_token,
     decode_token,
+    get_password_hash,
+    verify_password,
 )
 from app.models.customer import Customer
 from app.models.vendor import Vendor
@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 EMAIL_VERIFICATION_TTL_HOURS = 24
 OTP_TTL_SECONDS              = 300   # 5 minutes
 OTP_LENGTH                   = 6
-RESET_TOKEN_TTL_MINUTES      = 10   # reset token after OTP verified
+RESET_TOKEN_TTL_MINUTES      = 10    # reset token after OTP verified
 
 
 # ── Redis helper ──────────────────────────────────────────────────────────────
@@ -132,16 +132,23 @@ class AuthService:
             data={"sub": customer.email, "role": "CUSTOMER"}, expires_delta=timedelta(days=7),
         )
         return {
-            "access_token": access_token, "token_type": "bearer",
-            "accessToken": access_token, "refreshToken": refresh_token,
+            "access_token":  access_token,
+            "token_type":    "bearer",
+            "accessToken":   access_token,
+            "refreshToken":  refresh_token,
             "user": {
-                "userId": customer.customer_id, "email": customer.email,
-                "role": "CUSTOMER", "status": customer.status,
+                "userId": customer.customer_id,
+                "email":  customer.email,
+                "role":   "CUSTOMER",
+                "status": customer.status,
             },
         }
 
     def refresh_customer_token(self, db: Session, payload: RefreshTokenRequest) -> dict:
-        exc = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token.")
+        exc = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token.",
+        )
         try:
             claims = decode_token(payload.refresh_token)
         except PyJWTError:
@@ -163,17 +170,21 @@ class AuthService:
             data={"sub": customer.email, "role": "CUSTOMER"}, expires_delta=timedelta(days=7),
         )
         return {
-            "access_token": access_token, "token_type": "bearer",
-            "accessToken": access_token, "refreshToken": refresh_token,
+            "access_token":  access_token,
+            "token_type":    "bearer",
+            "accessToken":   access_token,
+            "refreshToken":  refresh_token,
             "user": {
-                "userId": customer.customer_id, "email": customer.email,
-                "role": "CUSTOMER", "status": customer.status,
+                "userId": customer.customer_id,
+                "email":  customer.email,
+                "role":   "CUSTOMER",
+                "status": customer.status,
             },
         }
 
     def verify_customer_email(self, db: Session, token: str) -> dict[str, str]:
-        claims = self._decode_verification_token(token, expected_type="verify_customer_email")
-        email  = claims.get("sub")
+        claims   = self._decode_verification_token(token, expected_type="verify_customer_email")
+        email    = claims.get("sub")
         customer = db.query(Customer).filter(Customer.email == email).first()
         if not customer:
             raise HTTPException(status_code=400, detail="Invalid verification token.")
@@ -219,9 +230,8 @@ class AuthService:
         self, db: Session, email: str,
     ) -> dict[str, str]:
         """Step 1 — send OTP to customer email."""
-        customer = customer_service.get_customer_by_email(db, email=email)
+        customer  = customer_service.get_customer_by_email(db, email=email)
         if not customer:
-            # Always return success to prevent email enumeration
             return {"message": "If this email is registered, a reset code has been sent."}
 
         otp_code  = _generate_otp()
@@ -259,8 +269,8 @@ class AuthService:
         self, db: Session, reset_token: str, new_password: str,
     ) -> dict[str, str]:
         """Step 3 — accept reset token + new password."""
-        claims = self._decode_reset_token(reset_token, expected_role="CUSTOMER")
-        email  = claims.get("sub")
+        claims   = self._decode_reset_token(reset_token, expected_role="CUSTOMER")
+        email    = claims.get("sub")
         customer = customer_service.get_customer_by_email(db, email=email)
         if not customer:
             raise HTTPException(status_code=404, detail="User not found.")
@@ -288,13 +298,15 @@ class AuthService:
         if not vendor:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password", headers={"WWW-Authenticate": "Bearer"},
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
             )
         vendor_password = getattr(vendor, "password_hash", None) or getattr(vendor, "hashed_password", None)
         if not vendor_password or not verify_password(password, vendor_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password", headers={"WWW-Authenticate": "Bearer"},
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
             )
         if os.getenv("SKIP_EMAIL_VERIFICATION") != "true":
             if not getattr(vendor, "email_verified", True) and not getattr(vendor, "is_verified", True):
@@ -307,11 +319,14 @@ class AuthService:
             data={"sub": vendor.email, "role": "VENDOR"}, expires_delta=timedelta(days=7),
         )
         return {
-            "access_token": access_token, "token_type": "bearer",
-            "accessToken": access_token, "refreshToken": refresh_token,
+            "access_token":  access_token,
+            "token_type":    "bearer",
+            "accessToken":   access_token,
+            "refreshToken":  refresh_token,
             "user": {
                 "userId": getattr(vendor, "vendor_id", str(getattr(vendor, "id", ""))),
-                "email": vendor.email, "role": "VENDOR",
+                "email":  vendor.email,
+                "role":   "VENDOR",
                 "status": getattr(vendor, "status", "ACTIVE"),
             },
         }
@@ -396,10 +411,50 @@ class AuthService:
         logger.info("Vendor password reset: %s", email)
         return {"message": "Password updated successfully."}
 
+    # ── Session Invalidation [E05] Customer / [E06] Vendor ───────────────────
+
+    def logout_customer(self, db: Session, authorization: str | None) -> dict[str, str]:
+        """
+        [E05] Invalidate customer session by blacklisting the access token in Redis.
+        The token is stored with a TTL equal to its remaining lifetime so Redis
+        never holds stale entries. If Redis is unavailable the logout still
+        succeeds — the token will expire naturally (best-effort invalidation).
+        """
+        if authorization and authorization.lower().startswith("bearer "):
+            token = authorization[7:]
+            self._blacklist_token(token, role="CUSTOMER")
+        return {"message": "Logged out successfully."}
+
+    def logout_vendor(self, db: Session, authorization: str | None) -> dict[str, str]:
+        """
+        [E06] Invalidate vendor session by blacklisting the access token in Redis.
+        Same best-effort semantics as logout_customer.
+        """
+        if authorization and authorization.lower().startswith("bearer "):
+            token = authorization[7:]
+            self._blacklist_token(token, role="VENDOR")
+        return {"message": "Logged out successfully."}
+
+    def _blacklist_token(self, token: str, role: str) -> None:
+        """Store the token in Redis with TTL matching its remaining lifetime."""
+        try:
+            claims = decode_token(token)
+            exp    = claims.get("exp")
+            if exp:
+                ttl = int(exp - datetime.now(UTC).timestamp())
+                if ttl > 0:
+                    redis = _get_redis()
+                    if redis:
+                        redis.setex(f"blacklist:{token}", ttl, role)
+                        logger.info("Token blacklisted role=%s ttl=%ds", role, ttl)
+        except Exception as exc:
+            # Never block logout because of Redis / JWT errors
+            logger.warning("Token blacklist failed (non-blocking): %s", exc)
+
     # ── Token helpers ─────────────────────────────────────────────────────────
 
     def _create_reset_token(self, email: str, role: str) -> str:
-        """Short-lived JWT issued after OTP is verified. Used to authorize the final password reset."""
+        """Short-lived JWT issued after OTP verified. Authorises the final password reset."""
         expires_at = datetime.now(UTC) + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
         return jwt.encode(
             {"sub": email, "type": "pwd_reset_verified", "role": role, "exp": expires_at},
@@ -410,7 +465,9 @@ class AuthService:
         try:
             claims = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         except ExpiredSignatureError as exc:
-            raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new OTP.") from exc
+            raise HTTPException(
+                status_code=400, detail="Reset token has expired. Please request a new OTP.",
+            ) from exc
         except PyJWTError as exc:
             raise HTTPException(status_code=400, detail="Invalid reset token.") from exc
         if claims.get("type") != "pwd_reset_verified":
