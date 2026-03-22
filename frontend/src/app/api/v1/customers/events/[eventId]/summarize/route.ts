@@ -4,20 +4,20 @@ import { EventSummaryResponse } from '@/types/customerEventChat';
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 };
 
 export async function POST(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventSummaryResponse>> {
-  if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}/summarize`) as Promise<NextResponse<EventSummaryResponse>>;
-  }
+  const { eventId } = await params;
 
-  const { eventId } = params;
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${eventId}/summarize`) as Promise<NextResponse<EventSummaryResponse>>;
+  }
 
   if (!eventId) {
     return NextResponse.json(

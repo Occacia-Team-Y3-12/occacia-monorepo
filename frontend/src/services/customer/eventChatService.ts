@@ -1,3 +1,5 @@
+import { featureFlags } from '@/config/featureFlags';
+import { mockCustomerEventChatService } from '@/mocks/customer/eventChatService';
 import {
   CalendarConnectRequest,
   CalendarConnectResponse,
@@ -97,7 +99,26 @@ const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise
   }
 };
 
-export const customerEventChatService = {
+export type CustomerEventChatService = {
+  getEvent(eventId: string): Promise<ServiceResult<EventDetailResponse>>;
+  getMessages(eventId: string): Promise<ServiceResult<EventMessagesResponse>>;
+  postChat(eventId: string, payload: EventChatRequest): Promise<ServiceResult<EventChatResponse>>;
+  getTasks(eventId: string): Promise<ServiceResult<EventTasksResponse>>;
+  createTask(eventId: string, payload: EventTaskMutationPayload): Promise<ServiceResult<EventTaskResponse>>;
+  updateTask(eventId: string, taskId: string, payload: Partial<EventTaskMutationPayload> & { completed?: boolean }): Promise<ServiceResult<EventTaskResponse>>;
+  deleteTask(eventId: string, taskId: string): Promise<ServiceResult<{ status: 'success' | 'error'; message: string }>>;
+  confirmTasks(eventId: string): Promise<ServiceResult<EventTasksConfirmResponse>>;
+  saveSchedule(eventId: string, payload: EventScheduleRequest): Promise<ServiceResult<EventScheduleResponse>>;
+  saveReminders(eventId: string, payload: EventRemindersRequest): Promise<ServiceResult<EventRemindersResponse>>;
+  getCalendarProviders(): Promise<ServiceResult<CalendarProvidersResponse>>;
+  getCalendarStatus(): Promise<ServiceResult<CalendarStatusResponse>>;
+  connectCalendar(payload: CalendarConnectRequest): Promise<ServiceResult<CalendarConnectResponse>>;
+  disconnectCalendar(): Promise<ServiceResult<{ status: 'success' | 'error'; message: string }>>;
+  setCalendarSync(eventId: string, payload: CalendarSyncRequest): Promise<ServiceResult<CalendarSyncResponse>>;
+  summarize(eventId: string): Promise<ServiceResult<EventSummaryResponse>>;
+};
+
+const apiCustomerEventChatService: CustomerEventChatService = {
   getEvent(eventId: string): Promise<ServiceResult<EventDetailResponse>> {
     return request<EventDetailResponse>(`/api/v1/customers/events/${eventId}`);
   },
@@ -198,3 +219,8 @@ export const customerEventChatService = {
     });
   },
 };
+
+export const customerEventChatService: CustomerEventChatService =
+  featureFlags.useCustomerPlanningMockApi
+    ? mockCustomerEventChatService
+    : apiCustomerEventChatService;

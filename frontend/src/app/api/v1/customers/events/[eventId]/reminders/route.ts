@@ -4,20 +4,20 @@ import { EventRemindersRequest, EventRemindersResponse } from '@/types/customerE
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 };
 
 export async function PUT(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventRemindersResponse>> {
-  if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}/reminders`) as Promise<NextResponse<EventRemindersResponse>>;
-  }
+  const { eventId } = await params;
 
-  const { eventId } = params;
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${eventId}/reminders`) as Promise<NextResponse<EventRemindersResponse>>;
+  }
 
   if (!eventId) {
     return NextResponse.json(

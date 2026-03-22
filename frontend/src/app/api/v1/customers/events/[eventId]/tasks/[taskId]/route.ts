@@ -4,21 +4,21 @@ import { EventTaskResponse } from '@/types/customerEventChat';
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     eventId: string;
     taskId: string;
-  };
+  }>;
 };
 
 export async function PUT(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventTaskResponse>> {
-  if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}/tasks/${params.taskId}`) as Promise<NextResponse<EventTaskResponse>>;
-  }
+  const { eventId, taskId } = await params;
 
-  const { eventId, taskId } = params;
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${eventId}/tasks/${taskId}`) as Promise<NextResponse<EventTaskResponse>>;
+  }
 
   if (!eventId || !taskId) {
     return NextResponse.json(
@@ -71,11 +71,11 @@ export async function DELETE(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<{ status: 'success' | 'error'; message: string }>> {
-  if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}/tasks/${params.taskId}`) as Promise<NextResponse<{ status: 'success' | 'error'; message: string }>>;
-  }
+  const { eventId, taskId } = await params;
 
-  const { eventId, taskId } = params;
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${eventId}/tasks/${taskId}`) as Promise<NextResponse<{ status: 'success' | 'error'; message: string }>>;
+  }
 
   if (!eventId || !taskId) {
     return NextResponse.json(
