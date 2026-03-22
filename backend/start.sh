@@ -19,5 +19,12 @@ else
     alembic upgrade heads
 fi
 
+if [ "${RUN_DB_SEED_ON_STARTUP:-1}" = "1" ]; then
+    echo "Running startup seed script..."
+    python -m app.scripts.seed
+else
+    echo "RUN_DB_SEED_ON_STARTUP is disabled. Skipping seed script."
+fi
+
 echo "Starting FastAPI Engine..."
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000
