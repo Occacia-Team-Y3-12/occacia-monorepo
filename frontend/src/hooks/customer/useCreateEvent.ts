@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { featureFlags } from '@/config/featureFlags';
 import { customerEventService } from '@/services/customer/eventServices';
 import { ROUTES } from '@/lib/routes';
 import { CreateCustomerEventPayload, CustomerPersonaOption, CustomerEventType, EventTypeOption } from '@/types/customer';
@@ -23,9 +22,7 @@ export const useCreateEvent = () => {
   const [eventType, setEventType] = useState<CustomerEventFormType>(DEFAULT_EVENT_TYPE);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [eventTypes, setEventTypes] = useState<EventTypeOption[]>(
-    featureFlags.useCustomerPlanningMockApi ? EVENT_TYPE_FALLBACKS : []
-  );
+  const [eventTypes, setEventTypes] = useState<EventTypeOption[]>(EVENT_TYPE_FALLBACKS);
   const [personas, setPersonas] = useState<CustomerPersonaOption[]>(PERSONA_OPTIONS);
   const [selectedPersonaIds, setSelectedPersonaIds] = useState<string[]>([]);
   const [errors, setErrors] = useState<{ eventType?: string; title?: string; form?: string }>({});
@@ -51,11 +48,12 @@ export const useCreateEvent = () => {
 
       if (result.ok && result.data?.data?.eventTypes?.length) {
         setEventTypes(result.data.data.eventTypes);
-      } else if (!result.ok) {
-        if (featureFlags.useCustomerPlanningMockApi) {
-          setEventTypes(EVENT_TYPE_FALLBACKS);
-        }
+      } else {
+        setEventTypes(EVENT_TYPE_FALLBACKS);
+
+        if (!result.ok) {
         setErrors((prev) => ({ ...prev, form: result.error || 'Unable to load event types right now.' }));
+        }
       }
 
       setIsLoadingEventTypes(false);

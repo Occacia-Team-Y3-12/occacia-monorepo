@@ -93,7 +93,7 @@ export default function CustomerEventChatPage() {
   }, [startDate]);
 
   if (!eventId) {
-    return <section className="rounded-2xl border border-[#E4E8F2] bg-white p-6 text-sm text-[#D64545]">Invalid event id.</section>;
+    return <section className="rounded-2xl border border-[#EAEAEA] bg-white p-6 text-sm text-[#EA4335]">Invalid event id.</section>;
   }
 
   const onSendMessage = (event: FormEvent) => {
@@ -155,7 +155,7 @@ export default function CustomerEventChatPage() {
   };
 
   if (isInitialLoading) {
-    return <section className="rounded-2xl border border-[#E4E8F2] bg-white p-6 text-sm text-[#4F5871]">Loading event chat...</section>;
+    return <section className="rounded-2xl border border-[#EAEAEA] bg-white p-6 text-sm text-[#666666]">Loading event chat...</section>;
   }
 
   const primaryAssistantMessage = messages[0]?.content
@@ -181,28 +181,28 @@ export default function CustomerEventChatPage() {
   ];
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-[#D9DFEA] bg-white">
+    <section className="overflow-hidden rounded-2xl border border-[#EAEAEA] bg-white">
       {(error || warning || success) && (
-        <div className="space-y-2 border-b border-[#E6EBF3] bg-[#F8FAFE] px-6 py-3 text-sm">
-          {error && <p className="rounded-md border border-[#F4CDCD] bg-[#FFF3F3] px-3 py-2 text-[#B23C3C]">{error}</p>}
-          {warning && <p className="rounded-md border border-[#F3E2B8] bg-[#FFF8E9] px-3 py-2 text-[#9D7200]">{warning}</p>}
-          {success && <p className="rounded-md border border-[#C7E7D0] bg-[#F0FBF4] px-3 py-2 text-[#1F7D46]">{success}</p>}
+        <div className="space-y-2 border-b border-[#EAEAEA] bg-[#F4F8FA] px-6 py-3 text-sm">
+          {error && <p className="rounded-md border border-[#EAEAEA] bg-[#FAFAFA] px-3 py-2 text-[#EA4335]">{error}</p>}
+          {warning && <p className="rounded-md border border-[#EAEAEA] bg-[#FAFAFA] px-3 py-2 text-[#FBBC05]">{warning}</p>}
+          {success && <p className="rounded-md border border-[#EAEAEA] bg-[#FAFAFA] px-3 py-2 text-[#34A853]">{success}</p>}
         </div>
       )}
 
       <div className="flex min-h-[820px] flex-col lg:min-h-[780px] lg:flex-row">
-        <div className="flex min-w-0 flex-1 flex-col border-r border-[#E6EBF3]">
-          <header className="border-b border-[#E6EBF3] px-6 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h1 className="text-[36px] font-bold leading-tight text-[#131C2E]">{eventTitle || 'Sarah’s Birthday'}</h1>
-                <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#95A0B6]">
-                  <span className="inline-block h-2 w-2 rounded-full bg-[#E5A30E]" />
+        <div className="flex min-w-0 flex-1 flex-col border-b border-[#EAEAEA] lg:border-b-0 lg:border-r">
+          <header className="border-b border-[#EAEAEA] px-4 py-4 sm:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
+              <div className="min-w-0">
+                <h1 className="truncate text-[22px] font-bold leading-tight text-[#0D47A1] sm:text-[36px]">{eventTitle || "Sarah's Birthday"}</h1>
+                <div className="mt-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666] sm:text-[11px] sm:tracking-[0.16em]">
+                  <span className="inline-block h-2 w-2 rounded-full bg-[#FBBC05]" />
                   Planning Phase
                 </div>
               </div>
 
-              <button className="inline-flex h-9 items-center gap-1 rounded-lg border border-[#E0E5EF] bg-white px-3 text-xs font-semibold text-[#36435E]">
+              <button className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#EAEAEA] bg-white px-2.5 text-[11px] font-semibold text-[#666666] sm:h-9 sm:px-3 sm:text-xs">
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M4 7h16" />
                   <path d="M4 12h10" />
@@ -213,23 +213,23 @@ export default function CustomerEventChatPage() {
             </div>
           </header>
 
-          <div className="flex-1 space-y-8 overflow-y-auto px-6 py-6">
-            <div className="flex gap-3">
+          <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5 sm:space-y-8 sm:px-6 sm:py-6">
+            <div className="flex min-w-0 gap-3">
               <img src="/icons/logo.svg" alt="assistant" className="mt-1 h-10 w-10 shrink-0 object-contain" />
-              <div className="w-full max-w-[650px]">
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA5BC]">Occacia Assistant</p>
-                <div className="rounded-2xl border border-[#E2E7F1] bg-white px-4 py-3 text-sm text-[#46536D]">
+              <div className="min-w-0 w-full max-w-[650px]">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">Occacia Assistant</p>
+                <div className="break-words rounded-2xl border border-[#EAEAEA] bg-white px-4 py-3 text-sm text-[#666666]">
                   {primaryAssistantMessage}
                 </div>
               </div>
             </div>
 
             <div className="flex justify-end">
-              <div className="w-full max-w-[650px] text-right">
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA5BC]">Me</p>
-                <div className="ml-auto inline-block rounded-2xl bg-[#0D4FB4] px-4 py-3 text-sm text-white shadow-[0_8px_20px_rgba(13,79,180,0.25)]">
+              <div className="min-w-0 w-full max-w-[650px] text-right">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">Me</p>
+                <div className="ml-auto inline-block max-w-full break-words rounded-2xl bg-[#0D47A1] px-4 py-3 text-sm text-white shadow-[0_8px_20px_rgba(13,79,180,0.25)]">
                   <p>It&apos;s on {startDate || '2025-10-11'}. Yes, repeat it every year.</p>
-                  <span className="mt-1 inline-flex items-center justify-end gap-0.5 text-[10px] text-[#D6E4FF]" aria-label="Sent">
+                  <span className="mt-1 inline-flex items-center justify-end gap-0.5 text-[10px] text-[#C9C9C9]" aria-label="Sent">
                     <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <path d="M2 6.4L4.3 8.6L10 3" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -241,18 +241,18 @@ export default function CustomerEventChatPage() {
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex min-w-0 gap-3">
               <img src="/icons/logo.svg" alt="assistant" className="mt-1 h-10 w-10 shrink-0 object-contain" />
-              <div className="w-full max-w-[650px]">
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA5BC]">Occacia Assistant</p>
-                <div className="rounded-2xl border border-[#DDE4F0] bg-white p-4">
-                  <p className="text-sm text-[#4D5971]">
+              <div className="min-w-0 w-full max-w-[650px]">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">Occacia Assistant</p>
+                <div className="rounded-2xl border border-[#EAEAEA] bg-white p-4">
+                  <p className="break-words text-sm text-[#666666]">
                     Got it! {startDate || 'Oct 11th'}, recurring yearly. Would you like to set reminders for 7 days and 1 day before? Also, would you like to sync this to your Google Calendar?
                   </p>
 
-                  <div className="mt-4 rounded-xl border border-[#DEE5F1] bg-[#F8FAFE] p-4">
+                  <div className="mt-4 rounded-xl border border-[#EAEAEA] bg-[#F4F8FA] p-4">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#98A4BC]">
+                      <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">
                         Date
                         <div className="relative mt-2">
                           <input
@@ -274,7 +274,7 @@ export default function CustomerEventChatPage() {
                             placeholder="DD/MM/YYYY"
                             inputMode="numeric"
                             autoComplete="off"
-                            className="h-10 w-full rounded-lg border border-[#D7DFEC] bg-white px-3 pr-10 text-sm text-[#1C2940] placeholder:text-[#98A4BC]"
+                            className="h-10 w-full rounded-lg border border-[#CCCCCC] bg-white px-3 pr-10 text-sm text-[#666666] placeholder:text-[#666666]"
                           />
 
                           <input
@@ -312,10 +312,10 @@ export default function CustomerEventChatPage() {
                           </button>
                         </div>
 
-                        {dateInputError && <p className="mt-1 text-[10px] font-medium normal-case tracking-normal text-[#C23D3D]">{dateInputError}</p>}
+                        {dateInputError && <p className="mt-1 text-[10px] font-medium normal-case tracking-normal text-[#EA4335]">{dateInputError}</p>}
                       </label>
 
-                      <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#98A4BC]">
+                      <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">
                         Recurrence
                         <select
                           value={frequency}
@@ -323,7 +323,7 @@ export default function CustomerEventChatPage() {
                             setIsRecurring(true);
                             setFrequency(event.target.value as typeof frequency);
                           }}
-                          className="mt-2 h-10 w-full rounded-lg border border-[#D7DFEC] bg-white px-3 text-sm text-[#1C2940]"
+                          className="mt-2 h-10 w-full rounded-lg border border-[#CCCCCC] bg-white px-3 text-sm text-[#666666]"
                         >
                           <option value="yearly">Every Year</option>
                           <option value="monthly">Every Month</option>
@@ -333,9 +333,9 @@ export default function CustomerEventChatPage() {
                       </label>
                     </div>
 
-                    <div className="mt-3 rounded-xl border border-[#DEE5F1] bg-white px-3 py-2">
+                    <div className="mt-3 rounded-xl border border-[#EAEAEA] bg-white px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
-                        <label className="flex items-center gap-2 text-sm font-semibold text-[#2C3A57]">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-[#666666]">
                           <input
                             type="checkbox"
                             checked={calendarSyncEnabled}
@@ -353,7 +353,7 @@ export default function CustomerEventChatPage() {
                             await handleCalendarSyncToggle(nextEnabled);
                           }}
                           className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 ${
-                            calendarSyncEnabled ? 'bg-[#0F5FD8]' : 'bg-[#C6D2E8]'
+                            calendarSyncEnabled ? 'bg-[#4285F4]' : 'bg-[#CCCCCC]'
                           }`}
                           aria-label="Toggle Google Calendar sync"
                           aria-pressed={calendarSyncEnabled}
@@ -378,8 +378,8 @@ export default function CustomerEventChatPage() {
                           }}
                           className={`h-9 rounded-lg border text-xs font-semibold ${
                             offsets.includes(offset)
-                              ? 'border-[#0F4FB7] bg-[#E8F0FF] text-[#0F4FB7]'
-                              : 'border-[#D8E0EE] bg-white text-[#5B6883]'
+                              ? 'border-[#0D47A1] bg-[#F4F8FA] text-[#0D47A1]'
+                              : 'border-[#EAEAEA] bg-white text-[#666666]'
                           }`}
                         >
                           {offset === 10080 ? '7 days' : offset === 1440 ? '1 day' : '1 hour'}
@@ -391,7 +391,7 @@ export default function CustomerEventChatPage() {
                       type="button"
                       onClick={() => void onSaveDetails()}
                       disabled={isBusy}
-                      className="mt-4 h-10 w-full rounded-lg bg-[#0F4FB7] text-sm font-semibold text-white disabled:opacity-60"
+                      className="mt-4 h-10 w-full rounded-lg bg-[#0D47A1] text-sm font-semibold text-white disabled:opacity-60"
                     >
                       Confirm & Save Details
                     </button>
@@ -401,17 +401,17 @@ export default function CustomerEventChatPage() {
             </div>
           </div>
 
-          <div className="border-t border-[#E6EBF3] bg-[#F8FAFE] px-4 py-4">
-            <form onSubmit={onSendMessage} className="rounded-2xl border border-[#D9E0EE] bg-white px-3 py-2">
+          <div className="border-t border-[#EAEAEA] bg-[#F4F8FA] px-4 py-4">
+            <form onSubmit={onSendMessage} className="rounded-2xl border border-[#EAEAEA] bg-white px-3 py-2">
               <div className="flex items-center gap-3">
                 <img src="/icons/customer/chat/file_attache_icon.svg" alt="attach" className="h-5 w-3" />
                 <input
                   value={chatInput}
                   onChange={(event) => setChatInput(event.target.value)}
                   placeholder="Type a message..."
-                  className="h-10 flex-1 bg-transparent text-sm text-[#2A3652] outline-none placeholder:text-[#A1ACC0]"
+                  className="h-10 flex-1 bg-transparent text-sm text-[#666666] outline-none placeholder:text-[#C9C9C9]"
                 />
-                <button type="submit" disabled={isBusy} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#0F4FB7] text-white disabled:opacity-60">
+                <button type="submit" disabled={isBusy} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#0D47A1] text-white disabled:opacity-60">
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M3 20l18-8L3 4v6l12 2-12 2z" />
                   </svg>
@@ -424,7 +424,7 @@ export default function CustomerEventChatPage() {
                 <button
                   key={chip}
                   type="button"
-                  className="h-7 rounded-full border border-[#D8DFED] bg-white px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#657590]"
+                  className="h-7 rounded-full border border-[#EAEAEA] bg-white px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#666666]"
                 >
                   {chip}
                 </button>
@@ -433,24 +433,24 @@ export default function CustomerEventChatPage() {
           </div>
         </div>
 
-        <aside className="flex w-full shrink-0 flex-col border-t border-[#DEE5F1] bg-[#F4F7FC] lg:w-[370px] lg:border-l lg:border-t-0">
-          <div className="space-y-8 px-6 py-6">
+        <aside className="flex w-full shrink-0 flex-col border-t border-[#EAEAEA] bg-[#F4F8FA] lg:w-[370px] lg:border-l lg:border-t-0">
+          <div className="space-y-8 px-4 py-6 sm:px-6">
             <section>
               <div className="flex items-center justify-between">
-                <h3 className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#8E9BB4]">Event Details</h3>
-                <span className="rounded-xl bg-[#E8EEF8] px-3 py-1 text-[11px] font-semibold uppercase text-[#526480]">{eventState}</span>
+                <h3 className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#666666]">Event Details</h3>
+                <span className="rounded-xl bg-[#F4F8FA] px-3 py-1 text-[11px] font-semibold uppercase text-[#666666]">{eventState}</span>
               </div>
 
-              <div className="mt-4 rounded-[20px] border border-[#D4DEED] bg-white px-5 py-5 shadow-[0_2px_0_rgba(209,217,231,0.55)]">
+              <div className="mt-4 rounded-[20px] border border-[#EAEAEA] bg-white px-5 py-5 shadow-[0_2px_0_rgba(209,217,231,0.55)]">
                 <div className="flex items-center gap-4">
-                  <img src="/images/customer/events/Sarah.svg" alt="Sarah" className="h-16 w-16 rounded-full border-[4px] border-[#C8D8EF]" />
+                  <img src="/images/customer/events/Sarah.svg" alt="Sarah" className="h-16 w-16 rounded-full border-[4px] border-[#CCCCCC]" />
                   <div className="min-w-0">
-                    <p className="whitespace-nowrap text-[24px] font-bold leading-none text-[#192236]">Sarah Rivers</p>
-                    <p className="mt-2 text-[14px] leading-none text-[#6D7F9C]">Sister · ISFP Persona</p>
+                    <p className="truncate text-[22px] font-bold leading-none text-[#0D47A1] sm:text-[24px]">Sarah Rivers</p>
+                    <p className="mt-2 text-[14px] leading-none text-[#666666]">Sister</p>
                   </div>
                 </div>
 
-                <div className="mt-5 space-y-2.5 text-[14px] text-[#1E2A3F]">
+                <div className="mt-5 space-y-2.5 text-[14px] text-[#666666]">
                   <p className="flex items-center gap-3 leading-none">
                     <img src="/icons/customer/chat/like_icon.svg" alt="likes" className="h-5 w-4" />
                     Likes: Nature, Minimalist design
@@ -464,21 +464,21 @@ export default function CustomerEventChatPage() {
             </section>
 
             <section>
-              <h3 className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#8E9BB4]">Suggested Tasks</h3>
+              <h3 className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#666666]">Suggested Tasks</h3>
 
               <div className="mt-4 space-y-3">
                 {sidebarTasks.map((task) => (
-                  <div key={task.key} className="flex items-center justify-between rounded-[20px] border border-[#D4DEED] bg-white px-5 py-4">
-                    <div>
-                      <p className="text-[15px] font-semibold leading-tight text-[#1A2438]">{task.title}</p>
-                      <p className="mt-1 text-[13px] leading-tight text-[#6D7F9C]">{task.subtitle}</p>
+                  <div key={task.key} className="flex items-center justify-between rounded-[20px] border border-[#EAEAEA] bg-white px-5 py-4">
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-semibold leading-tight text-[#666666]">{task.title}</p>
+                      <p className="mt-1 text-[13px] leading-tight text-[#666666]">{task.subtitle}</p>
                     </div>
 
                     <div className="relative">
                       <button
                         type="button"
                         onClick={() => setActiveTaskMenuId((prev) => (prev === task.key ? null : task.key))}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#94A3BC] hover:bg-[#EEF3FB]"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#666666] hover:bg-[#F4F8FA]"
                         aria-label="Task actions"
                       >
                         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
@@ -489,14 +489,14 @@ export default function CustomerEventChatPage() {
                       </button>
 
                       {activeTaskMenuId === task.key && (
-                        <div className="absolute right-0 top-9 z-20 w-28 rounded-lg border border-[#D7DFEC] bg-white p-1 shadow-[0_10px_24px_rgba(22,37,74,0.12)]">
+                        <div className="absolute right-0 top-9 z-20 w-28 rounded-lg border border-[#CCCCCC] bg-white p-1 shadow-[0_10px_24px_rgba(22,37,74,0.12)]">
                           <button
                             type="button"
                             onClick={() => {
                               setNewTaskTitle(task.title);
                               setActiveTaskMenuId(null);
                             }}
-                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-[#30415F] hover:bg-[#F2F6FD]"
+                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-[#666666] hover:bg-[#FAFAFA]"
                           >
                             <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M12 20h9" />
@@ -513,7 +513,7 @@ export default function CustomerEventChatPage() {
                               }
                               setActiveTaskMenuId(null);
                             }}
-                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-[#B23C3C] hover:bg-[#FFF3F3]"
+                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-[#EA4335] hover:bg-[#FAFAFA]"
                           >
                             <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M3 6h18" />
@@ -531,7 +531,7 @@ export default function CustomerEventChatPage() {
 
               <button
                 type="button"
-                className="mt-5 h-14 w-full rounded-[16px] border-2 border-[#BCD0EC] bg-white text-[14px] font-semibold uppercase tracking-[0.12em] text-[#0F4FB7]"
+                className="mt-5 h-14 w-full rounded-[16px] border-2 border-[#CCCCCC] bg-white text-[14px] font-semibold uppercase tracking-[0.12em] text-[#0D47A1]"
               >
                 View All Tasks ({Math.max(tasks.length, 8)})
               </button>
@@ -541,9 +541,9 @@ export default function CustomerEventChatPage() {
                   value={newTaskTitle}
                   onChange={(event) => setNewTaskTitle(event.target.value)}
                   placeholder="Add custom task"
-                  className="h-12 flex-1 rounded-[16px] border-2 border-[#D4DEED] bg-white px-4 text-sm text-[#2A3652]"
+                  className="h-12 flex-1 rounded-[16px] border-2 border-[#EAEAEA] bg-white px-4 text-sm text-[#666666]"
                 />
-                <button type="submit" className="h-12 rounded-[16px] border-2 border-[#D4DEED] bg-white px-5 text-xl font-semibold text-[#5E708D]">
+                <button type="submit" className="h-12 rounded-[16px] border-2 border-[#EAEAEA] bg-white px-5 text-xl font-semibold text-[#666666]">
                   +
                 </button>
               </form>
@@ -551,11 +551,11 @@ export default function CustomerEventChatPage() {
 
           </div>
 
-          <div className="mt-auto border-t border-[#DDE5F2] bg-[#F4F7FC] px-6 py-6">
+          <div className="mt-auto border-t border-[#EAEAEA] bg-[#F4F8FA] px-6 py-6">
             <button
               type="button"
               onClick={() => router.push(ROUTES.CUSTOMER.EVENT_DRAFT_REVIEW(eventId || ''))}
-              className="mb-3 h-10 w-full rounded-[12px] border border-[#D3DEEF] bg-white text-[12px] font-semibold uppercase tracking-[0.08em] text-[#3C4C6D]"
+              className="mb-3 h-10 w-full rounded-[12px] border border-[#EAEAEA] bg-white text-[12px] font-semibold uppercase tracking-[0.08em] text-[#666666]"
             >
               Save As Draft
             </button>
@@ -563,7 +563,7 @@ export default function CustomerEventChatPage() {
               type="button"
               onClick={() => void confirmTasks()}
               disabled={isBusy}
-              className="h-14 w-full rounded-[18px] bg-[#0F4FB7] px-6 text-[13px] font-semibold uppercase tracking-[0.08em] text-white disabled:opacity-60"
+              className="h-14 w-full rounded-[18px] bg-[#0D47A1] px-6 text-[13px] font-semibold uppercase tracking-[0.08em] text-white disabled:opacity-60"
             >
               Confirm Tasks & View Recommendations
             </button>

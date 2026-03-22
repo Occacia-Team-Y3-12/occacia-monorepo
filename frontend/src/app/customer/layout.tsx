@@ -25,7 +25,7 @@ function CustomerLayoutInner({ children }: { children: React.ReactNode }) {
   if (!authChecked || !isAuthenticated) return null;
 
   return (
-    <div className="customer-portal-font min-h-screen overflow-x-hidden bg-[#F7F7FA]">
+    <div className="customer-portal-font min-h-screen overflow-x-hidden bg-[#F4F8FA]">
       <CustomerSidebar
         isOpen={isSidebarOpen}
         isDesktopCollapsed={isDesktopSidebarCollapsed}
