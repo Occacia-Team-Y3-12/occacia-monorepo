@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import html
 import logging
+import smtplib
 from dataclasses import dataclass
 from datetime import timedelta
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from string import Formatter
 
-import httpx
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
@@ -182,7 +184,7 @@ class NotificationService:
             subject=rendered.subject,
             body_text=rendered.text_body,
             body_html=rendered.html_body,
-            provider="SENDGRID",
+            provider="SMTP",
             attempt_count=0,
             max_attempts=DEFAULT_MAX_ATTEMPTS,
             next_attempt_at=timestamp,
@@ -276,7 +278,7 @@ class NotificationService:
                 "userName": customer.full_name,
                 "userEmail": customer.email,
                 "verificationToken": verification_token,
-                "verificationLink": f"https://app.occacia.com/customers/register/verify-email?token={verification_token}",
+                "verificationLink": f"https://app.occacia.com/customer/auth/verify-email?token={verification_token}",
             },
         )
 
@@ -296,7 +298,7 @@ class NotificationService:
                 "userName": vendor.display_name or vendor.business_name or vendor.email,
                 "userEmail": vendor.email,
                 "verificationToken": verification_token,
-                "verificationLink": f"https://app.occacia.com/vendor-verify?token={verification_token}",
+                "verificationLink": f"https://app.occacia.com/vendor/auth/verify-email?token={verification_token}",
             },
         )
 
@@ -316,7 +318,7 @@ class NotificationService:
                 "userName": customer.full_name,
                 "userEmail": customer.email,
                 "resetToken": token,
-                "resetLink": f"https://app.occacia.com/reset-password?token={token}",
+                "resetLink": f"https://app.occacia.com/customer/auth/reset-password?token={token}",
             },
         )
 
@@ -399,40 +401,70 @@ class NotificationService:
         return notification
 
     def _send_email(self, *, to: str, subject: str, text_body: str, html_body: str | None) -> ProviderResult:
-        api_key = settings.SENDGRID_API_KEY or ""
+        """
+        Send email via SMTP. Supports both TLS (port 587) and SSL (port 465).
+        Falls back to a dev-mode log if SMTP_HOST is not configured.
+        """
+        smtp_host = settings.SMTP_HOST
+        smtp_port = settings.SMTP_PORT
+        smtp_user = settings.SMTP_USER
+        smtp_password = settings.SMTP_PASSWORD
         from_email = settings.FROM_EMAIL
-        if not api_key:
-            logger.warning("No SENDGRID_API_KEY set - email not sent")
-            logger.info("DEV MOCK | To: %s | Subject: %s", to, subject)
-            return ProviderResult(success=False, provider="SENDGRID", error_message="SENDGRID_API_KEY is not configured")
+        smtp_use_tls = settings.SMTP_USE_TLS
 
-        try:
-            response = httpx.post(
-                "https://api.sendgrid.com/v3/mail/send",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "from": {"email": from_email, "name": "Occacia"},
-                    "personalizations": [{"to": [{"email": to}]}],
-                    "subject": subject,
-                    "content": [
-                        {"type": "text/plain", "value": text_body},
-                        {"type": "text/html", "value": html_body or text_body},
-                    ],
-                },
-                timeout=10,
+        # ── Dev mode: no SMTP configured ─────────────────────────────────────
+        if not smtp_host:
+            logger.warning("SMTP_HOST not set — email not sent (dev mode)")
+            logger.info(
+                "DEV EMAIL LOG\n  To: %s\n  Subject: %s\n  Body:\n%s",
+                to, subject, text_body,
             )
-            response.raise_for_status()
             return ProviderResult(
-                success=True,
-                provider="SENDGRID",
-                provider_message_id=response.headers.get("X-Message-Id"),
+                success=False,
+                provider="SMTP",
+                error_message="SMTP_HOST is not configured",
             )
+
+        # ── Build MIME message ────────────────────────────────────────────────
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"Occacia <{from_email}>"
+        msg["To"] = to
+        msg.attach(MIMEText(text_body, "plain", "utf-8"))
+        if html_body:
+            msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        # ── Send ──────────────────────────────────────────────────────────────
+        try:
+            if smtp_port == 465:
+                # SSL connection (port 465)
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+                    if smtp_user and smtp_password:
+                        server.login(smtp_user, smtp_password)
+                    server.sendmail(from_email, [to], msg.as_string())
+            else:
+                # STARTTLS connection (port 587 or 25)
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                    server.ehlo()
+                    if smtp_use_tls:
+                        server.starttls()
+                        server.ehlo()
+                    if smtp_user and smtp_password:
+                        server.login(smtp_user, smtp_password)
+                    server.sendmail(from_email, [to], msg.as_string())
+
+            logger.info("Email sent via SMTP to %s | Subject: %s", to, subject)
+            return ProviderResult(success=True, provider="SMTP")
+
+        except smtplib.SMTPAuthenticationError as exc:
+            logger.error("SMTP authentication failed: %s", exc)
+            return ProviderResult(success=False, provider="SMTP", error_message=f"Auth failed: {exc}")
+        except smtplib.SMTPRecipientsRefused as exc:
+            logger.error("SMTP recipient refused %s: %s", to, exc)
+            return ProviderResult(success=False, provider="SMTP", error_message=f"Recipient refused: {exc}")
         except Exception as exc:
-            logger.error("Failed to send email to %s: %s", to, exc)
-            return ProviderResult(success=False, provider="SENDGRID", error_message=str(exc))
+            logger.error("Failed to send email to %s via SMTP: %s", to, exc)
+            return ProviderResult(success=False, provider="SMTP", error_message=str(exc))
 
     def _resolve_recipient(self, db: Session, *, recipient_id: str) -> dict[str, str]:
         if recipient_id.startswith("CUS"):
