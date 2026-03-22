@@ -11,6 +11,7 @@ from pydantic import ConfigDict
 
 from app.schemas.event_planning_schema import TaskResponse
 from app.schemas.package_schema import FulfillmentRequestResponse
+from app.schemas.vendor_task_schema import VendorTaskSummary
 
 
 class VendorRegisterRequest(BaseModel):
@@ -59,7 +60,7 @@ class VendorTaskSummary(BaseModel):
 
 class VendorResponse(BaseModel):
     id: int
-    user_id: int
+    user_id: int | None = None  # Make this field optional
     business_name: str
     email: EmailStr
     location_base: Optional[str] = None
