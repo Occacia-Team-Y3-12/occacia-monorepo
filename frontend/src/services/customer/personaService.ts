@@ -157,7 +157,7 @@ const extractPersona = (value: unknown): CustomerPersona | null | undefined => {
 
 export const customerPersonaService = {
   async listPersonas(): Promise<ServiceResult<CustomerPersona[]>> {
-    const result = await request('/v1/customers/personas/');
+    const result = await request('/api/v1/customers/personas/');
     return {
       ...result,
       data: extractPersonaList(result.data) ?? [],
@@ -166,7 +166,7 @@ export const customerPersonaService = {
   },
 
   async getPersona(personaId: string): Promise<ServiceResult<CustomerPersona>> {
-    const result = await request(`/v1/customers/personas/${personaId}`);
+    const result = await request(`/api/v1/customers/personas/${personaId}`);
     const persona = extractPersona(result.data);
 
     if (result.ok && !persona) {
@@ -187,7 +187,7 @@ export const customerPersonaService = {
     personaId: string,
     payload: CustomerPersonaUpdatePayload
   ): Promise<ServiceResult<CustomerPersona>> {
-    const result = await request(`/v1/customers/personas/${personaId}`, {
+    const result = await request(`/api/v1/customers/personas/${personaId}`, {
       method: 'PUT',
       headers: JSON_HEADERS,
       body: JSON.stringify(payload),
@@ -200,7 +200,7 @@ export const customerPersonaService = {
   },
 
   async confirmPersona(personaId: string): Promise<ServiceResult<CustomerPersona | null>> {
-    const result = await request(`/v1/customers/personas/${personaId}/confirm`, {
+    const result = await request(`/api/v1/customers/personas/${personaId}/confirm`, {
       method: 'POST',
     });
 
@@ -211,7 +211,7 @@ export const customerPersonaService = {
   },
 
   async unconfirmPersona(personaId: string): Promise<ServiceResult<CustomerPersona | null>> {
-    const result = await request(`/v1/customers/personas/${personaId}/confirm`, {
+    const result = await request(`/api/v1/customers/personas/${personaId}/confirm`, {
       method: 'DELETE',
     });
 

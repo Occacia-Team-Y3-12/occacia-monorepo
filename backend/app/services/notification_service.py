@@ -24,21 +24,26 @@ from app.models.vendor import Vendor
 
 logger = logging.getLogger(__name__)
 
-TASK_CONFIRMED_NOTIFICATION = "TASK_CONFIRMED"
-CUSTOMER_VERIFICATION_NOTIFICATION = "CUSTOMER_VERIFICATION"
-VENDOR_VERIFICATION_NOTIFICATION = "VENDOR_VERIFICATION"
-PASSWORD_RESET_NOTIFICATION = "PASSWORD_RESET"
+# ── Notification types ────────────────────────────────────────────────────────
+TASK_CONFIRMED_NOTIFICATION             = "TASK_CONFIRMED"
+CUSTOMER_VERIFICATION_NOTIFICATION     = "CUSTOMER_VERIFICATION"
+VENDOR_VERIFICATION_NOTIFICATION       = "VENDOR_VERIFICATION"
+CUSTOMER_PASSWORD_RESET_OTP            = "CUSTOMER_PASSWORD_RESET_OTP"
+VENDOR_PASSWORD_RESET_OTP              = "VENDOR_PASSWORD_RESET_OTP"
+ADMIN_LOGIN_OTP_NOTIFICATION           = "ADMIN_LOGIN_OTP"
+ADMIN_PASSWORD_RESET_OTP               = "ADMIN_PASSWORD_RESET_OTP"
 
-NOTIFICATION_CHANNEL_EMAIL = "EMAIL"
-NOTIFICATION_STATUS_QUEUED = "QUEUED"
-NOTIFICATION_STATUS_RETRY_PENDING = "RETRY_PENDING"
-NOTIFICATION_STATUS_PROCESSING = "PROCESSING"
-NOTIFICATION_STATUS_SENT = "SENT"
-NOTIFICATION_STATUS_PERMANENT_FAILURE = "PERMANENT_FAILURE"
+# ── Statuses / channels ───────────────────────────────────────────────────────
+NOTIFICATION_CHANNEL_EMAIL             = "EMAIL"
+NOTIFICATION_STATUS_QUEUED             = "QUEUED"
+NOTIFICATION_STATUS_RETRY_PENDING      = "RETRY_PENDING"
+NOTIFICATION_STATUS_PROCESSING         = "PROCESSING"
+NOTIFICATION_STATUS_SENT               = "SENT"
+NOTIFICATION_STATUS_PERMANENT_FAILURE  = "PERMANENT_FAILURE"
 
 DEFAULT_IDEMPOTENCY_WINDOW = timedelta(minutes=10)
-DEFAULT_MAX_ATTEMPTS = 4
-DEFAULT_RETRY_DELAY = timedelta(minutes=1)
+DEFAULT_MAX_ATTEMPTS       = 4
+DEFAULT_RETRY_DELAY        = timedelta(minutes=1)
 
 
 @dataclass(frozen=True)
@@ -56,58 +61,184 @@ class ProviderResult:
     error_message: str | None = None
 
 
+# ── Shared OTP block helpers ──────────────────────────────────────────────────
+def _otp_text(otp: str, expiry_minutes: int = 5) -> str:
+    return (
+        f"    {otp}\n\n"
+        f"This code expires in {expiry_minutes} minutes.\n\n"
+        "Do not share this code with anyone."
+    )
+
+
+def _otp_html_block(otp: str, expiry_minutes: int = 5) -> str:
+    return (
+        f"<p style='font-size:36px;font-weight:bold;letter-spacing:10px;"
+        f"color:#6C3FC5;margin:24px 0;text-align:center;'>{otp}</p>"
+        f"<p style='color:#888;font-size:13px;text-align:center;'>"
+        f"Expires in {expiry_minutes} minutes &nbsp;|&nbsp; Do not share this code.</p>"
+    )
+
+
+# ── Email templates ───────────────────────────────────────────────────────────
 _TEMPLATES: dict[str, NotificationTemplate] = {
+
     CUSTOMER_VERIFICATION_NOTIFICATION: NotificationTemplate(
         subject="Verify your Occacia account",
         text_body=(
             "Welcome to Occacia, {userName}!\n\n"
             "Please verify your email address to activate your account:\n\n"
             "{verificationLink}\n\n"
-            "This link expires in 24 hours."
+            "This link expires in 24 hours.\n"
+            "If you did not create an account, you can safely ignore this email."
         ),
         html_body=(
-            "<html><body>"
-            "<h1>Welcome to Occacia, {userName}!</h1>"
-            "<p>Please verify your email address to activate your account.</p>"
-            '<p><a href="{verificationLink}">Verify your account</a></p>'
-            "<p>This link expires in 24 hours.</p>"
-            "</body></html>"
+            "<html><body style='font-family:Arial,sans-serif;color:#333;max-width:600px;margin:auto;'>"
+            "<div style='background:#6C3FC5;padding:24px;text-align:center;'>"
+            "<h1 style='color:#fff;margin:0;font-size:24px;'>Occacia</h1></div>"
+            "<div style='padding:32px;'>"
+            "<h2 style='color:#6C3FC5;'>Welcome, {userName}!</h2>"
+            "<p>Thank you for creating a customer account. Please verify your email "
+            "address to activate your account and start planning your events.</p>"
+            "<div style='text-align:center;margin:32px 0;'>"
+            "<a href='{verificationLink}' style='background:#6C3FC5;color:#fff;"
+            "padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:bold;"
+            "font-size:16px;'>Verify My Account</a></div>"
+            "<p style='color:#888;font-size:13px;'>This link expires in 24 hours.<br>"
+            "If you did not create an account, you can safely ignore this email.</p>"
+            "</div></body></html>"
         ),
     ),
+
     VENDOR_VERIFICATION_NOTIFICATION: NotificationTemplate(
         subject="Verify your Occacia vendor account",
         text_body=(
             "Welcome to Occacia Vendors, {userName}!\n\n"
-            "Please verify your email address to complete registration:\n\n"
+            "Please verify your email address to complete your vendor registration:\n\n"
             "{verificationLink}\n\n"
-            "Your account will be reviewed after verification."
+            "After verification your account will be reviewed by our team.\n"
+            "This link expires in 24 hours."
         ),
         html_body=(
-            "<html><body>"
-            "<h1>Welcome to Occacia Vendors, {userName}!</h1>"
-            "<p>Please verify your email address to complete registration.</p>"
-            '<p><a href="{verificationLink}">Verify your vendor account</a></p>'
-            "<p>Your account will be reviewed after verification.</p>"
-            "</body></html>"
+            "<html><body style='font-family:Arial,sans-serif;color:#333;max-width:600px;margin:auto;'>"
+            "<div style='background:#6C3FC5;padding:24px;text-align:center;'>"
+            "<h1 style='color:#fff;margin:0;font-size:24px;'>Occacia Vendors</h1></div>"
+            "<div style='padding:32px;'>"
+            "<h2 style='color:#6C3FC5;'>Welcome, {userName}!</h2>"
+            "<p>Thank you for registering as a vendor. Please verify your email address "
+            "to complete your registration.</p>"
+            "<div style='text-align:center;margin:32px 0;'>"
+            "<a href='{verificationLink}' style='background:#6C3FC5;color:#fff;"
+            "padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:bold;"
+            "font-size:16px;'>Verify Vendor Account</a></div>"
+            "<p>After verification, your account will be reviewed by our team. "
+            "You will receive an email once approved.</p>"
+            "<p style='color:#888;font-size:13px;'>This link expires in 24 hours.</p>"
+            "</div></body></html>"
         ),
     ),
-    PASSWORD_RESET_NOTIFICATION: NotificationTemplate(
-        subject="Reset your Occacia password",
+
+    CUSTOMER_PASSWORD_RESET_OTP: NotificationTemplate(
+        subject="Your Occacia password reset code",
         text_body=(
             "Hi {userName},\n\n"
-            "We received a password reset request for your Occacia account.\n\n"
-            "{resetLink}\n\n"
-            "This link expires in 15 minutes."
+            "We received a request to reset the password for your Occacia customer account.\n\n"
+            "Your password reset code is:\n\n"
+            "{otpCode}\n\n"
+            "Enter this code on the password reset page to continue.\n\n"
+            "If you did not request a password reset, you can safely ignore this email."
         ),
         html_body=(
-            "<html><body>"
-            "<h1>Password Reset</h1>"
-            "<p>Hi {userName}, we received a password reset request for your Occacia account.</p>"
-            '<p><a href="{resetLink}">Reset your password</a></p>'
-            "<p>This link expires in 15 minutes.</p>"
-            "</body></html>"
+            "<html><body style='font-family:Arial,sans-serif;color:#333;max-width:600px;margin:auto;'>"
+            "<div style='background:#6C3FC5;padding:24px;text-align:center;'>"
+            "<h1 style='color:#fff;margin:0;font-size:24px;'>Occacia</h1></div>"
+            "<div style='padding:32px;'>"
+            "<h2 style='color:#6C3FC5;'>Password Reset Code</h2>"
+            "<p>Hi {userName},</p>"
+            "<p>We received a request to reset the password for your Occacia customer account. "
+            "Enter the code below on the password reset page:</p>"
+            "{otpBlock}"
+            "<p style='color:#888;font-size:13px;'>"
+            "If you did not request this, your password will not be changed.</p>"
+            "</div></body></html>"
         ),
     ),
+
+    VENDOR_PASSWORD_RESET_OTP: NotificationTemplate(
+        subject="Your Occacia vendor account password reset code",
+        text_body=(
+            "Hi {userName},\n\n"
+            "We received a request to reset the password for your Occacia vendor account.\n\n"
+            "Your password reset code is:\n\n"
+            "{otpCode}\n\n"
+            "Enter this code on the password reset page to continue.\n\n"
+            "If you did not request a password reset, you can safely ignore this email."
+        ),
+        html_body=(
+            "<html><body style='font-family:Arial,sans-serif;color:#333;max-width:600px;margin:auto;'>"
+            "<div style='background:#6C3FC5;padding:24px;text-align:center;'>"
+            "<h1 style='color:#fff;margin:0;font-size:24px;'>Occacia Vendors</h1></div>"
+            "<div style='padding:32px;'>"
+            "<h2 style='color:#6C3FC5;'>Vendor Password Reset Code</h2>"
+            "<p>Hi {userName},</p>"
+            "<p>We received a request to reset the password for your Occacia vendor account. "
+            "Enter the code below on the password reset page:</p>"
+            "{otpBlock}"
+            "<p style='color:#888;font-size:13px;'>"
+            "If you did not request this, your password will not be changed.</p>"
+            "</div></body></html>"
+        ),
+    ),
+
+    ADMIN_LOGIN_OTP_NOTIFICATION: NotificationTemplate(
+        subject="Your Occacia Admin Login Code",
+        text_body=(
+            "Hi {userName},\n\n"
+            "Your one-time login code for Occacia Admin is:\n\n"
+            "{otpCode}\n\n"
+            "This code expires in 5 minutes.\n"
+            "If you did not attempt to log in, contact your system administrator immediately."
+        ),
+        html_body=(
+            "<html><body style='font-family:Arial,sans-serif;color:#333;max-width:600px;margin:auto;'>"
+            "<div style='background:#1a1a2e;padding:24px;text-align:center;'>"
+            "<h1 style='color:#fff;margin:0;font-size:24px;'>Occacia Admin</h1></div>"
+            "<div style='padding:32px;'>"
+            "<h2 style='color:#6C3FC5;'>Admin Login Verification</h2>"
+            "<p>Hi {userName},</p>"
+            "<p>Your one-time login code for Occacia Admin is:</p>"
+            "{otpBlock}"
+            "<p style='color:#888;font-size:13px;'>"
+            "If you did not attempt to log in, please contact your system administrator immediately.</p>"
+            "</div></body></html>"
+        ),
+    ),
+
+    ADMIN_PASSWORD_RESET_OTP: NotificationTemplate(
+        subject="Your Occacia Admin Password Reset Code",
+        text_body=(
+            "Hi {userName},\n\n"
+            "We received a request to reset the password for your Occacia Admin account.\n\n"
+            "Your password reset code is:\n\n"
+            "{otpCode}\n\n"
+            "This code expires in 5 minutes.\n"
+            "If you did not request this, contact your system administrator immediately."
+        ),
+        html_body=(
+            "<html><body style='font-family:Arial,sans-serif;color:#333;max-width:600px;margin:auto;'>"
+            "<div style='background:#1a1a2e;padding:24px;text-align:center;'>"
+            "<h1 style='color:#fff;margin:0;font-size:24px;'>Occacia Admin</h1></div>"
+            "<div style='padding:32px;'>"
+            "<h2 style='color:#6C3FC5;'>Admin Password Reset Code</h2>"
+            "<p>Hi {userName},</p>"
+            "<p>We received a request to reset your Occacia Admin account password. "
+            "Enter the code below to continue:</p>"
+            "{otpBlock}"
+            "<p style='color:#888;font-size:13px;'>"
+            "If you did not request this, contact your system administrator immediately.</p>"
+            "</div></body></html>"
+        ),
+    ),
+
     TASK_CONFIRMED_NOTIFICATION: NotificationTemplate(
         subject="Task confirmed for {eventTitle}",
         text_body=(
@@ -119,15 +250,21 @@ _TEMPLATES: dict[str, NotificationTemplate] = {
             "We will keep you updated as planning progresses."
         ),
         html_body=(
-            "<html><body>"
-            "<h1>Task Confirmed</h1>"
-            "<p>Hi {userName}, your task has been confirmed in Occacia.</p>"
-            "<ul>"
-            "<li><strong>Event:</strong> {eventTitle}</li>"
-            "<li><strong>Task:</strong> {taskTitle}</li>"
-            "<li><strong>Task ID:</strong> {taskId}</li>"
-            "</ul>"
-            "</body></html>"
+            "<html><body style='font-family:Arial,sans-serif;color:#333;max-width:600px;margin:auto;'>"
+            "<div style='background:#6C3FC5;padding:24px;text-align:center;'>"
+            "<h1 style='color:#fff;margin:0;font-size:24px;'>Occacia</h1></div>"
+            "<div style='padding:32px;'>"
+            "<h2 style='color:#6C3FC5;'>Task Confirmed</h2>"
+            "<p>Hi {userName}, your task has been confirmed.</p>"
+            "<table style='border-collapse:collapse;width:100%;margin:16px 0;'>"
+            "<tr style='background:#f5f0ff;'><td style='padding:10px;font-weight:bold;'>Event</td>"
+            "<td style='padding:10px;'>{eventTitle}</td></tr>"
+            "<tr><td style='padding:10px;font-weight:bold;'>Task</td>"
+            "<td style='padding:10px;'>{taskTitle}</td></tr>"
+            "<tr style='background:#f5f0ff;'><td style='padding:10px;font-weight:bold;'>Task ID</td>"
+            "<td style='padding:10px;'>{taskId}</td></tr>"
+            "</table>"
+            "</div></body></html>"
         ),
     ),
 }
@@ -139,6 +276,9 @@ class _SafeDict(dict):
 
 
 class NotificationService:
+
+    # ── Core enqueue ──────────────────────────────────────────────────────────
+
     def enqueue_notification(
         self,
         db: Session,
@@ -148,7 +288,7 @@ class NotificationService:
         context_data: dict[str, object],
         dedupe_window: timedelta | None = None,
     ) -> Notification | None:
-        recipient = self._resolve_recipient(db, recipient_id=recipient_id)
+        recipient  = self._resolve_recipient(db, recipient_id=recipient_id)
         dedupe_key = self._build_dedupe_key(
             notification_type=notification_type,
             recipient_id=recipient_id,
@@ -156,15 +296,12 @@ class NotificationService:
         )
 
         if dedupe_key and dedupe_window and self._has_recent_non_terminal(
-            db,
-            type=notification_type,
-            dedupe_key=dedupe_key,
-            window=dedupe_window,
+            db, type=notification_type, dedupe_key=dedupe_key, window=dedupe_window,
         ):
-            logger.info("Skipping duplicate queued notification %s for recipient=%s", notification_type, recipient_id)
+            logger.info("Skipping duplicate %s for %s", notification_type, recipient_id)
             return None
 
-        rendered = self.render_template(
+        rendered  = self.render_template(
             notification_type=notification_type,
             recipient_name=recipient["name"],
             context_data=context_data,
@@ -201,22 +338,36 @@ class NotificationService:
         recipient_name: str,
         context_data: dict[str, object],
     ) -> NotificationTemplate:
-        template = _TEMPLATES[notification_type]
-        text_context = self._build_template_context(recipient_name=recipient_name, context_data=context_data, html_escape=False)
-        html_context = self._build_template_context(recipient_name=recipient_name, context_data=context_data, html_escape=True)
-        return NotificationTemplate(
-            subject=template.subject.format_map(_SafeDict(text_context)),
-            text_body=template.text_body.format_map(_SafeDict(text_context)),
-            html_body=template.html_body.format_map(_SafeDict(html_context)),
+        template  = _TEMPLATES[notification_type]
+        text_ctx  = self._build_template_context(
+            recipient_name=recipient_name, context_data=context_data, html_escape=False,
+        )
+        html_ctx  = self._build_template_context(
+            recipient_name=recipient_name, context_data=context_data, html_escape=True,
         )
 
+        # Inject OTP HTML block for templates that use {otpBlock}
+        otp_code = str(context_data.get("otpCode", ""))
+        html_ctx["otpBlock"] = _otp_html_block(otp_code) if otp_code else ""
+
+        return NotificationTemplate(
+            subject=template.subject.format_map(_SafeDict(text_ctx)),
+            text_body=template.text_body.format_map(_SafeDict(text_ctx)),
+            html_body=template.html_body.format_map(_SafeDict(html_ctx)),
+        )
+
+    # ── Worker ────────────────────────────────────────────────────────────────
+
     def process_pending_notifications(self, db: Session, *, batch_size: int = 20) -> int:
-        now = now_utc()
+        now   = now_utc()
         items = (
             db.query(Notification)
             .filter(
                 Notification.channel == NOTIFICATION_CHANNEL_EMAIL,
-                Notification.status.in_([NOTIFICATION_STATUS_QUEUED, NOTIFICATION_STATUS_RETRY_PENDING]),
+                Notification.status.in_([
+                    NOTIFICATION_STATUS_QUEUED,
+                    NOTIFICATION_STATUS_RETRY_PENDING,
+                ]),
                 Notification.next_attempt_at.is_not(None),
                 Notification.next_attempt_at <= now,
             )
@@ -224,11 +375,115 @@ class NotificationService:
             .limit(batch_size)
             .all()
         )
-        processed = 0
         for notification in items:
             self._deliver_notification(db, notification=notification)
-            processed += 1
-        return processed
+        return len(items)
+
+    # ── Queue helpers — Customer ──────────────────────────────────────────────
+
+    def queue_customer_verification(
+        self, db: Session, *, customer: Customer, verification_token: str,
+    ) -> Notification | None:
+        return self.enqueue_notification(
+            db,
+            notification_type=CUSTOMER_VERIFICATION_NOTIFICATION,
+            recipient_id=customer.customer_id,
+            context_data={
+                "userId": customer.customer_id,
+                "userName": customer.full_name,
+                "userEmail": customer.email,
+                "verificationToken": verification_token,
+                "verificationLink": (
+                    f"https://app.occacia.com/customer/auth/verify-email"
+                    f"?token={verification_token}"
+                ),
+            },
+        )
+
+    def queue_customer_password_reset_otp(
+        self, db: Session, *, customer: Customer, otp_code: str,
+    ) -> Notification | None:
+        return self.enqueue_notification(
+            db,
+            notification_type=CUSTOMER_PASSWORD_RESET_OTP,
+            recipient_id=customer.customer_id,
+            context_data={
+                "userId": customer.customer_id,
+                "userName": customer.full_name,
+                "userEmail": customer.email,
+                "otpCode": otp_code,
+            },
+        )
+
+    # ── Queue helpers — Vendor ────────────────────────────────────────────────
+
+    def queue_vendor_verification(
+        self, db: Session, *, vendor: Vendor, verification_token: str,
+    ) -> Notification | None:
+        return self.enqueue_notification(
+            db,
+            notification_type=VENDOR_VERIFICATION_NOTIFICATION,
+            recipient_id=vendor.vendor_id,
+            context_data={
+                "userId": vendor.vendor_id,
+                "userName": vendor.display_name or vendor.business_name or vendor.email,
+                "userEmail": vendor.email,
+                "verificationToken": verification_token,
+                "verificationLink": (
+                    f"https://app.occacia.com/vendor/auth/verify-email"
+                    f"?token={verification_token}"
+                ),
+            },
+        )
+
+    def queue_vendor_password_reset_otp(
+        self, db: Session, *, vendor: Vendor, otp_code: str,
+    ) -> Notification | None:
+        return self.enqueue_notification(
+            db,
+            notification_type=VENDOR_PASSWORD_RESET_OTP,
+            recipient_id=vendor.vendor_id,
+            context_data={
+                "userId": vendor.vendor_id,
+                "userName": vendor.display_name or vendor.business_name or vendor.email,
+                "userEmail": vendor.email,
+                "otpCode": otp_code,
+            },
+        )
+
+    # ── Queue helpers — Admin ─────────────────────────────────────────────────
+
+    def queue_admin_login_otp(
+        self, db: Session, *, admin: Admin, otp_code: str,
+    ) -> Notification | None:
+        return self.enqueue_notification(
+            db,
+            notification_type=ADMIN_LOGIN_OTP_NOTIFICATION,
+            recipient_id=admin.admin_id,
+            context_data={
+                "userId": admin.admin_id,
+                "userName": admin.email,
+                "userEmail": admin.email,
+                "otpCode": otp_code,
+            },
+        )
+
+    def queue_admin_password_reset_otp(
+        self, db: Session, *, admin: Admin, otp_code: str,
+    ) -> Notification | None:
+        return self.enqueue_notification(
+            db,
+            notification_type=ADMIN_PASSWORD_RESET_OTP,
+            recipient_id=admin.admin_id,
+            context_data={
+                "userId": admin.admin_id,
+                "userName": admin.email,
+                "userEmail": admin.email,
+                "otpCode": otp_code,
+            },
+        )
+
+    # ── Queue helpers — Tasks ─────────────────────────────────────────────────
 
     def send_task_confirmed_notifications(
         self,
@@ -241,7 +496,7 @@ class NotificationService:
     ) -> list[Notification]:
         notifications: list[Notification] = []
         for task in tasks:
-            notification = self.enqueue_notification(
+            n = self.enqueue_notification(
                 db,
                 notification_type=TASK_CONFIRMED_NOTIFICATION,
                 recipient_id=customer.customer_id,
@@ -258,69 +513,11 @@ class NotificationService:
                 },
                 dedupe_window=window,
             )
-            if notification is not None:
-                notifications.append(notification)
+            if n is not None:
+                notifications.append(n)
         return notifications
 
-    def queue_customer_verification(
-        self,
-        db: Session,
-        *,
-        customer: Customer,
-        verification_token: str,
-    ) -> Notification | None:
-        return self.enqueue_notification(
-            db,
-            notification_type=CUSTOMER_VERIFICATION_NOTIFICATION,
-            recipient_id=customer.customer_id,
-            context_data={
-                "userId": customer.customer_id,
-                "userName": customer.full_name,
-                "userEmail": customer.email,
-                "verificationToken": verification_token,
-                "verificationLink": f"https://app.occacia.com/customer/auth/verify-email?token={verification_token}",
-            },
-        )
-
-    def queue_vendor_verification(
-        self,
-        db: Session,
-        *,
-        vendor: Vendor,
-        verification_token: str,
-    ) -> Notification | None:
-        return self.enqueue_notification(
-            db,
-            notification_type=VENDOR_VERIFICATION_NOTIFICATION,
-            recipient_id=vendor.vendor_id,
-            context_data={
-                "userId": vendor.vendor_id,
-                "userName": vendor.display_name or vendor.business_name or vendor.email,
-                "userEmail": vendor.email,
-                "verificationToken": verification_token,
-                "verificationLink": f"https://app.occacia.com/vendor/auth/verify-email?token={verification_token}",
-            },
-        )
-
-    def queue_password_reset(
-        self,
-        db: Session,
-        *,
-        customer: Customer,
-        token: str,
-    ) -> Notification | None:
-        return self.enqueue_notification(
-            db,
-            notification_type=PASSWORD_RESET_NOTIFICATION,
-            recipient_id=customer.customer_id,
-            context_data={
-                "userId": customer.customer_id,
-                "userName": customer.full_name,
-                "userEmail": customer.email,
-                "resetToken": token,
-                "resetLink": f"https://app.occacia.com/customer/auth/reset-password?token={token}",
-            },
-        )
+    # ── Notification listing ──────────────────────────────────────────────────
 
     def list_notifications(
         self,
@@ -346,26 +543,32 @@ class NotificationService:
         if type:
             query = query.filter(Notification.type == type.upper())
         if cursor:
-            cursor_row = db.query(Notification).filter(Notification.notification_id == cursor).first()
-            if cursor_row:
+            row = db.query(Notification).filter(Notification.notification_id == cursor).first()
+            if row:
                 query = query.filter(
                     or_(
-                        Notification.created_at < cursor_row.created_at,
+                        Notification.created_at < row.created_at,
                         and_(
-                            Notification.created_at == cursor_row.created_at,
-                            Notification.id > cursor_row.id,
+                            Notification.created_at == row.created_at,
+                            Notification.id > row.id,
                         ),
                     )
                 )
-        items = query.order_by(Notification.created_at.desc(), Notification.id.asc()).limit(limit + 1).all()
+        items = (
+            query.order_by(Notification.created_at.desc(), Notification.id.asc())
+            .limit(limit + 1)
+            .all()
+        )
         next_cursor = None
         if len(items) > limit:
             next_cursor = items[limit].notification_id
             items = items[:limit]
         return items, next_cursor
 
+    # ── Delivery ──────────────────────────────────────────────────────────────
+
     def _deliver_notification(self, db: Session, *, notification: Notification) -> Notification:
-        notification.status = NOTIFICATION_STATUS_PROCESSING
+        notification.status         = NOTIFICATION_STATUS_PROCESSING
         notification.last_attempt_at = now_utc()
         db.add(notification)
         db.commit()
@@ -378,21 +581,21 @@ class NotificationService:
             html_body=notification.body_html,
         )
 
-        notification.attempt_count = (notification.attempt_count or 0) + 1
-        notification.provider = result.provider
-        notification.provider_message_id = result.provider_message_id
-        notification.error_message = result.error_message
+        notification.attempt_count        = (notification.attempt_count or 0) + 1
+        notification.provider             = result.provider
+        notification.provider_message_id  = result.provider_message_id
+        notification.error_message        = result.error_message
 
         if result.success:
-            notification.status = NOTIFICATION_STATUS_SENT
-            notification.sent_at = now_utc()
-            notification.next_attempt_at = None
+            notification.status           = NOTIFICATION_STATUS_SENT
+            notification.sent_at          = now_utc()
+            notification.next_attempt_at  = None
         else:
             if notification.attempt_count >= (notification.max_attempts or DEFAULT_MAX_ATTEMPTS):
-                notification.status = NOTIFICATION_STATUS_PERMANENT_FAILURE
+                notification.status          = NOTIFICATION_STATUS_PERMANENT_FAILURE
                 notification.next_attempt_at = None
             else:
-                notification.status = NOTIFICATION_STATUS_RETRY_PENDING
+                notification.status          = NOTIFICATION_STATUS_RETRY_PENDING
                 notification.next_attempt_at = now_utc() + DEFAULT_RETRY_DELAY
 
         db.add(notification)
@@ -400,50 +603,41 @@ class NotificationService:
         db.refresh(notification)
         return notification
 
-    def _send_email(self, *, to: str, subject: str, text_body: str, html_body: str | None) -> ProviderResult:
-        """
-        Send email via SMTP. Supports both TLS (port 587) and SSL (port 465).
-        Falls back to a dev-mode log if SMTP_HOST is not configured.
-        """
-        smtp_host = settings.SMTP_HOST
-        smtp_port = settings.SMTP_PORT
-        smtp_user = settings.SMTP_USER
+    def _send_email(
+        self,
+        *,
+        to: str,
+        subject: str,
+        text_body: str,
+        html_body: str | None,
+    ) -> ProviderResult:
+        smtp_host     = settings.SMTP_HOST
+        smtp_port     = settings.SMTP_PORT
+        smtp_user     = settings.SMTP_USER
         smtp_password = settings.SMTP_PASSWORD
-        from_email = settings.FROM_EMAIL
-        smtp_use_tls = settings.SMTP_USE_TLS
+        from_email    = settings.FROM_EMAIL
+        smtp_use_tls  = settings.SMTP_USE_TLS
 
-        # ── Dev mode: no SMTP configured ─────────────────────────────────────
         if not smtp_host:
             logger.warning("SMTP_HOST not set — email not sent (dev mode)")
-            logger.info(
-                "DEV EMAIL LOG\n  To: %s\n  Subject: %s\n  Body:\n%s",
-                to, subject, text_body,
-            )
-            return ProviderResult(
-                success=False,
-                provider="SMTP",
-                error_message="SMTP_HOST is not configured",
-            )
+            logger.info("DEV EMAIL\n  To: %s\n  Subject: %s\n  Body:\n%s", to, subject, text_body)
+            return ProviderResult(success=False, provider="SMTP", error_message="SMTP_HOST not configured")
 
-        # ── Build MIME message ────────────────────────────────────────────────
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = f"Occacia <{from_email}>"
-        msg["To"] = to
+        msg["From"]    = f"Occacia <{from_email}>"
+        msg["To"]      = to
         msg.attach(MIMEText(text_body, "plain", "utf-8"))
         if html_body:
             msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-        # ── Send ──────────────────────────────────────────────────────────────
         try:
             if smtp_port == 465:
-                # SSL connection (port 465)
                 with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
                     if smtp_user and smtp_password:
                         server.login(smtp_user, smtp_password)
                     server.sendmail(from_email, [to], msg.as_string())
             else:
-                # STARTTLS connection (port 587 or 25)
                 with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
                     server.ehlo()
                     if smtp_use_tls:
@@ -457,48 +651,45 @@ class NotificationService:
             return ProviderResult(success=True, provider="SMTP")
 
         except smtplib.SMTPAuthenticationError as exc:
-            logger.error("SMTP authentication failed: %s", exc)
+            logger.error("SMTP auth failed: %s", exc)
             return ProviderResult(success=False, provider="SMTP", error_message=f"Auth failed: {exc}")
         except smtplib.SMTPRecipientsRefused as exc:
             logger.error("SMTP recipient refused %s: %s", to, exc)
             return ProviderResult(success=False, provider="SMTP", error_message=f"Recipient refused: {exc}")
         except Exception as exc:
-            logger.error("Failed to send email to %s via SMTP: %s", to, exc)
+            logger.error("Failed to send email to %s: %s", to, exc)
             return ProviderResult(success=False, provider="SMTP", error_message=str(exc))
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _resolve_recipient(self, db: Session, *, recipient_id: str) -> dict[str, str]:
         if recipient_id.startswith("CUS"):
-            customer = db.query(Customer).filter(Customer.customer_id == recipient_id).first()
-            if customer:
-                return {"email": customer.email, "name": customer.full_name or customer.email}
+            c = db.query(Customer).filter(Customer.customer_id == recipient_id).first()
+            if c:
+                return {"email": c.email, "name": c.full_name or c.email}
         if recipient_id.startswith("VEN"):
-            vendor = db.query(Vendor).filter(Vendor.vendor_id == recipient_id).first()
-            if vendor:
-                return {"email": vendor.email, "name": vendor.display_name or vendor.business_name or vendor.email}
+            v = db.query(Vendor).filter(Vendor.vendor_id == recipient_id).first()
+            if v:
+                return {"email": v.email, "name": v.display_name or v.business_name or v.email}
         if recipient_id.startswith("ADM"):
-            admin = db.query(Admin).filter(Admin.admin_id == recipient_id).first()
-            if admin:
-                return {"email": admin.email, "name": admin.email}
+            a = db.query(Admin).filter(Admin.admin_id == recipient_id).first()
+            if a:
+                return {"email": a.email, "name": a.email}
         if recipient_id.startswith("USR"):
-            user = db.query(User).filter(User.user_id == recipient_id).first()
-            if user:
-                return {"email": user.email, "name": user.email}
-
-        customer = db.query(Customer).filter(Customer.customer_id == recipient_id).first()
-        if customer:
-            return {"email": customer.email, "name": customer.full_name or customer.email}
-        vendor = db.query(Vendor).filter(Vendor.vendor_id == recipient_id).first()
-        if vendor:
-            return {"email": vendor.email, "name": vendor.display_name or vendor.business_name or vendor.email}
+            u = db.query(User).filter(User.user_id == recipient_id).first()
+            if u:
+                return {"email": u.email, "name": u.email}
+        # fallback
+        c = db.query(Customer).filter(Customer.customer_id == recipient_id).first()
+        if c:
+            return {"email": c.email, "name": c.full_name or c.email}
+        v = db.query(Vendor).filter(Vendor.vendor_id == recipient_id).first()
+        if v:
+            return {"email": v.email, "name": v.display_name or v.business_name or v.email}
         raise ValueError(f"Unsupported recipient_id: {recipient_id}")
 
     def _has_recent_non_terminal(
-        self,
-        db: Session,
-        *,
-        type: str,
-        dedupe_key: str,
-        window: timedelta,
+        self, db: Session, *, type: str, dedupe_key: str, window: timedelta,
     ) -> bool:
         cutoff = now_utc() - window
         return (
@@ -507,18 +698,15 @@ class NotificationService:
                 Notification.type == type,
                 Notification.dedupe_key == dedupe_key,
                 Notification.created_at >= cutoff,
-                Notification.status.in_(
-                    [
-                        NOTIFICATION_STATUS_QUEUED,
-                        NOTIFICATION_STATUS_PROCESSING,
-                        NOTIFICATION_STATUS_RETRY_PENDING,
-                        NOTIFICATION_STATUS_SENT,
-                    ]
-                ),
+                Notification.status.in_([
+                    NOTIFICATION_STATUS_QUEUED,
+                    NOTIFICATION_STATUS_PROCESSING,
+                    NOTIFICATION_STATUS_RETRY_PENDING,
+                    NOTIFICATION_STATUS_SENT,
+                ]),
             )
             .first()
-            is not None
-        )
+        ) is not None
 
     def _build_dedupe_key(
         self,
@@ -529,7 +717,7 @@ class NotificationService:
     ) -> str | None:
         if notification_type == TASK_CONFIRMED_NOTIFICATION:
             event_id = self._string_or_none(context_data.get("eventId"))
-            task_id = self._string_or_none(context_data.get("taskId"))
+            task_id  = self._string_or_none(context_data.get("taskId"))
             if event_id and task_id:
                 return f"{notification_type}:{recipient_id}:{event_id}:{task_id}"
         return None
@@ -544,13 +732,10 @@ class NotificationService:
         context = {"userName": recipient_name}
         formatter = Formatter()
         for key, value in context_data.items():
-            if value is None:
-                normalized = ""
-            else:
-                normalized = str(value)
+            normalized = "" if value is None else str(value)
             context[key] = html.escape(normalized) if html_escape else normalized
-
-        for _, field_name, _, _ in formatter.parse(" ".join([t.subject + t.text_body + t.html_body for t in _TEMPLATES.values()])):
+        all_text = " ".join([t.subject + t.text_body + t.html_body for t in _TEMPLATES.values()])
+        for _, field_name, _, _ in formatter.parse(all_text):
             if field_name and field_name not in context:
                 context[field_name] = ""
         return context
