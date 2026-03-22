@@ -10,20 +10,32 @@ Changes from original:
   - test_planning_endpoint_passes_tags_to_ai: capture_gen accepts **kwargs.
   - test_all_tags_passed_to_ai_exist_in_db: capture_gen accepts **kwargs.
   - test_missing_info_carried_across_turns: turn1/turn2 accept **kwargs.
+
+  FIX (notification rename):
+  - PASSWORD_RESET_NOTIFICATION renamed to CUSTOMER_PASSWORD_RESET_OTP
+    and test_password_reset_triggers_email updated to match the new OTP
+    flow: forgot-password now queues a CUSTOMER_PASSWORD_RESET_OTP
+    notification instead of PASSWORD_RESET_NOTIFICATION.
+
   Everything else unchanged.
 """
 import hashlib
 import json
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-tests-only")
+os.environ.setdefault("DB_PASSWORD", "test")
+os.environ.setdefault("REDIS_PASSWORD", "test")
+
 from app.core.database import SessionLocal
 from app.models.notification import Notification
 from app.services.notification_service import (
     NOTIFICATION_STATUS_QUEUED,
-    PASSWORD_RESET_NOTIFICATION,
+    CUSTOMER_PASSWORD_RESET_OTP,   # replaces PASSWORD_RESET_NOTIFICATION
 )
 
 
@@ -91,28 +103,26 @@ def _fake_ai(
 
 class TestEmailSending:
 
-    def test_send_email_without_api_key_returns_false(self):
-        from app.services.auth_service import _send_email
-        with patch("app.services.auth_service.settings") as mock_settings:
-            mock_settings.SENDGRID_API_KEY = None
-            result = _send_email("user@test.com", "Subject", "<p>Hello</p>")
-        assert result is False
-
-    def test_send_email_sendgrid_exception_returns_false(self):
-        from app.services.auth_service import _send_email
-        with patch("app.services.auth_service.settings") as mock_settings:
-            mock_settings.SENDGRID_API_KEY = "SG.fake-key"
+    def test_send_email_without_smtp_host_returns_false(self):
+        """When SMTP_HOST is not configured, _send_email returns False (dev mode)."""
+        from app.services.notification_service import notification_service
+        with patch("app.services.notification_service.settings") as mock_settings:
+            mock_settings.SMTP_HOST = None
             mock_settings.FROM_EMAIL = "noreply@occacia.com"
-            boom = MagicMock()
-            boom.SendGridAPIClient.side_effect = RuntimeError("network error")
-            with patch.dict("sys.modules", {
-                "sendgrid": boom,
-                "sendgrid.helpers.mail": MagicMock(),
-            }):
-                result = _send_email("user@test.com", "Oops", "<p>Hi</p>")
-        assert result is False
+            result = notification_service._send_email(
+                to="user@test.com",
+                subject="Test",
+                text_body="Hello",
+                html_body=None,
+            )
+        assert result.success is False
 
     def test_send_email_is_callable(self):
+        from app.services.notification_service import notification_service
+        assert callable(notification_service._send_email)
+
+    def test_send_email_wrapper_is_callable(self):
+        """_send_email wrapper in auth_service must still be importable and callable."""
         from app.services.auth_service import _send_email
         assert callable(_send_email)
 
@@ -123,15 +133,30 @@ class TestEmailSending:
             "password":  "TestPass123!",
             "phone":     "+94771234567",
         }
-        with patch("app.services.auth_service._send_email", return_value=False):
+        with patch("app.services.notification_service.notification_service._send_email",
+                   return_value=MagicMock(success=False, provider="SMTP",
+                                          error_message="SMTP_HOST not configured")):
             resp = client.post(AUTH_URL + "/register", json=payload)
         assert resp.status_code in (200, 201), resp.text
 
-    def test_password_reset_triggers_email(self, client, active_customer):
-        resp = client.post(
-            AUTH_URL + "/password/forgot",
-            json={"email": active_customer.email},
-        )
+    def test_password_reset_otp_triggers_notification(self, client, active_customer):
+        """
+        forgot-password now queues a CUSTOMER_PASSWORD_RESET_OTP notification
+        (OTP-based flow) instead of the old link-based PASSWORD_RESET_NOTIFICATION.
+        """
+        # Mock Redis so OTP storage doesn't fail in test environment
+        mock_redis = MagicMock()
+        mock_redis.setex = MagicMock()
+        mock_redis.get = MagicMock(return_value=None)
+
+        with patch("app.services.auth_service._get_redis", return_value=mock_redis), \
+             patch("app.services.notification_service.notification_service._send_email",
+                   return_value=MagicMock(success=False, provider="SMTP",
+                                          error_message="SMTP not configured in test")):
+            resp = client.post(
+                AUTH_URL + "/password/forgot",
+                json={"email": active_customer.email},
+            )
 
         assert resp.status_code in (200, 202), resp.text
 
@@ -141,12 +166,15 @@ class TestEmailSending:
                 db.query(Notification)
                 .filter(
                     Notification.user_id == active_customer.customer_id,
-                    Notification.type == PASSWORD_RESET_NOTIFICATION,
+                    Notification.type == CUSTOMER_PASSWORD_RESET_OTP,
                 )
                 .order_by(Notification.created_at.desc())
                 .first()
             )
-            assert notification is not None
+            assert notification is not None, (
+                f"Expected a {CUSTOMER_PASSWORD_RESET_OTP} notification to be queued "
+                f"for customer {active_customer.customer_id}"
+            )
             assert notification.recipient_email == active_customer.email
             assert notification.status == NOTIFICATION_STATUS_QUEUED
         finally:
@@ -166,7 +194,6 @@ class TestAITagInjection:
 
     def test_tag_block_injected_into_prompt(self, svc):
         """AVAILABLE_VENUE_TAGS and each tag must appear in the built prompt."""
-        # Use _build_prompt() — direct inspection, no HTTP call needed.
         tags = ["romantic", "outdoor", "luxury"]
         prompt = svc._build_prompt("Plan a romantic dinner", available_tags=tags)
         assert "AVAILABLE_VENUE_TAGS" in prompt, \
@@ -177,7 +204,6 @@ class TestAITagInjection:
     def test_no_tags_means_no_tag_block(self, svc):
         """When no tags are provided the prompt must not contain the tag block."""
         prompt = svc._build_prompt("Plan something", available_tags=None)
-        # Without tags the header should not appear (default fallback text is used)
         assert "AVAILABLE_VENUE_TAGS" not in prompt
 
     def test_invalid_tags_stripped_from_parsed_response(self, svc):
@@ -186,7 +212,6 @@ class TestAITagInjection:
 
         fake_resp = MagicMock()
         fake_resp.raise_for_status = MagicMock()
-        # Use Groq response format
         fake_resp.json.return_value = {
             "choices": [{
                 "message": {
@@ -552,7 +577,6 @@ class TestMissingInfoPersistence:
         """missing_info items must appear in the prompt built by _build_prompt."""
         from app.services.ai_service import AIService
         svc = AIService()
-        # Use _build_prompt() — direct inspection, no HTTP call needed.
         prompt = svc._build_prompt(
             "Continue planning",
             missing_info=["budget", "guest_count"],

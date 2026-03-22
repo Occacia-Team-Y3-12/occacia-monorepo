@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_admin
@@ -20,10 +19,10 @@ from app.models.task_request import TaskRequest
 from app.models.vendor import Vendor
 from app.schemas.admin_schema import (
     AdminRegister, AdminResponse, NotificationResponse, PaginatedNotificationsResponse,
-    VendorAdminView, VendorRejectRequest, CustomerAdminView, PaginatedCustomers, CustomerStatusUpdateRequest,
-    AdminTaskSupportActionRequest, InternalNoteCreateRequest, InternalNoteResponse,
-    PaginatedFulfillmentRequestsResponse, PaginatedInternalNotesResponse, PaginatedPackageOrdersResponse,
-    PaginatedTasksResponse, AdminDashboardResponse
+    VendorAdminView, VendorRejectRequest, CustomerAdminView, PaginatedCustomers,
+    CustomerStatusUpdateRequest, AdminTaskSupportActionRequest, InternalNoteCreateRequest,
+    InternalNoteResponse, PaginatedFulfillmentRequestsResponse, PaginatedInternalNotesResponse,
+    PaginatedPackageOrdersResponse, PaginatedTasksResponse, AdminDashboardResponse,
 )
 from app.schemas.event_planning_schema import TaskResponse
 from app.schemas.package_schema import (
@@ -31,32 +30,42 @@ from app.schemas.package_schema import (
     PackageOrderDetailsResponse,
     PackageOrderResponse,
 )
-from app.services.admin_service import admin_service 
+from app.services.admin_service import admin_service
 from app.services.admin_dashboard_service import admin_dashboard_aggregator
 from app.services.notification_service import notification_service
 from app.services.auth_service import _send_email
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin", tags=["Admin"])
+router            = APIRouter(prefix="/admin",      tags=["Admin"])
 auth_admin_router = APIRouter(prefix="/auth/admin", tags=["Authentication"])
 
-# --- Email helpers (Required here to satisfy Test Mocks) ---
+
+# ── Email helpers (vendor approval / rejection) ───────────────────────────────
 
 def _send_approval_email(vendor: Vendor):
     subject = "Your Occacia vendor account has been approved!"
     body = (
         f"Congratulations, {vendor.display_name or vendor.business_name}!\n\n"
         f"Your vendor application for {vendor.business_name} has been approved.\n\n"
+        f"You can now log in and start adding your packages.\n\n"
         f"Vendor ID: {vendor.vendor_id}\n"
     )
     _send_email(vendor.email, subject, body)
 
+
 def _send_rejection_email(vendor: Vendor, reason: str):
     subject = "Update on your Occacia vendor application"
-    body = f"Reason: {reason}"
+    body = (
+        f"Hi {vendor.display_name or vendor.business_name},\n\n"
+        f"Unfortunately, your vendor application was not approved at this time.\n\n"
+        f"Reason: {reason}\n\n"
+        f"If you have questions, please contact our support team."
+    )
     _send_email(vendor.email, subject, body)
 
+
+# ── Response builders ─────────────────────────────────────────────────────────
 
 def _task_response(task: Task) -> TaskResponse:
     return TaskResponse(
@@ -129,28 +138,26 @@ def _internal_note_response(note: SupportNote) -> InternalNoteResponse:
         createdAt=note.created_at,
     )
 
-# --- Auth Routes ---
+
+# ── Auth routes — registration only (login moved to auth_router.py) ───────────
 
 @auth_admin_router.post("/register", response_model=AdminResponse, status_code=201)
 def register_admin(payload: AdminRegister, db: Session = Depends(get_db)):
-    """Provision admin account (internal)."""
+    """
+    Provision a new admin account (internal use only).
+    Disabled in production via DISABLE_ADMIN_REGISTER env var.
+    """
     if getattr(settings, "DISABLE_ADMIN_REGISTER", "false").lower() == "true":
         raise HTTPException(status_code=403, detail="Admin registration is disabled.")
-        
     return admin_service.register_admin(
-        db, 
-        email=payload.email, 
-        password=payload.password, 
-        staff_role=payload.staff_role
+        db,
+        email=payload.email,
+        password=payload.password,
+        staff_role=payload.staff_role,
     )
 
-@auth_admin_router.post("/login")
-def admin_login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db),
-):
-    """Admin login."""
-    return admin_service.login_admin(db, form_data.username, form_data.password)
+
+# ── Vendor management ─────────────────────────────────────────────────────────
 
 @router.get("/vendors", response_model=list[VendorAdminView])
 def list_vendors(
@@ -159,9 +166,9 @@ def list_vendors(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    """List vendors for admin management."""
     _ = current_admin
     return admin_service.list_vendors(db, approval_status=approval_status, status=status)
+
 
 @router.get("/vendors/{vendor_id}", response_model=VendorAdminView)
 def get_vendor_detail(
@@ -169,9 +176,9 @@ def get_vendor_detail(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    """Get vendor detail for admin management."""
     _ = current_admin
     return admin_service.get_vendor(db, vendor_id=vendor_id)
+
 
 @router.post("/vendors/{vendor_id}/approve", response_model=VendorAdminView)
 def approve_vendor(
@@ -179,10 +186,10 @@ def approve_vendor(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    """Approve vendor registration."""
     vendor = admin_service.approve_vendor(db, vendor_id=vendor_id, admin_email=current_admin.email)
     _send_approval_email(vendor)
     return vendor
+
 
 @router.post("/vendors/{vendor_id}/reject", response_model=VendorAdminView)
 def reject_vendor(
@@ -191,11 +198,14 @@ def reject_vendor(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    """Reject vendor registration."""
-    vendor = admin_service.reject_vendor(db, vendor_id=vendor_id, reason=body.reason, admin_email=current_admin.email)
+    vendor = admin_service.reject_vendor(
+        db, vendor_id=vendor_id, reason=body.reason, admin_email=current_admin.email,
+    )
     _send_rejection_email(vendor, body.reason)
     return vendor
 
+
+# ── Notifications ─────────────────────────────────────────────────────────────
 
 @router.get("/notifications", response_model=PaginatedNotificationsResponse)
 def list_notifications(
@@ -225,6 +235,9 @@ def list_notifications(
         next_cursor=next_cursor,
     )
 
+
+# ── Customer management ───────────────────────────────────────────────────────
+
 @router.get("/customers", response_model=PaginatedCustomers)
 def list_customers(
     status: str | None = None,
@@ -233,13 +246,15 @@ def list_customers(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    """List customers for admin management."""
     _ = current_admin
-    customers, next_cursor = admin_service.list_customers(db, status=status, limit=limit, cursor=cursor)
+    customers, next_cursor = admin_service.list_customers(
+        db, status=status, limit=limit, cursor=cursor,
+    )
     return PaginatedCustomers(
         items=[CustomerAdminView.model_validate(c) for c in customers],
         nextCursor=next_cursor,
     )
+
 
 @router.get("/customers/{customer_id}", response_model=CustomerAdminView)
 def get_customer_detail(
@@ -247,9 +262,9 @@ def get_customer_detail(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    """Get customer detail for admin management."""
     _ = current_admin
     return admin_service.get_customer(db, customer_id=customer_id)
+
 
 @router.put("/customers/{customer_id}/status", response_model=CustomerAdminView)
 def update_customer_status(
@@ -258,11 +273,15 @@ def update_customer_status(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    """Update customer account status."""
     return admin_service.update_customer_status(
-        db, customer_id=customer_id, new_status=body.status, admin_email=current_admin.email
+        db,
+        customer_id=customer_id,
+        new_status=body.status,
+        admin_email=current_admin.email,
     )
 
+
+# ── Internal notes ────────────────────────────────────────────────────────────
 
 @router.get("/internal-notes", response_model=PaginatedInternalNotesResponse)
 def list_internal_notes(
@@ -309,6 +328,8 @@ def create_internal_note(
     return _internal_note_response(note)
 
 
+# ── Package orders ────────────────────────────────────────────────────────────
+
 @router.get("/package-orders", response_model=PaginatedPackageOrdersResponse)
 def list_package_orders(
     status: str | None = None,
@@ -320,11 +341,7 @@ def list_package_orders(
 ):
     _ = current_admin
     items, next_cursor = admin_service.list_package_orders(
-        db,
-        status_filter=status,
-        event_id=eventId,
-        limit=limit,
-        cursor=cursor,
+        db, status_filter=status, event_id=eventId, limit=limit, cursor=cursor,
     )
     return PaginatedPackageOrdersResponse(
         items=[_package_order_response(item) for item in items],
@@ -345,6 +362,8 @@ def get_package_order_detail(
         tasks=[_task_response(task) for task in tasks],
     )
 
+
+# ── Tasks ─────────────────────────────────────────────────────────────────────
 
 @router.get("/tasks", response_model=PaginatedTasksResponse)
 def list_tasks(
@@ -414,6 +433,8 @@ def get_task_fulfillment_requests(
         nextCursor=None,
     )
 
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
 
 @router.get("/dashboard", response_model=AdminDashboardResponse)
 def get_admin_dashboard(

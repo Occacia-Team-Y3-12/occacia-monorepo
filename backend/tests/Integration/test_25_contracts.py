@@ -265,14 +265,14 @@ class TestForgotPassword:
 
     def test_forgot_known_email(self, client, db_session):
         cust = _make_customer(db_session)
-        with patch("app.services.auth_service.auth_service.request_password_reset") as mock_r:
+        with patch("app.services.auth_service.auth_service.request_customer_password_reset_otp") as mock_r:
             mock_r.return_value = {"message": "Password reset email sent."}
             resp = client.post(self.URL, json={"email": cust.email})
         assert resp.status_code == 200
         assert "message" in resp.json()
 
     def test_forgot_unknown_email_still_200(self, client):
-        with patch("app.services.auth_service.auth_service.request_password_reset") as mock_r:
+        with patch("app.services.auth_service.auth_service.request_customer_password_reset_otp") as mock_r:
             mock_r.return_value = {"message": "If this email is registered, a reset link has been sent."}
             resp = client.post(self.URL, json={"email": "unknown@test.com"})
         assert resp.status_code == 200
@@ -295,21 +295,21 @@ class TestResetPassword:
     URL = "/api/v1/auth/customer/password/reset"
 
     def test_reset_valid_token(self, client):
-        with patch("app.services.auth_service.auth_service.confirm_password_reset") as mock_r:
+        with patch("app.services.auth_service.auth_service.confirm_customer_password_reset") as mock_r:
             mock_r.return_value = {"message": "Password reset successfully."}
             resp = client.post(self.URL, json={
-                "token": "valid-reset-token",
+                "reset_token": "valid-reset-token",
                 "new_password": "NewPassword1!",
             })
         assert resp.status_code == 200
         assert "message" in resp.json()
 
     def test_reset_invalid_token_400(self, client):
-        with patch("app.services.auth_service.auth_service.confirm_password_reset") as mock_r:
+        with patch("app.services.auth_service.auth_service.confirm_customer_password_reset") as mock_r:
             from fastapi import HTTPException
             mock_r.side_effect = HTTPException(status_code=400, detail="Invalid verification token.")
             resp = client.post(self.URL, json={
-                "token": "bad-token",
+                "reset_token": "bad-token",
                 "new_password": "NewPassword1!",
             })
         assert resp.status_code == 400
@@ -320,7 +320,7 @@ class TestResetPassword:
 
     def test_reset_old_path_missing(self, client):
         resp = client.post("/api/v1/auth/customers/reset-password",
-                           json={"token": "t", "new_password": "p"})
+                           json={"reset_token": "t", "new_password": "p"})
         assert resp.status_code in (404, 405)
 
 
@@ -495,8 +495,8 @@ class TestAdminLogin:
 
     def test_login_admin_success(self, client, db_session):
         adm = _make_admin(db_session)
-        resp = client.post(self.URL, data={
-            "username": adm.email,
+        resp = client.post(self.URL, json={
+            "email": adm.email,
             "password": "AdminPass1!",
         })
         if resp.status_code == 404:
@@ -505,8 +505,8 @@ class TestAdminLogin:
 
     def test_login_admin_wrong_password_401(self, client, db_session):
         adm = _make_admin(db_session)
-        resp = client.post(self.URL, data={
-            "username": adm.email,
+        resp = client.post(self.URL, json={
+            "email": adm.email,
             "password": "WrongAdmin!",
         })
         if resp.status_code == 404:
@@ -514,8 +514,8 @@ class TestAdminLogin:
         assert resp.status_code == 401
 
     def test_login_admin_unknown_401(self, client):
-        resp = client.post(self.URL, data={
-            "username": "nobody@admin.com",
+        resp = client.post(self.URL, json={
+            "email": "nobody@admin.com",
             "password": "AdminPass1!",
         })
         if resp.status_code == 404:
@@ -524,7 +524,7 @@ class TestAdminLogin:
 
     def test_login_admin_path_correct(self, client):
         resp = client.post("/api/v1/admin/login",
-                           data={"username": "x@x.com", "password": "x"})
+                           json={"email": "x@x.com", "password": "x"})
         assert resp.status_code in (404, 405)
 
 
