@@ -26,14 +26,14 @@ export function PersonaConfirmationBar({
     <motion.div
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
-      className="sticky bottom-4 z-20 rounded-[28px] border border-white/10 bg-[#0e1220]/92 p-4 shadow-[0_22px_60px_rgba(0,0,0,0.45)] backdrop-blur"
+      className="sticky bottom-4 z-20 rounded-[24px] border border-[#DCE4F2] bg-white/95 px-5 py-4 shadow-[0_20px_48px_-32px_rgba(13,71,161,0.28)] backdrop-blur"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-white">
+          <p className="text-sm font-semibold text-[#173B7A]">
             {isConfirmed ? 'Your persona is confirmed.' : 'Ready when this feels like you.'}
           </p>
-          <p className="mt-1 text-sm text-white/55">
+          <p className="mt-1 text-sm text-[#5B6780]">
             {isDirty
               ? 'We will save your edits before confirming.'
               : 'You can still refine these preferences later.'}
@@ -44,7 +44,7 @@ export function PersonaConfirmationBar({
           <button
             type="button"
             onClick={onEdit}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white/78 transition hover:bg-white/10"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[#D7DFEC] bg-[#F8FBFF] px-5 py-3 text-sm font-semibold text-[#35548D] transition hover:border-[#BFD0EE] hover:bg-[#EEF5FF]"
           >
             <PencilLine className="h-4 w-4" />
             Edit details
@@ -53,7 +53,7 @@ export function PersonaConfirmationBar({
           <button
             type="button"
             onClick={onSkip}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-transparent px-4 py-3 text-sm font-semibold text-white/72 transition hover:bg-white/6"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[#D7DFEC] bg-transparent px-5 py-3 text-sm font-semibold text-[#5B6780] transition hover:bg-[#F8FBFF]"
           >
             <SkipForward className="h-4 w-4" />
             Skip for now
@@ -63,7 +63,7 @@ export function PersonaConfirmationBar({
             type="button"
             onClick={onConfirm}
             disabled={isSaving || isConfirming}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#f5c871] px-5 py-3 text-sm font-semibold text-[#171a23] transition hover:bg-[#ffd987] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0D47A1] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1C5BC3] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSaving || isConfirming ? (
               <Loader2 className="h-4 w-4 animate-spin" />

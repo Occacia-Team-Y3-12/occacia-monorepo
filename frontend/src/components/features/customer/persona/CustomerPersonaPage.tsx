@@ -495,7 +495,7 @@ function CustomerPersonaContent({ personaId }: CustomerPersonaPageProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-[calc(100vh-160px)] rounded-[40px] bg-[#080b14] p-4 sm:p-6 lg:p-8">
+      <div className="min-h-[calc(100vh-160px)] rounded-[40px] bg-[#F4F8FA] p-4 sm:p-6 lg:p-8">
         <PersonaReviewSkeleton />
       </div>
     );
@@ -503,12 +503,12 @@ function CustomerPersonaContent({ personaId }: CustomerPersonaPageProps) {
 
   if (personasQuery.isError || personaQuery.isError) {
     return (
-      <div className="flex min-h-[65vh] flex-col items-center justify-center rounded-[36px] border border-white/10 bg-[#0b0f1a] px-6 py-12 text-center">
-        <div className="rounded-[28px] border border-[#ff9d9d]/20 bg-[#ff9d9d]/10 p-4 text-[#ffbebe]">
+      <div className="flex min-h-[65vh] flex-col items-center justify-center rounded-[36px] border border-[#DCE4F2] bg-white px-6 py-12 text-center shadow-[0_24px_60px_-36px_rgba(13,71,161,0.18)]">
+        <div className="rounded-[28px] border border-[#F4CDCD] bg-[#FFF4F4] p-4 text-[#B23C3C]">
           <RefreshCw className="h-8 w-8" />
         </div>
-        <h1 className="mt-5 text-3xl font-semibold text-white">We couldn&apos;t load your persona just now</h1>
-        <p className="mt-3 max-w-lg text-white/60">
+        <h1 className="mt-5 text-3xl font-semibold text-[#173B7A]">We couldn&apos;t load your persona just now</h1>
+        <p className="mt-3 max-w-lg text-[#5B6780]">
           {(personasQuery.error instanceof Error && personasQuery.error.message)
             || (personaQuery.error instanceof Error && personaQuery.error.message)
             || 'Please try again in a moment.'}
@@ -519,7 +519,7 @@ function CustomerPersonaContent({ personaId }: CustomerPersonaPageProps) {
             personasQuery.refetch();
             personaQuery.refetch();
           }}
-          className="mt-6 rounded-full bg-[#f5c871] px-5 py-3 text-sm font-semibold text-[#171a23]"
+          className="mt-6 inline-flex items-center justify-center rounded-full bg-[#0D47A1] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1C5BC3]"
         >
           Try again
         </button>
@@ -529,7 +529,7 @@ function CustomerPersonaContent({ personaId }: CustomerPersonaPageProps) {
 
   if (!personasQuery.data?.length || !persona) {
     return (
-      <div className="min-h-[calc(100vh-160px)] rounded-[40px] bg-[#080b14] p-4 sm:p-6 lg:p-8">
+      <div className="min-h-[calc(100vh-160px)] rounded-[40px] bg-[#F4F8FA] p-4 sm:p-6 lg:p-8">
         <PersonaEmptyState />
       </div>
     );
@@ -537,15 +537,15 @@ function CustomerPersonaContent({ personaId }: CustomerPersonaPageProps) {
 
   if (!draft) {
     return (
-      <div className="min-h-[calc(100vh-160px)] rounded-[40px] bg-[#080b14] p-4 sm:p-6 lg:p-8">
+      <div className="min-h-[calc(100vh-160px)] rounded-[40px] bg-[#F4F8FA] p-4 sm:p-6 lg:p-8">
         <PersonaReviewSkeleton />
       </div>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-160px)] rounded-[40px] bg-[radial-gradient(circle_at_top,_rgba(245,200,113,0.08),_transparent_20%),linear-gradient(180deg,#080b14_0%,#070911_100%)] p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-5xl space-y-5">
+    <div className="min-h-[calc(100vh-160px)] rounded-[40px] bg-[#F4F8FA] px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+      <div className="mx-auto max-w-6xl space-y-6">
         <PersonaReviewHero isConfirmed={persona.is_confirmed} />
 
         <AnimatePresence>
@@ -554,13 +554,13 @@ function CustomerPersonaContent({ personaId }: CustomerPersonaPageProps) {
               initial={{ opacity: 0, y: 20, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -12 }}
-              className="rounded-[28px] border border-[#5dd7c4]/20 bg-[#5dd7c4]/10 p-4 text-[#d7fff7] shadow-[0_18px_45px_rgba(18,88,74,0.28)]"
+              className="rounded-[24px] border border-[#B7E4C7] bg-[#F0FBF4] px-5 py-4 text-[#1F7D46] shadow-[0_18px_45px_rgba(18,88,74,0.12)]"
             >
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
                   <p className="font-semibold">Persona confirmed</p>
-                  <p className="mt-1 text-sm text-[#d7fff7]/80">
+                  <p className="mt-1 text-sm text-[#2F6F56]/80">
                     We&apos;ll use this profile to tune future recommendations and event ideas.
                   </p>
                 </div>
@@ -571,10 +571,10 @@ function CustomerPersonaContent({ personaId }: CustomerPersonaPageProps) {
 
         {(feedbackMessage || errorMessage) && (
           <div
-            className={`rounded-[24px] border px-4 py-3 text-sm ${
+            className={`rounded-[24px] border px-5 py-4 text-sm ${
               errorMessage
-                ? 'border-[#ff9d9d]/20 bg-[#ff9d9d]/10 text-[#ffd0d0]'
-                : 'border-[#f5c871]/20 bg-[#f5c871]/10 text-[#ffe2a2]'
+                ? 'border-[#F4CDCD] bg-[#FFF4F4] text-[#B23C3C]'
+                : 'border-[#D7DFEC] bg-[#F8FBFF] text-[#35548D]'
             }`}
           >
             {errorMessage || feedbackMessage}
@@ -619,11 +619,11 @@ function CustomerPersonaContent({ personaId }: CustomerPersonaPageProps) {
           rawPreferencesJson={draft.preferences_json}
         />
 
-        <div className="flex flex-wrap items-center gap-3 rounded-[28px] border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-white/60">
+        <div className="flex flex-wrap items-center gap-3 rounded-[24px] border border-[#DCE4F2] bg-white px-5 py-5 text-sm text-[#5B6780] shadow-[0_16px_40px_-32px_rgba(13,71,161,0.2)]">
           <button
             type="button"
             onClick={() => setIsEditingDetails(true)}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/78 transition hover:bg-white/10"
+            className="inline-flex items-center gap-2 rounded-full border border-[#D7DFEC] bg-[#F8FBFF] px-5 py-3 text-sm font-semibold text-[#35548D] transition hover:border-[#BFD0EE] hover:bg-[#EEF5FF]"
           >
             Edit details
           </button>
@@ -632,13 +632,13 @@ function CustomerPersonaContent({ personaId }: CustomerPersonaPageProps) {
               type="button"
               onClick={() => unconfirmMutation.mutate()}
               disabled={unconfirmMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-4 py-2 text-sm font-semibold text-white/72 transition hover:bg-white/6 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-full border border-[#D7DFEC] bg-transparent px-5 py-3 text-sm font-semibold text-[#5B6780] transition hover:bg-[#F8FBFF] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Undo2 className="h-4 w-4" />
               {unconfirmMutation.isPending ? 'Updating...' : 'Remove confirmation'}
             </button>
           )}
-          <span className="text-white/40">Recommendations still work even if you skip this step.</span>
+          <span className="text-[#7A87A3]">Recommendations still work even if you skip this step.</span>
         </div>
 
         <PersonaConfirmationBar
