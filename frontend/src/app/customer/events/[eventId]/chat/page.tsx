@@ -61,6 +61,8 @@ export default function CustomerEventChatPage() {
     success,
     eventTitle,
     eventState,
+    eventType,
+    personaCount,
     messages,
     tasks,
     chatInput,
@@ -158,27 +160,18 @@ export default function CustomerEventChatPage() {
     return <section className="rounded-2xl border border-[#EAEAEA] bg-white p-6 text-sm text-[#666666]">Loading event chat...</section>;
   }
 
-  const primaryAssistantMessage = messages[0]?.content
-    || `I've created a package for ${eventTitle || 'this event'}! Let's refine the schedule. When is the event, and should it repeat yearly?`;
-
-  const visibleTasks = tasks.slice(0, 3);
-  const sidebarTasks = [
-    {
-      key: visibleTasks[0]?.id || 'task-1',
-      title: visibleTasks[0]?.title || 'Book High Tea venue',
-      subtitle: 'Suggested: The Ritz or Savoy',
-    },
-    {
-      key: visibleTasks[1]?.id || 'task-2',
-      title: visibleTasks[1]?.title || 'Order custom flowers',
-      subtitle: 'Sarah prefers Pastel Peonies',
-    },
-    {
-      key: visibleTasks[2]?.id || 'task-3',
-      title: visibleTasks[2]?.title || 'Buy birthday gift',
-      subtitle: 'Check Amazon Wishlist',
-    },
-  ];
+  const visibleMessages = messages.length
+    ? messages
+    : [
+        {
+          id: 'empty-assistant',
+          role: 'assistant' as const,
+          content:
+            'Start planning by sharing the date, recurrence, reminders, budget, and must-have details for this event.',
+          createdAt: new Date().toISOString(),
+        },
+      ];
+  const sidebarTasks = tasks.slice(0, 3);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-[#EAEAEA] bg-white">
@@ -195,7 +188,7 @@ export default function CustomerEventChatPage() {
           <header className="border-b border-[#EAEAEA] px-4 py-4 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
               <div className="min-w-0">
-                <h1 className="truncate text-[22px] font-bold leading-tight text-[#0D47A1] sm:text-[36px]">{eventTitle || "Sarah's Birthday"}</h1>
+                <h1 className="truncate text-[22px] font-bold leading-tight text-[#0D47A1] sm:text-[36px]">{eventTitle || 'Event'}</h1>
                 <div className="mt-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666] sm:text-[11px] sm:tracking-[0.16em]">
                   <span className="inline-block h-2 w-2 rounded-full bg-[#FBBC05]" />
                   Planning Phase
@@ -214,191 +207,199 @@ export default function CustomerEventChatPage() {
           </header>
 
           <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5 sm:space-y-8 sm:px-6 sm:py-6">
-            <div className="flex min-w-0 gap-3">
-              <img src="/icons/logo.svg" alt="assistant" className="mt-1 h-10 w-10 shrink-0 object-contain" />
-              <div className="min-w-0 w-full max-w-[650px]">
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">Occacia Assistant</p>
-                <div className="break-words rounded-2xl border border-[#EAEAEA] bg-white px-4 py-3 text-sm text-[#666666]">
-                  {primaryAssistantMessage}
-                </div>
-              </div>
-            </div>
+            {visibleMessages.map((message, index) => {
+              const isAssistant = message.role === 'assistant' || message.role === 'system';
+              const showControls = isAssistant && index === visibleMessages.length - 1;
 
-            <div className="flex justify-end">
-              <div className="min-w-0 w-full max-w-[650px] text-right">
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">Me</p>
-                <div className="ml-auto inline-block max-w-full break-words rounded-2xl bg-[#0D47A1] px-4 py-3 text-sm text-white shadow-[0_8px_20px_rgba(13,79,180,0.25)]">
-                  <p>It&apos;s on {startDate || '2025-10-11'}. Yes, repeat it every year.</p>
-                  <span className="mt-1 inline-flex items-center justify-end gap-0.5 text-[10px] text-[#C9C9C9]" aria-label="Sent">
-                    <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M2 6.4L4.3 8.6L10 3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <svg viewBox="0 0 12 12" className="-ml-1.5 h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M2 6.4L4.3 8.6L10 3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </span>
-                </div>
-              </div>
-            </div>
+              return (
+                <div
+                  key={message.id}
+                  className={isAssistant ? 'flex min-w-0 gap-3' : 'flex justify-end'}
+                >
+                  {isAssistant ? (
+                    <img src="/icons/logo.svg" alt="assistant" className="mt-1 h-10 w-10 shrink-0 object-contain" />
+                  ) : null}
 
-            <div className="flex min-w-0 gap-3">
-              <img src="/icons/logo.svg" alt="assistant" className="mt-1 h-10 w-10 shrink-0 object-contain" />
-              <div className="min-w-0 w-full max-w-[650px]">
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">Occacia Assistant</p>
-                <div className="rounded-2xl border border-[#EAEAEA] bg-white p-4">
-                  <p className="break-words text-sm text-[#666666]">
-                    Got it! {startDate || 'Oct 11th'}, recurring yearly. Would you like to set reminders for 7 days and 1 day before? Also, would you like to sync this to your Google Calendar?
-                  </p>
+                  <div className={isAssistant ? 'min-w-0 w-full max-w-[650px]' : 'min-w-0 w-full max-w-[650px] text-right'}>
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">
+                      {isAssistant ? 'Occacia Assistant' : 'You'}
+                    </p>
 
-                  <div className="mt-4 rounded-xl border border-[#EAEAEA] bg-[#F4F8FA] p-4">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">
-                        Date
-                        <div className="relative mt-2">
-                          <input
-                            type="text"
-                            value={dateInputValue}
-                            onChange={(event) => {
-                              setDateInputValue(event.target.value);
-                              if (dateInputError) {
-                                setDateInputError(null);
-                              }
-                            }}
-                            onBlur={commitTypedDate}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                event.preventDefault();
-                                commitTypedDate();
-                              }
-                            }}
-                            placeholder="DD/MM/YYYY"
-                            inputMode="numeric"
-                            autoComplete="off"
-                            className="h-10 w-full rounded-lg border border-[#CCCCCC] bg-white px-3 pr-10 text-sm text-[#666666] placeholder:text-[#666666]"
-                          />
+                    <div
+                      className={
+                        isAssistant
+                          ? 'rounded-2xl border border-[#EAEAEA] bg-white p-4'
+                          : 'ml-auto inline-block max-w-full break-words rounded-2xl bg-[#0D47A1] px-4 py-3 text-left text-sm text-white shadow-[0_8px_20px_rgba(13,79,180,0.25)]'
+                      }
+                    >
+                      <p className={`break-words text-sm ${isAssistant ? 'text-[#666666]' : ''}`}>
+                        {message.content}
+                      </p>
 
-                          <input
-                            ref={datePickerRef}
-                            type="date"
-                            value={startDate}
-                            onChange={(event) => {
-                              setStartDate(event.target.value);
-                              setDateInputError(null);
-                            }}
-                            className="pointer-events-none absolute right-2 top-2 h-6 w-6 opacity-0"
-                            tabIndex={-1}
-                            aria-hidden="true"
-                          />
+                      {!isAssistant ? (
+                        <span className="mt-1 inline-flex items-center justify-end gap-0.5 text-[10px] text-[#C9C9C9]" aria-label="Sent">
+                          <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8">
+                            <path d="M2 6.4L4.3 8.6L10 3" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          <svg viewBox="0 0 12 12" className="-ml-1.5 h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8">
+                            <path d="M2 6.4L4.3 8.6L10 3" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
+                      ) : null}
+
+                      {showControls && (
+                        <div className="mt-4 rounded-xl border border-[#EAEAEA] bg-[#F4F8FA] p-4">
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">
+                              Date
+                              <div className="relative mt-2">
+                                <input
+                                  type="text"
+                                  value={dateInputValue}
+                                  onChange={(event) => {
+                                    setDateInputValue(event.target.value);
+                                    if (dateInputError) {
+                                      setDateInputError(null);
+                                    }
+                                  }}
+                                  onBlur={commitTypedDate}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                      event.preventDefault();
+                                      commitTypedDate();
+                                    }
+                                  }}
+                                  placeholder="DD/MM/YYYY"
+                                  inputMode="numeric"
+                                  autoComplete="off"
+                                  className="h-10 w-full rounded-lg border border-[#CCCCCC] bg-white px-3 pr-10 text-sm text-[#666666] placeholder:text-[#666666]"
+                                />
+
+                                <input
+                                  ref={datePickerRef}
+                                  type="date"
+                                  value={startDate}
+                                  onChange={(event) => {
+                                    setStartDate(event.target.value);
+                                    setDateInputError(null);
+                                  }}
+                                  className="pointer-events-none absolute right-2 top-2 h-6 w-6 opacity-0"
+                                  tabIndex={-1}
+                                  aria-hidden="true"
+                                />
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const picker = datePickerRef.current;
+                                    if (!picker) {
+                                      return;
+                                    }
+
+                                    if (typeof picker.showPicker === 'function') {
+                                      picker.showPicker();
+                                      return;
+                                    }
+
+                                    picker.click();
+                                  }}
+                                  className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center"
+                                  aria-label="Open calendar"
+                                >
+                                  <img src="/icons/customer/events/calander_icon.svg" alt="calendar" className="h-5 w-5 object-contain" />
+                                </button>
+                              </div>
+
+                              {dateInputError && <p className="mt-1 text-[10px] font-medium normal-case tracking-normal text-[#EA4335]">{dateInputError}</p>}
+                            </label>
+
+                            <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">
+                              Recurrence
+                              <select
+                                value={frequency}
+                                onChange={(event) => {
+                                  setIsRecurring(true);
+                                  setFrequency(event.target.value as typeof frequency);
+                                }}
+                                className="mt-2 h-10 w-full rounded-lg border border-[#CCCCCC] bg-white px-3 text-sm text-[#666666]"
+                              >
+                                <option value="yearly">Every Year</option>
+                                <option value="monthly">Every Month</option>
+                                <option value="weekly">Every Week</option>
+                                <option value="daily">Every Day</option>
+                              </select>
+                            </label>
+                          </div>
+
+                          <div className="mt-3 rounded-xl border border-[#EAEAEA] bg-white px-3 py-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <label className="flex items-center gap-2 text-sm font-semibold text-[#666666]">
+                                <input
+                                  type="checkbox"
+                                  checked={calendarSyncEnabled}
+                                  onChange={async (event) => {
+                                    const enabled = event.target.checked;
+                                    await handleCalendarSyncToggle(enabled);
+                                  }}
+                                />
+                                Sync to Google Calendar
+                              </label>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const nextEnabled = !calendarSyncEnabled;
+                                  await handleCalendarSyncToggle(nextEnabled);
+                                }}
+                                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 ${
+                                  calendarSyncEnabled ? 'bg-[#4285F4]' : 'bg-[#CCCCCC]'
+                                }`}
+                                aria-label="Toggle Google Calendar sync"
+                                aria-pressed={calendarSyncEnabled}
+                              >
+                                <span
+                                  className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-[0_2px_4px_rgba(17,35,74,0.3)] transition-transform duration-200 ${
+                                    calendarSyncEnabled ? 'translate-x-7' : 'translate-x-1'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-3 gap-2">
+                            {[10080, 1440, 60].map((offset) => (
+                              <button
+                                key={offset}
+                                type="button"
+                                onClick={() => {
+                                  setRemindersEnabled(true);
+                                  toggleOffset(offset);
+                                }}
+                                className={`h-9 rounded-lg border text-xs font-semibold ${
+                                  offsets.includes(offset)
+                                    ? 'border-[#0D47A1] bg-[#F4F8FA] text-[#0D47A1]'
+                                    : 'border-[#EAEAEA] bg-white text-[#666666]'
+                                }`}
+                              >
+                                {offset === 10080 ? '7 days' : offset === 1440 ? '1 day' : '1 hour'}
+                              </button>
+                            ))}
+                          </div>
 
                           <button
                             type="button"
-                            onClick={() => {
-                              const picker = datePickerRef.current;
-                              if (!picker) {
-                                return;
-                              }
-
-                              if (typeof picker.showPicker === 'function') {
-                                picker.showPicker();
-                                return;
-                              }
-
-                              picker.click();
-                            }}
-                            className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center"
-                            aria-label="Open calendar"
+                            onClick={() => void onSaveDetails()}
+                            disabled={isBusy}
+                            className="mt-4 h-10 w-full rounded-lg bg-[#0D47A1] text-sm font-semibold text-white disabled:opacity-60"
                           >
-                            <img src="/icons/customer/events/calander_icon.svg" alt="calendar" className="h-5 w-5 object-contain" />
+                            Confirm & Save Details
                           </button>
                         </div>
-
-                        {dateInputError && <p className="mt-1 text-[10px] font-medium normal-case tracking-normal text-[#EA4335]">{dateInputError}</p>}
-                      </label>
-
-                      <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">
-                        Recurrence
-                        <select
-                          value={frequency}
-                          onChange={(event) => {
-                            setIsRecurring(true);
-                            setFrequency(event.target.value as typeof frequency);
-                          }}
-                          className="mt-2 h-10 w-full rounded-lg border border-[#CCCCCC] bg-white px-3 text-sm text-[#666666]"
-                        >
-                          <option value="yearly">Every Year</option>
-                          <option value="monthly">Every Month</option>
-                          <option value="weekly">Every Week</option>
-                          <option value="daily">Every Day</option>
-                        </select>
-                      </label>
+                      )}
                     </div>
-
-                    <div className="mt-3 rounded-xl border border-[#EAEAEA] bg-white px-3 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="flex items-center gap-2 text-sm font-semibold text-[#666666]">
-                          <input
-                            type="checkbox"
-                            checked={calendarSyncEnabled}
-                            onChange={async (event) => {
-                              const enabled = event.target.checked;
-                              await handleCalendarSyncToggle(enabled);
-                            }}
-                          />
-                          Sync to Google Calendar
-                        </label>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const nextEnabled = !calendarSyncEnabled;
-                            await handleCalendarSyncToggle(nextEnabled);
-                          }}
-                          className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 ${
-                            calendarSyncEnabled ? 'bg-[#4285F4]' : 'bg-[#CCCCCC]'
-                          }`}
-                          aria-label="Toggle Google Calendar sync"
-                          aria-pressed={calendarSyncEnabled}
-                        >
-                          <span
-                            className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-[0_2px_4px_rgba(17,35,74,0.3)] transition-transform duration-200 ${
-                              calendarSyncEnabled ? 'translate-x-7' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-3 gap-2">
-                      {[10080, 1440, 60].map((offset) => (
-                        <button
-                          key={offset}
-                          type="button"
-                          onClick={() => {
-                            setRemindersEnabled(true);
-                            toggleOffset(offset);
-                          }}
-                          className={`h-9 rounded-lg border text-xs font-semibold ${
-                            offsets.includes(offset)
-                              ? 'border-[#0D47A1] bg-[#F4F8FA] text-[#0D47A1]'
-                              : 'border-[#EAEAEA] bg-white text-[#666666]'
-                          }`}
-                        >
-                          {offset === 10080 ? '7 days' : offset === 1440 ? '1 day' : '1 hour'}
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => void onSaveDetails()}
-                      disabled={isBusy}
-                      className="mt-4 h-10 w-full rounded-lg bg-[#0D47A1] text-sm font-semibold text-white disabled:opacity-60"
-                    >
-                      Confirm & Save Details
-                    </button>
                   </div>
                 </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
 
           <div className="border-t border-[#EAEAEA] bg-[#F4F8FA] px-4 py-4">
@@ -443,21 +444,23 @@ export default function CustomerEventChatPage() {
 
               <div className="mt-4 rounded-[20px] border border-[#EAEAEA] bg-white px-5 py-5 shadow-[0_2px_0_rgba(209,217,231,0.55)]">
                 <div className="flex items-center gap-4">
-                  <img src="/images/customer/events/Sarah.svg" alt="Sarah" className="h-16 w-16 rounded-full border-[4px] border-[#CCCCCC]" />
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full border-[4px] border-[#CCCCCC] bg-[#F4F8FA] text-[22px] font-bold text-[#0D47A1]">
+                    {eventTitle.trim().charAt(0).toUpperCase() || 'E'}
+                  </div>
                   <div className="min-w-0">
-                    <p className="truncate text-[22px] font-bold leading-none text-[#0D47A1] sm:text-[24px]">Sarah Rivers</p>
-                    <p className="mt-2 text-[14px] leading-none text-[#666666]">Sister</p>
+                    <p className="truncate text-[22px] font-bold leading-none text-[#0D47A1] sm:text-[24px]">{eventTitle || 'Event'}</p>
+                    <p className="mt-2 text-[14px] leading-none text-[#666666]">{eventType || 'General event'}</p>
                   </div>
                 </div>
 
                 <div className="mt-5 space-y-2.5 text-[14px] text-[#666666]">
                   <p className="flex items-center gap-3 leading-none">
                     <img src="/icons/customer/chat/like_icon.svg" alt="likes" className="h-5 w-4" />
-                    Likes: Nature, Minimalist design
+                    Personas linked: {personaCount}
                   </p>
                   <p className="flex items-center gap-3 leading-none">
                     <img src="/icons/customer/chat/cake.svg" alt="birthday" className="h-5 w-4 shrink-0" />
-                    Age: Turning 28
+                    Scheduled date: {startDate || 'Date TBD'}
                   </p>
                 </div>
               </div>
@@ -467,17 +470,21 @@ export default function CustomerEventChatPage() {
               <h3 className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#666666]">Suggested Tasks</h3>
 
               <div className="mt-4 space-y-3">
-                {sidebarTasks.map((task) => (
-                  <div key={task.key} className="flex items-center justify-between rounded-[20px] border border-[#EAEAEA] bg-white px-5 py-4">
+                {sidebarTasks.length === 0 ? (
+                  <div className="rounded-[20px] border border-dashed border-[#D7DFEC] bg-white px-5 py-6 text-sm text-[#666666]">
+                    No tasks yet. Add tasks in chat to continue planning.
+                  </div>
+                ) : sidebarTasks.map((task) => (
+                  <div key={task.id} className="flex items-center justify-between rounded-[20px] border border-[#EAEAEA] bg-white px-5 py-4">
                     <div className="min-w-0">
                       <p className="text-[15px] font-semibold leading-tight text-[#666666]">{task.title}</p>
-                      <p className="mt-1 text-[13px] leading-tight text-[#666666]">{task.subtitle}</p>
+                      <p className="mt-1 text-[13px] leading-tight text-[#666666]">{task.category || 'Planning task'}</p>
                     </div>
 
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() => setActiveTaskMenuId((prev) => (prev === task.key ? null : task.key))}
+                        onClick={() => setActiveTaskMenuId((prev) => (prev === task.id ? null : task.id))}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#666666] hover:bg-[#F4F8FA]"
                         aria-label="Task actions"
                       >
@@ -488,7 +495,7 @@ export default function CustomerEventChatPage() {
                         </svg>
                       </button>
 
-                      {activeTaskMenuId === task.key && (
+                      {activeTaskMenuId === task.id && (
                         <div className="absolute right-0 top-9 z-20 w-28 rounded-lg border border-[#CCCCCC] bg-white p-1 shadow-[0_10px_24px_rgba(22,37,74,0.12)]">
                           <button
                             type="button"
@@ -508,9 +515,7 @@ export default function CustomerEventChatPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              if (!task.key.startsWith('task-')) {
-                                void removeTask(task.key);
-                              }
+                              void removeTask(task.id);
                               setActiveTaskMenuId(null);
                             }}
                             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-[#EA4335] hover:bg-[#FAFAFA]"
@@ -533,7 +538,7 @@ export default function CustomerEventChatPage() {
                 type="button"
                 className="mt-5 h-14 w-full rounded-[16px] border-2 border-[#CCCCCC] bg-white text-[14px] font-semibold uppercase tracking-[0.12em] text-[#0D47A1]"
               >
-                View All Tasks ({Math.max(tasks.length, 8)})
+                View All Tasks ({tasks.length})
               </button>
 
               <form onSubmit={onAddTask} className="mt-4 flex gap-2">

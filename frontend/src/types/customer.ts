@@ -21,6 +21,28 @@ export type CreateCustomerEventPayload = {
 	description?: string;
 };
 
+export type CustomerEventSummary = {
+	eventId: string;
+	customerId?: string;
+	eventType: string;
+	title: string;
+	description?: string | null;
+	locationText?: string | null;
+	startAt?: string | null;
+	endAt?: string | null;
+	timezone?: string | null;
+	isAllDay?: boolean;
+	status: string;
+	personaIds: string[];
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type PaginatedCustomerEventsResponse = {
+	items: CustomerEventSummary[];
+	nextCursor?: string | null;
+};
+
 export type UpdateEventPersonasPayload = {
 	personaIds: string[];
 };

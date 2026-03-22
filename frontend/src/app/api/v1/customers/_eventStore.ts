@@ -157,6 +157,55 @@ const deriveAssistantResponse = (message: string, eventType: string): string => 
 };
 
 export const eventStore = {
+  listEvents(params?: {
+    status?: string | null;
+    limit?: number;
+    cursor?: string | null;
+  }) {
+    const items = Object.values(getStore().events)
+      .filter((record) =>
+        params?.status
+          ? record.event.state.toLowerCase() === params.status.toLowerCase()
+          : true
+      )
+      .sort((left, right) =>
+        right.event.updatedAt.localeCompare(left.event.updatedAt)
+      );
+
+    const startIndex = params?.cursor
+      ? Math.max(
+          0,
+          items.findIndex((record) => record.event.eventId === params.cursor) + 1
+        )
+      : 0;
+    const limit = params?.limit ?? 20;
+    const pageItems = items.slice(startIndex, startIndex + limit);
+    const nextCursor =
+      startIndex + limit < items.length
+        ? pageItems[pageItems.length - 1]?.event.eventId ?? null
+        : null;
+
+    return {
+      items: pageItems.map(({ event }) => ({
+        eventId: event.eventId,
+        customerId: 'mock-customer-1',
+        eventType: event.eventType,
+        title: event.title,
+        description: event.description ?? null,
+        locationText: null,
+        startAt: event.schedule.startAt ?? null,
+        endAt: event.schedule.endAt ?? null,
+        timezone: event.schedule.timezone ?? null,
+        isAllDay: event.schedule.isAllDay,
+        status: event.state,
+        personaIds: event.personaIds,
+        createdAt: event.updatedAt,
+        updatedAt: event.updatedAt,
+      })),
+      nextCursor,
+    };
+  },
+
   createEventWithId(eventId: string, payload: CreateCustomerEventPayload): CustomerEventDetail {
     const store = getStore();
 

@@ -1,7 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { proxyApiRequest, shouldUseCustomerPlanningMockApi } from '@/app/api/v1/_proxy';
-import { CreateCustomerEventPayload, CreateCustomerEventResponse } from '@/types/customer';
+import {
+  CreateCustomerEventPayload,
+  CreateCustomerEventResponse,
+  PaginatedCustomerEventsResponse,
+} from '@/types/customer';
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
+
+export async function GET(request: NextRequest): Promise<NextResponse<PaginatedCustomerEventsResponse>> {
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, '/customers/events') as Promise<NextResponse<PaginatedCustomerEventsResponse>>;
+  }
+
+  const { searchParams } = new URL(request.url);
+  const limit = Number.parseInt(searchParams.get('limit') || '20', 10);
+
+  return NextResponse.json(
+    eventStore.listEvents({
+      status: searchParams.get('status'),
+      limit: Number.isNaN(limit) ? 20 : limit,
+      cursor: searchParams.get('cursor'),
+    }),
+    { status: 200 }
+  );
+}
 
 export async function POST(request: NextRequest): Promise<NextResponse<CreateCustomerEventResponse>> {
   if (!shouldUseCustomerPlanningMockApi()) {
