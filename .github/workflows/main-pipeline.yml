@@ -179,6 +179,7 @@ jobs:
 
             # Write .env file
             cat <<EOF > .env
+            REDIS_URL=redis://:${REDIS_PASSWORD}@127.0.0.1:6379
             LANGFLOW_URL=${LANGFLOW_URL}
             LANGFLOW_ORG_ID=${LANGFLOW_ORG_ID}
             LANGFLOW_TOKEN=${LANGFLOW_TOKEN}
