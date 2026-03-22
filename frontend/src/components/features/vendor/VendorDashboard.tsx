@@ -132,9 +132,9 @@ export default function VendorDashboard() {
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           } ${isDesktopSidebarCollapsed ? 'lg:hidden' : 'lg:flex lg:relative'}`}
         >
-          <div className="mb-2 flex items-center gap-2 py-1">
+          <div className="mb-2 flex items-center gap-0 py-1">
           <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="ml-[-8px] h-[59px] w-[59px] shrink-0" priority />
-          <span className="text-[22px] font-extrabold tracking-tight text-[#1562CC]">OCCACIA</span>
+          <span className="text-[26px] font-bold tracking-normal text-[#0D47A1]">Occacia</span>
           <button
             type="button"
             onClick={() => setIsDesktopSidebarCollapsed(true)}
@@ -186,7 +186,7 @@ export default function VendorDashboard() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:gap-5 lg:w-auto">
             {isDesktopSidebarCollapsed && (
-              <div className="group relative hidden lg:block">
+              <div className="-ml-2 group relative hidden shrink-0 items-center gap-1 lg:flex">
                 <button
                   type="button"
                   onClick={() => setIsDesktopSidebarCollapsed(false)}
@@ -202,19 +202,32 @@ export default function VendorDashboard() {
                     </svg>
                   </span>
                 </button>
+                <span className="whitespace-nowrap text-[26px] font-bold tracking-normal text-[#0D47A1]">Occacia</span>
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen((prev) => !prev)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#E2E5EC] bg-white text-[#5B6478] lg:hidden"
-              aria-label="Toggle sidebar"
-            >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 7h16M4 12h16M4 17h16" />
-              </svg>
-            </button>
+            {isSidebarOpen ? (
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(false)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#E2E5EC] bg-white text-[#5B6478] lg:hidden"
+                aria-label="Close sidebar"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="-ml-2 flex shrink-0 items-center gap-1 self-start lg:hidden"
+                aria-label="Open sidebar"
+              >
+                <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="h-[59px] w-[59px]" />
+                <span className="whitespace-nowrap text-[26px] font-bold tracking-normal text-[#0D47A1]">Occacia</span>
+              </button>
+            )}
         <div className="relative w-full sm:w-[320px] md:w-[360px]">
                   <input
                     type="search"
