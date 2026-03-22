@@ -4,20 +4,20 @@ import { EventTaskMutationPayload, EventTasksResponse, EventTaskResponse } from 
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 };
 
 export async function GET(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventTasksResponse>> {
-  if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}/tasks`) as Promise<NextResponse<EventTasksResponse>>;
-  }
+  const { eventId } = await params;
 
-  const { eventId } = params;
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${eventId}/tasks`) as Promise<NextResponse<EventTasksResponse>>;
+  }
 
   if (!eventId) {
     return NextResponse.json(
@@ -58,11 +58,11 @@ export async function POST(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventTaskResponse>> {
-  if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}/tasks`) as Promise<NextResponse<EventTaskResponse>>;
-  }
+  const { eventId } = await params;
 
-  const { eventId } = params;
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${eventId}/tasks`) as Promise<NextResponse<EventTaskResponse>>;
+  }
 
   if (!eventId) {
     return NextResponse.json(

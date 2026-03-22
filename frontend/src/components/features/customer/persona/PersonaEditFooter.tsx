@@ -22,11 +22,11 @@ export function PersonaEditFooter({
     <motion.footer
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#0d1117]/95 backdrop-blur-lg"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#DCE4F2] bg-white/95 backdrop-blur-lg"
     >
       <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
         {isDirty && (
-          <div className="mb-3 text-center text-xs text-[#f5c871]">
+          <div className="mb-3 text-center text-xs text-[#0D47A1]">
             You have unsaved changes
           </div>
         )}
@@ -36,7 +36,7 @@ export function PersonaEditFooter({
             type="button"
             onClick={onDelete}
             disabled={isSaving}
-            className="inline-flex items-center gap-2 rounded-full border border-[#ff9d9d]/20 bg-[#ff9d9d]/10 px-4 py-2 text-sm font-semibold text-[#ffd0d0] transition hover:bg-[#ff9d9d]/20 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full border border-[#F4CDCD] bg-[#FFF4F4] px-4 py-2 text-sm font-semibold text-[#B23C3C] transition hover:bg-[#FFEAEA] disabled:opacity-50"
           >
             <Trash2 className="h-4 w-4" />
             Delete Persona
@@ -47,7 +47,7 @@ export function PersonaEditFooter({
               type="button"
               onClick={onReset}
               disabled={!isDirty || isSaving}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/10 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-full border border-[#D7DFEC] bg-[#F8FBFF] px-4 py-2 text-sm font-semibold text-[#4A5976] transition hover:border-[#BFD0EE] hover:bg-[#F1F6FE] disabled:opacity-50"
             >
               <RotateCcw className="h-4 w-4" />
               Reset
@@ -57,7 +57,7 @@ export function PersonaEditFooter({
               type="button"
               onClick={onSave}
               disabled={isSaving}
-              className="inline-flex items-center gap-2 rounded-full bg-[#f5c871] px-6 py-2 text-sm font-semibold text-[#0a0d14] transition hover:bg-[#ffe2a2] disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-full bg-[#0D47A1] px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#4285F4] disabled:opacity-50"
             >
               {isSaving ? (
                 <>

@@ -4,20 +4,20 @@ import { EventTasksConfirmResponse } from '@/types/customerEventChat';
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 };
 
 export async function POST(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventTasksConfirmResponse>> {
-  if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}/tasks/confirm`) as Promise<NextResponse<EventTasksConfirmResponse>>;
-  }
+  const { eventId } = await params;
 
-  const { eventId } = params;
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${eventId}/tasks/confirm`) as Promise<NextResponse<EventTasksConfirmResponse>>;
+  }
 
   if (!eventId) {
     return NextResponse.json(

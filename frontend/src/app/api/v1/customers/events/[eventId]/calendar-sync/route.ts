@@ -4,20 +4,20 @@ import { CalendarSyncRequest, CalendarSyncResponse } from '@/types/customerEvent
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 };
 
 export async function PUT(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<CalendarSyncResponse>> {
-  if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}/calendar-sync`) as Promise<NextResponse<CalendarSyncResponse>>;
-  }
+  const { eventId } = await params;
 
-  const { eventId } = params;
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${eventId}/calendar-sync`) as Promise<NextResponse<CalendarSyncResponse>>;
+  }
 
   if (!eventId) {
     return NextResponse.json(

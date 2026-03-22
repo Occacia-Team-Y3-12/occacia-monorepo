@@ -4,12 +4,13 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:800
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { personaId: string } }
+  { params }: { params: Promise<{ personaId: string }> }
 ) {
   try {
+    const { personaId } = await params;
     const token = request.cookies.get('auth_token')?.value;
     
-    const response = await fetch(`${BACKEND_URL}/api/v1/customers/personas/${params.personaId}`, {
+    const response = await fetch(`${BACKEND_URL}/api/v1/customers/personas/${personaId}`, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',
         'Content-Type': 'application/json',
@@ -28,13 +29,14 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { personaId: string } }
+  { params }: { params: Promise<{ personaId: string }> }
 ) {
   try {
+    const { personaId } = await params;
     const token = request.cookies.get('auth_token')?.value;
     const body = await request.json();
     
-    const response = await fetch(`${BACKEND_URL}/api/v1/customers/personas/${params.personaId}`, {
+    const response = await fetch(`${BACKEND_URL}/api/v1/customers/personas/${personaId}`, {
       method: 'PUT',
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',

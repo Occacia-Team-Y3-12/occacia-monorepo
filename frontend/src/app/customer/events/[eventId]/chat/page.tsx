@@ -49,6 +49,7 @@ export default function CustomerEventChatPage() {
   const router = useRouter();
   const eventId = params?.eventId;
   const [activeTaskMenuId, setActiveTaskMenuId] = useState<string | null>(null);
+  const [showAllTasks, setShowAllTasks] = useState(false);
   const [dateInputValue, setDateInputValue] = useState('');
   const [dateInputError, setDateInputError] = useState<string | null>(null);
   const datePickerRef = useRef<HTMLInputElement>(null);
@@ -171,7 +172,7 @@ export default function CustomerEventChatPage() {
           createdAt: new Date().toISOString(),
         },
       ];
-  const sidebarTasks = tasks.slice(0, 3);
+  const sidebarTasks = showAllTasks ? tasks : tasks.slice(0, 3);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-[#EAEAEA] bg-white">
@@ -536,9 +537,10 @@ export default function CustomerEventChatPage() {
 
               <button
                 type="button"
+                onClick={() => setShowAllTasks((prev) => !prev)}
                 className="mt-5 h-14 w-full rounded-[16px] border-2 border-[#CCCCCC] bg-white text-[14px] font-semibold uppercase tracking-[0.12em] text-[#0D47A1]"
               >
-                View All Tasks ({tasks.length})
+                {showAllTasks ? 'Show Less Tasks' : `View All Tasks (${tasks.length})`}
               </button>
 
               <form onSubmit={onAddTask} className="mt-4 flex gap-2">

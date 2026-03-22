@@ -264,7 +264,7 @@ function PersonaEditContent() {
 
   if (isLoading || !draft) {
     return (
-      <div className="min-h-screen bg-[#0a0d14]">
+      <div className="min-h-screen bg-[#F4F8FA]">
         <PersonaEditSkeleton />
       </div>
     );
@@ -272,14 +272,14 @@ function PersonaEditContent() {
 
   if (!personasQuery.data?.length || !persona) {
     return (
-      <div className="min-h-screen bg-[#0a0d14]">
+      <div className="min-h-screen bg-[#F4F8FA]">
         <PersonaEditEmptyState />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0d14] pb-32">
+    <div className="min-h-screen bg-[#F4F8FA] pb-32">
       <PersonaEditHeader />
 
       <div className="mx-auto max-w-3xl px-4 pt-6 sm:px-6">
@@ -289,7 +289,7 @@ function PersonaEditContent() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="mb-4 flex items-center gap-3 rounded-2xl border border-[#5dd7c4]/20 bg-[#5dd7c4]/10 px-4 py-3 text-[#d7fff7]"
+              className="mb-4 flex items-center gap-3 rounded-2xl border border-[#B7E4C7] bg-[#F0FBF4] px-4 py-3 text-[#1F7D46]"
             >
               <CheckCircle2 className="h-5 w-5 shrink-0" />
               <span className="text-sm font-medium">{successMessage}</span>
@@ -298,7 +298,7 @@ function PersonaEditContent() {
         </AnimatePresence>
 
         {errorMessage && (
-          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#ff9d9d]/20 bg-[#ff9d9d]/10 px-4 py-3 text-[#ffd0d0]">
+          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#F4CDCD] bg-[#FFF4F4] px-4 py-3 text-[#B23C3C]">
             <AlertTriangle className="h-5 w-5 shrink-0" />
             <span className="text-sm font-medium">{errorMessage}</span>
             <button type="button" onClick={() => setErrorMessage(null)} className="ml-auto">

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { featureFlags } from '@/config/featureFlags';
-
 function getBackendApiBaseUrl() {
   const configuredBaseUrl =
     process.env.NEXT_PUBLIC_API_URL?.trim() || 'http://localhost:8000';
@@ -12,8 +10,24 @@ function getBackendApiBaseUrl() {
     : `${normalizedBaseUrl}/api/v1`;
 }
 
-export const shouldUseCustomerPlanningMockApi = () =>
-  featureFlags.useCustomerPlanningMockApi;
+const envFlag = (value: string | undefined, defaultValue = false) => {
+  if (value == null) {
+    return defaultValue;
+  }
+
+  return value.trim().toLowerCase() === 'true';
+};
+
+export const shouldUseCustomerPlanningMockApi = () => {
+  const enableFrontendMocks = envFlag(
+    process.env.NEXT_PUBLIC_ENABLE_FRONTEND_MOCKS
+  );
+
+  return envFlag(
+    process.env.NEXT_PUBLIC_USE_CUSTOMER_PLANNING_MOCK_API,
+    enableFrontendMocks
+  );
+};
 
 export async function proxyApiRequest(
   request: Request | NextRequest,

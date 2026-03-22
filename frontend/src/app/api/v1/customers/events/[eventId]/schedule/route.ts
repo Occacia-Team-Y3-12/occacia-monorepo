@@ -4,9 +4,9 @@ import { EventScheduleRequest, EventScheduleResponse } from '@/types/customerEve
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 };
 
 const toIso = (value: string, fallbackTime = '00:00'): string => {
@@ -21,11 +21,11 @@ export async function PUT(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventScheduleResponse>> {
-  if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}/schedule`) as Promise<NextResponse<EventScheduleResponse>>;
-  }
+  const { eventId } = await params;
 
-  const { eventId } = params;
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${eventId}/schedule`) as Promise<NextResponse<EventScheduleResponse>>;
+  }
 
   if (!eventId) {
     return NextResponse.json(

@@ -5,22 +5,22 @@ import { EventDetailResponse } from '@/types/customerEventChat';
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 };
 
 export async function GET(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventDetailResponse>> {
+  const { eventId } = await params;
+
   if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}`) as Promise<NextResponse<EventDetailResponse>>;
+    return proxyApiRequest(request, `/customers/events/${eventId}`) as Promise<NextResponse<EventDetailResponse>>;
   }
 
   try {
-    const { eventId } = params;
-
     if (!eventId) {
       return NextResponse.json(
         {
@@ -59,11 +59,11 @@ export async function DELETE(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<DeleteDraftEventResponse>> {
-  if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}`) as Promise<NextResponse<DeleteDraftEventResponse>>;
-  }
+  const { eventId } = await params;
 
-  const { eventId } = params;
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${eventId}`) as Promise<NextResponse<DeleteDraftEventResponse>>;
+  }
 
   if (!eventId) {
     return NextResponse.json(

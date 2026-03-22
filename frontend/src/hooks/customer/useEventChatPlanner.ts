@@ -236,7 +236,7 @@ export const useEventChatPlanner = (eventId: string) => {
       return;
     }
 
-    setTasks((prev) => [...prev, result.data!.data!.task]);
+    setTasks((prev) => [result.data!.data!.task, ...prev]);
     setNewTaskTitle('');
     setIsBusy(false);
   };

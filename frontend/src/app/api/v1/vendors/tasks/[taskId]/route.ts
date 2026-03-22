@@ -5,18 +5,20 @@ import { featureFlags } from '@/config/featureFlags';
 import { getMockVendorTaskDetail } from '@/mocks/vendor/vendorTaskDetail';
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     taskId: string;
-  };
+  }>;
 };
 
 export async function GET(
   request: NextRequest,
   { params }: RouteContext
 ) {
+  const { taskId } = await params;
+
   if (!featureFlags.useVendorTasksMock) {
-    return proxyApiRequest(request, `/vendors/tasks/${params.taskId}`);
+    return proxyApiRequest(request, `/vendors/tasks/${taskId}`);
   }
 
-  return NextResponse.json(getMockVendorTaskDetail(params.taskId));
+  return NextResponse.json(getMockVendorTaskDetail(taskId));
 }

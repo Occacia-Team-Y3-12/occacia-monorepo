@@ -1,3 +1,5 @@
+import { featureFlags } from '@/config/featureFlags';
+import { mockCustomerEventService } from '@/mocks/customer/eventService';
 import {
   CreateCustomerEventPayload,
   CreateCustomerEventResponse,
@@ -85,7 +87,22 @@ const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise
   }
 };
 
-export const customerEventService = {
+export type CustomerEventService = {
+  listEvents(params?: {
+    status?: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<ServiceResult<PaginatedCustomerEventsResponse>>;
+  getEventTypes(): Promise<ServiceResult<EventTypesResponse>>;
+  createEvent(payload: CreateCustomerEventPayload): Promise<ServiceResult<CreateCustomerEventResponse>>;
+  updatePersonas(
+    eventId: string,
+    payload: UpdateEventPersonasPayload
+  ): Promise<ServiceResult<UpdateEventPersonasResponse>>;
+  deleteDraft(eventId: string): Promise<ServiceResult<DeleteDraftEventResponse>>;
+};
+
+const apiCustomerEventService: CustomerEventService = {
   listEvents(params?: {
     status?: string;
     limit?: number;
@@ -146,3 +163,8 @@ export const customerEventService = {
     });
   },
 };
+
+export const customerEventService: CustomerEventService =
+  featureFlags.useCustomerPlanningMockApi
+    ? mockCustomerEventService
+    : apiCustomerEventService;
