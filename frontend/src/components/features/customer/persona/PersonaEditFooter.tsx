@@ -8,7 +8,8 @@ type PersonaEditFooterProps = {
   isSaving: boolean;
   onSave: () => void;
   onReset: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
+  saveLabel?: string;
 };
 
 export function PersonaEditFooter({
@@ -17,6 +18,7 @@ export function PersonaEditFooter({
   onSave,
   onReset,
   onDelete,
+  saveLabel = 'Save Changes',
 }: PersonaEditFooterProps) {
   return (
     <motion.footer
@@ -32,15 +34,19 @@ export function PersonaEditFooter({
         )}
         
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={isSaving}
-            className="inline-flex items-center gap-2 rounded-full border border-[#F4CDCD] bg-[#FFF4F4] px-4 py-2 text-sm font-semibold text-[#B23C3C] transition hover:bg-[#FFEAEA] disabled:opacity-50"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete Persona
-          </button>
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 rounded-full border border-[#F4CDCD] bg-[#FFF4F4] px-4 py-2 text-sm font-semibold text-[#B23C3C] transition hover:bg-[#FFEAEA] disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Persona
+            </button>
+          ) : (
+            <div />
+          )}
 
           <div className="flex gap-3">
             <button
@@ -67,7 +73,7 @@ export function PersonaEditFooter({
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  Save Changes
+                  {saveLabel}
                 </>
               )}
             </button>

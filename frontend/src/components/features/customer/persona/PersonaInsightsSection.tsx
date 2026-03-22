@@ -25,15 +25,15 @@ export function PersonaInsightsSection({
     <motion.section
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,21,36,0.96),rgba(10,14,24,0.98))] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.32)] sm:p-6"
+      className="rounded-[32px] border border-[#DCE4F2] bg-white p-5 shadow-[0_24px_60px_-36px_rgba(13,71,161,0.18)] sm:p-6"
     >
       <div className="mb-5 flex items-start gap-3">
-        <div className="rounded-2xl border border-[#5dd7c4]/20 bg-[#5dd7c4]/10 p-3 text-[#b8f6eb]">
+        <div className="rounded-2xl border border-[#C8D7F0] bg-[#EEF5FF] p-3 text-[#0D47A1]">
           <Radar className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="text-xl font-semibold text-white sm:text-2xl">More Signals We Picked Up</h2>
-          <p className="mt-1 text-sm leading-6 text-white/60">
+          <h2 className="text-xl font-semibold text-[#173B7A] sm:text-2xl">More Signals We Picked Up</h2>
+          <p className="mt-1 text-sm leading-6 text-[#5B6780]">
             These extra hints came from your activity and conversations. We only surface them if they look usable.
           </p>
         </div>
@@ -42,13 +42,13 @@ export function PersonaInsightsSection({
       {insights.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2">
           {insights.map((group) => (
-            <div key={group.label} className="rounded-[26px] border border-white/10 bg-white/[0.04] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/35">{group.label}</p>
+            <div key={group.label} className="rounded-[26px] border border-[#DCE4F2] bg-[#F8FBFF] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7A87A3]">{group.label}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {group.items.map((item) => (
                   <span
                     key={`${group.label}-${item}`}
-                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-sm text-white/78"
+                    className="rounded-full border border-[#D7DFEC] bg-white px-3 py-1.5 text-sm text-[#35548D]"
                   >
                     {item}
                   </span>
@@ -60,12 +60,12 @@ export function PersonaInsightsSection({
       )}
 
       {Boolean(rawPreferencesJson) && (
-        <details className="mt-5 rounded-[24px] border border-white/10 bg-black/20 p-4 text-sm text-white/60">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold text-white/72">
+        <details className="mt-5 rounded-[24px] border border-[#D7DFEC] bg-[#F8FBFF] p-4 text-sm text-[#5B6780]">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold text-[#35548D]">
             Advanced raw data
             <ChevronDown className="h-4 w-4" />
           </summary>
-          <pre className="mt-4 overflow-x-auto rounded-2xl border border-white/8 bg-[#090c15] p-4 text-xs leading-6 text-white/65">
+          <pre className="mt-4 overflow-x-auto rounded-2xl border border-[#DCE4F2] bg-white p-4 text-xs leading-6 text-[#4A5976]">
             {JSON.stringify(rawPreferencesJson, null, 2) ?? ''}
           </pre>
         </details>

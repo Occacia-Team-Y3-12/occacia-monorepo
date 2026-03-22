@@ -93,8 +93,17 @@ export default function CustomerEventDraftPage() {
   }
 
   const onSaveDraft = async () => {
-    await saveSchedule();
-    await saveReminders();
+    const scheduleSaved = await saveSchedule();
+    if (!scheduleSaved) {
+      return;
+    }
+
+    const remindersSaved = await saveReminders();
+    if (!remindersSaved) {
+      return;
+    }
+
+    router.push(ROUTES.CUSTOMER.EVENTS);
   };
 
   const onAddCustomTask = () => {

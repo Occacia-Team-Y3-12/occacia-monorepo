@@ -11,7 +11,6 @@ interface RegisterFormProps {
 
 export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps) {
   const [formData, setFormData] = useState<RegisterFormValues>({
-    username: '',
     fullName: '',
     email: '',
     mobileNumber: '',
@@ -78,20 +77,6 @@ export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps)
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <input
-        type="text"
-        name="username"
-        value={formData.username}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        placeholder="Username"
-        disabled={isLoading}
-        className={`w-full border rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 disabled:bg-gray-100 ${
-          errors.username ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
-        }`}
-      />
-      {errors.username && <p className="text-xs text-red-500 -mt-2">{errors.username}</p>}
-
       <input
         type="text"
         name="fullName"

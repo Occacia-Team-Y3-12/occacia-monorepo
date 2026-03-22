@@ -5,8 +5,13 @@ import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/lib/routes';
 
-export function PersonaEditHeader() {
+type PersonaEditHeaderProps = {
+  mode?: 'create' | 'edit';
+};
+
+export function PersonaEditHeader({ mode = 'edit' }: PersonaEditHeaderProps) {
   const router = useRouter();
+  const isCreateMode = mode === 'create';
 
   return (
     <motion.header
@@ -17,18 +22,24 @@ export function PersonaEditHeader() {
       <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
         <button
           type="button"
-          onClick={() => router.push(ROUTES.CUSTOMER.DASHBOARD)}
+          onClick={() => router.push(ROUTES.CUSTOMER.PERSONA)}
           className="mb-3 inline-flex items-center gap-2 text-sm text-[#5B6780] transition hover:text-[#0D47A1]"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
+          Back to People
         </button>
-        <h1 className="text-2xl font-bold text-[#0D47A1] sm:text-3xl">My Preferences</h1>
+        <h1 className="text-2xl font-bold text-[#0D47A1] sm:text-3xl">
+          {isCreateMode ? 'Create Persona' : 'My Preferences'}
+        </h1>
         <p className="mt-2 text-sm text-[#5B6780]">
-          Update the preferences we use to personalize your recommendations
+          {isCreateMode
+            ? 'Add a new persona so recommendations stay tailored to the right person'
+            : 'Update the preferences we use to personalize your recommendations'}
         </p>
         <p className="mt-1 text-xs text-[#7A87A3]">
-          These can be changed anytime to refine your experience
+          {isCreateMode
+            ? 'You can edit these details later from the People section'
+            : 'These can be changed anytime to refine your experience'}
         </p>
       </div>
     </motion.header>

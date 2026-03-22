@@ -12,6 +12,14 @@ import RegisterForm from '@/components/customer/auth/RegisterForm';
 import SocialLoginButtons from '@/components/ui/SocialLoginButtons';
 import { RegisterFormValues } from '@/lib/validators';
 import { customerAuthService } from '@/services/customer/authServices';
+import type { RegisterFormData } from '@/types/customer/auth';
+
+const deriveUsername = ({ fullName, email }: RegisterFormValues): string => {
+  const emailLocalPart = email.split('@')[0]?.trim().toLowerCase() || '';
+  const normalizedName = fullName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+  return emailLocalPart || normalizedName || `customer${Date.now()}`;
+};
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -22,7 +30,12 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      await customerAuthService.register(data);
+      const payload: RegisterFormData = {
+        ...data,
+        username: deriveUsername(data),
+      };
+
+      await customerAuthService.register(payload);
       setRegisteredEmail(data.email);
       toast.success('Registration successful! Please check your email.');
     } catch (error: any) {

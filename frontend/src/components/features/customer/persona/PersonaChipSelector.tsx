@@ -52,20 +52,20 @@ export function PersonaChipSelector({
 
   return (
     <div className="space-y-4">
-      <div className={`rounded-[28px] border border-white/10 bg-gradient-to-br ${accentClassName} p-[1px]`}>
-        <div className="rounded-[27px] bg-[#111524]/90 p-4">
-          <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/5 px-4 py-3">
-            <Search className="h-4 w-4 text-white/45" />
+      <div className={`rounded-[28px] border border-[#D7DFEC] bg-gradient-to-br ${accentClassName} p-[1px]`}>
+        <div className="rounded-[27px] bg-[#F8FBFF] p-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-[#D7DFEC] bg-white px-4 py-3">
+            <Search className="h-4 w-4 text-[#7A87A3]" />
             <input
               value={searchValue}
               onChange={(event) => onSearchChange(event.target.value)}
               placeholder={`Search ${title.toLowerCase()}`}
-              className="w-full bg-transparent text-sm text-white placeholder:text-white/35 focus:outline-none"
+              className="w-full bg-transparent text-sm text-[#173B7A] placeholder:text-[#9AA6BF] focus:outline-none"
             />
           </div>
 
-          <div className="mt-3 flex items-center gap-2 rounded-2xl border border-dashed border-white/10 bg-black/15 px-3 py-2.5">
-            <Plus className="h-4 w-4 text-[#f2c94c]" />
+          <div className="mt-3 flex items-center gap-2 rounded-2xl border border-dashed border-[#C8D7F0] bg-white px-3 py-2.5">
+            <Plus className="h-4 w-4 text-[#4285F4]" />
             <input
               value={draftValue}
               onChange={(event) => onDraftValueChange(event.target.value)}
@@ -76,13 +76,13 @@ export function PersonaChipSelector({
                 }
               }}
               placeholder={`Add a custom ${title.toLowerCase()} tag`}
-              className="w-full bg-transparent text-sm text-white placeholder:text-white/35 focus:outline-none"
+              className="w-full bg-transparent text-sm text-[#173B7A] placeholder:text-[#9AA6BF] focus:outline-none"
             />
             <button
               type="button"
               onClick={() => onAdd(draftValue)}
               disabled={!canAddDraft}
-              className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full bg-[#0D47A1] px-3 py-1 text-xs font-semibold text-white transition hover:bg-[#1C5BC3] disabled:cursor-not-allowed disabled:opacity-40"
             >
               Add
             </button>
@@ -104,8 +104,8 @@ export function PersonaChipSelector({
                 onClick={() => onToggle(item)}
                 className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
                   active
-                    ? 'border-[#f5c871] bg-[#f5c871] text-[#161820] shadow-[0_8px_20px_rgba(245,200,113,0.25)]'
-                    : 'border-white/10 bg-white/5 text-white/80 hover:border-white/20 hover:bg-white/10'
+                    ? 'border-[#0D47A1] bg-[#0D47A1] text-white shadow-[0_8px_20px_rgba(13,71,161,0.2)]'
+                    : 'border-[#D7DFEC] bg-white text-[#35548D] hover:border-[#BFD0EE] hover:bg-[#EEF5FF]'
                 }`}
               >
                 <span>{item}</span>
@@ -117,7 +117,7 @@ export function PersonaChipSelector({
       </div>
 
       {filteredSuggestions.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-white/55">
+        <div className="rounded-2xl border border-dashed border-[#C8D7F0] bg-[#F8FBFF] px-4 py-4 text-sm text-[#5B6780]">
           No matching suggestions right now. Add your own chip above.
         </div>
       )}
@@ -126,7 +126,7 @@ export function PersonaChipSelector({
         <button
           type="button"
           onClick={onToggleExpanded}
-          className="text-sm font-semibold text-[#f5c871] transition hover:text-[#ffe2a2]"
+          className="text-sm font-semibold text-[#0D47A1] transition hover:text-[#1C5BC3]"
         >
           {expanded ? 'Show less' : `Show more (${filteredSuggestions.length - visibleSuggestions.length} more)`}
         </button>

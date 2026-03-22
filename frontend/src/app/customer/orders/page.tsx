@@ -61,7 +61,7 @@ export default function OrdersPage() {
           <p className="text-base font-semibold text-gray-700 mb-1">No orders yet</p>
           <p className="text-sm text-gray-400 mb-5">Confirm a package to create your first order.</p>
           <button
-            onClick={() => router.push(ROUTES.CUSTOMER.EVENTS_NEW)}
+            onClick={() => router.push(ROUTES.CUSTOMER.PERSONA)}
             className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition"
           >
             Browse Events

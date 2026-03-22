@@ -26,10 +26,10 @@ export function PersonaEditEmptyState() {
 
         <button
           type="button"
-          onClick={() => router.push(ROUTES.CUSTOMER.DASHBOARD)}
+          onClick={() => router.push(ROUTES.CUSTOMER.PERSONA)}
           className="inline-flex items-center gap-2 rounded-full bg-[#0D47A1] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#4285F4]"
         >
-          Go to Dashboard
+          Back to People
         </button>
       </motion.div>
     </div>

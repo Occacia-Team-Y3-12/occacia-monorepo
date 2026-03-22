@@ -45,7 +45,7 @@ const CustomerSidebar = ({ isOpen, isDesktopCollapsed, onToggleDesktopSidebar }:
           <button
             type="button"
             onClick={onToggleDesktopSidebar}
-            className="h-10 w-10 items-center justify-center rounded-xl border border-[#CCCCCC] bg-[#FFFFFF] text-[#666666] lg:inline-flex"
+            className="h-10 w-10 items-center justify-center rounded-xl border border-[#D7DFEC] bg-[#FFFFFF] text-[#5B6780] transition hover:border-[#BFD0EE] hover:bg-[#F8FBFF] hover:text-[#0D47A1] lg:inline-flex"
             aria-label="Close sidebar"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -55,7 +55,7 @@ const CustomerSidebar = ({ isOpen, isDesktopCollapsed, onToggleDesktopSidebar }:
             </svg>
           </button>
           <span
-            className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-2xl bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-[0_8px_18px_rgba(17,24,39,0.35)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+            className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-2xl border border-[#DCE4F2] bg-white px-3 py-1.5 text-[13px] font-medium text-[#35548D] opacity-0 shadow-[0_12px_28px_-18px_rgba(13,71,161,0.35)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
             aria-hidden="true"
           >
             Close sidebar
@@ -89,13 +89,24 @@ const CustomerSidebar = ({ isOpen, isDesktopCollapsed, onToggleDesktopSidebar }:
         ))}
       </nav>
 
-      <div className="mt-auto w-[190px] rounded-lg bg-[#F4F8FA] px-2.5 py-2.5">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#666666]">Plan Usage</p>
-          <div className="mt-2 h-2.5 w-[150px] rounded-full bg-[#EAEAEA]">
-            <div className="h-full w-3/5 rounded-full bg-gradient-to-r from-[#0D47A1] to-[#4285F4]" />
-          </div>
-          <p className="mt-2 text-[11px] font-medium leading-none text-[#666666]">6 of 10 events used</p>
+      <div className="mt-auto rounded-[20px] border border-[#DCE4F2] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] px-4 py-4 shadow-[0_18px_40px_-32px_rgba(13,71,161,0.24)]">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#5B6780]">Plan Usage</p>
+          <span className="inline-flex rounded-full bg-[#EAF2FF] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#0D47A1]">
+            Starter
+          </span>
+        </div>
+
+        <div className="mt-3 overflow-hidden rounded-full bg-[#DCE4F2]">
+          <div
+            className="h-2.5 rounded-full bg-[linear-gradient(90deg,#0D47A1_0%,#1562CC_55%,#4285F4_100%)]"
+            style={{ width: '60%' }}
+          />
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="text-[11px] font-medium leading-none text-[#35548D]">6 of 10 events used</p>
+          <p className="text-[11px] font-semibold leading-none text-[#7A87A3]">60%</p>
         </div>
       </div>
 

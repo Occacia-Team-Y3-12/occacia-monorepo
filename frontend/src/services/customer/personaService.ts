@@ -3,11 +3,13 @@ import { mockCustomerPersonaService } from '@/mocks/customer/personaService';
 import { ServiceResult } from '@/types/customer';
 import {
   CustomerPersona,
+  CustomerPersonaCreatePayload,
   CustomerPersonaUpdatePayload,
 } from '@/types/customer/persona';
 
 type CustomerPersonaService = {
   listPersonas(): Promise<ServiceResult<CustomerPersona[]>>;
+  createPersona(payload: CustomerPersonaCreatePayload): Promise<ServiceResult<CustomerPersona>>;
   getPersona(personaId: string): Promise<ServiceResult<CustomerPersona>>;
   updatePersona(
     personaId: string,
@@ -176,6 +178,19 @@ const apiCustomerPersonaService: CustomerPersonaService = {
       ...result,
       data: extractPersonaList(result.data) ?? [],
       error: result.ok ? undefined : result.error,
+    };
+  },
+
+  async createPersona(payload: CustomerPersonaCreatePayload): Promise<ServiceResult<CustomerPersona>> {
+    const result = await request('/api/v1/customers/personas/', {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
+
+    return {
+      ...result,
+      data: extractPersona(result.data) ?? undefined,
     };
   },
 

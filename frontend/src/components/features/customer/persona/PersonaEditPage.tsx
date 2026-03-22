@@ -7,7 +7,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { ROUTES } from '@/lib/routes';
 import { customerPersonaService } from '@/services/customer/personaService';
-import { CustomerPersona, CustomerPersonaDraft, CustomerPersonaUpdatePayload } from '@/types/customer/persona';
+import {
+  CustomerPersona,
+  CustomerPersonaCreatePayload,
+  CustomerPersonaDraft,
+  CustomerPersonaUpdatePayload,
+} from '@/types/customer/persona';
 import { PersonaEditHeader } from './PersonaEditHeader';
 import { PersonaEditIdentitySection } from './PersonaEditIdentitySection';
 import { PersonaEditPreferenceGroup } from './PersonaEditPreferenceGroup';
@@ -118,9 +123,27 @@ const hasDraftChanged = (draft: CustomerPersonaDraft, persona: CustomerPersona |
   return JSON.stringify(original) !== JSON.stringify(current);
 };
 
-function PersonaEditContent() {
+const EMPTY_DRAFT: CustomerPersonaDraft = {
+  name: '',
+  relationship: '',
+  birthday: '',
+  personality: '',
+  preferences_json: null,
+  food_preferences: [],
+  color_preferences: [],
+  music_preferences: [],
+  personality_tags: [],
+};
+
+type PersonaEditPageProps = {
+  mode?: 'create' | 'edit';
+  personaId?: string;
+};
+
+function PersonaEditContent({ mode = 'edit', personaId }: PersonaEditPageProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const isCreateMode = mode === 'create';
   const [draft, setDraft] = useState<CustomerPersonaDraft | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -129,6 +152,7 @@ function PersonaEditContent() {
 
   const personasQuery = useQuery({
     queryKey: ['customer-personas'],
+    enabled: !isCreateMode,
     queryFn: async () => {
       const response = await customerPersonaService.listPersonas();
       if (!response.ok) throw new Error(response.error || 'Failed to load personas');
@@ -138,14 +162,16 @@ function PersonaEditContent() {
   });
 
   const selectedPersonaId = useMemo(() => {
+    if (isCreateMode) return null;
+    if (personaId) return personaId;
     const personas = personasQuery.data ?? [];
     if (!personas.length) return null;
     return personas[0].persona_id;
-  }, [personasQuery.data]);
+  }, [isCreateMode, personaId, personasQuery.data]);
 
   const personaQuery = useQuery({
     queryKey: ['customer-persona', selectedPersonaId],
-    enabled: Boolean(selectedPersonaId),
+    enabled: !isCreateMode && Boolean(selectedPersonaId),
     queryFn: async () => {
       const response = await customerPersonaService.getPersona(selectedPersonaId as string);
       if (!response.ok || !response.data) throw new Error(response.error || 'Failed to load persona');
@@ -155,12 +181,19 @@ function PersonaEditContent() {
   });
 
   useEffect(() => {
+    if (isCreateMode) {
+      setDraft(EMPTY_DRAFT);
+      setValidationErrors({});
+      setErrorMessage(null);
+      return;
+    }
+
     if (personaQuery.data) {
       setDraft(buildDraft(personaQuery.data));
       setValidationErrors({});
       setErrorMessage(null);
     }
-  }, [personaQuery.data]);
+  }, [isCreateMode, personaQuery.data]);
 
   useEffect(() => {
     if (!successMessage) return;
@@ -189,6 +222,28 @@ function PersonaEditContent() {
     },
   });
 
+  const createMutation = useMutation({
+    mutationFn: async (payload: CustomerPersonaCreatePayload) => {
+      const response = await customerPersonaService.createPersona(payload);
+      if (!response.ok || !response.data) throw new Error(response.error || 'Failed to create persona');
+      return response.data;
+    },
+    onSuccess: (created: CustomerPersona) => {
+      queryClient.setQueryData<CustomerPersona[]>(['customer-personas'], (existing) => [
+        created,
+        ...(existing ?? []),
+      ]);
+      queryClient.setQueryData(['customer-persona', created.persona_id], created);
+      setDraft(buildDraft(created));
+      setSuccessMessage('Persona created successfully');
+      setErrorMessage(null);
+      router.push(ROUTES.CUSTOMER.PERSONA);
+    },
+    onError: (error: Error) => {
+      setErrorMessage(error.message || 'Failed to create persona');
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async () => {
       if (!selectedPersonaId) throw new Error('Persona not found');
@@ -197,7 +252,7 @@ function PersonaEditContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer-personas'] });
-      router.push(ROUTES.CUSTOMER.DASHBOARD);
+      router.push(ROUTES.CUSTOMER.PERSONA);
     },
     onError: (error: Error) => {
       setErrorMessage(error.message || 'Failed to delete persona');
@@ -206,8 +261,14 @@ function PersonaEditContent() {
   });
 
   const persona = personaQuery.data;
-  const isLoading = personasQuery.isLoading || (selectedPersonaId && personaQuery.isLoading);
-  const isDirty = draft ? hasDraftChanged(draft, persona) : false;
+  const isLoading = isCreateMode
+    ? draft === null
+    : personasQuery.isLoading || (selectedPersonaId && personaQuery.isLoading);
+  const isDirty = draft
+    ? (isCreateMode
+      ? JSON.stringify(draftToPayload(draft)) !== JSON.stringify(draftToPayload(EMPTY_DRAFT))
+      : hasDraftChanged(draft, persona))
+    : false;
 
   const setFieldValue = (field: keyof CustomerPersonaDraft, value: string) => {
     setDraft((current) => (current ? { ...current, [field]: value } : current));
@@ -246,10 +307,23 @@ function PersonaEditContent() {
       setErrorMessage('Please fix validation errors');
       return;
     }
+    if (isCreateMode) {
+      await createMutation.mutateAsync(draftToPayload(draft) as CustomerPersonaCreatePayload);
+      return;
+    }
+
     await updateMutation.mutateAsync(draftToPayload(draft));
   };
 
   const handleReset = () => {
+    if (isCreateMode) {
+      setDraft(EMPTY_DRAFT);
+      setValidationErrors({});
+      setSuccessMessage(null);
+      setErrorMessage(null);
+      return;
+    }
+
     if (persona) {
       setDraft(buildDraft(persona));
       setValidationErrors({});
@@ -270,7 +344,7 @@ function PersonaEditContent() {
     );
   }
 
-  if (!personasQuery.data?.length || !persona) {
+  if (!isCreateMode && (!personasQuery.data?.length || !persona)) {
     return (
       <div className="min-h-screen bg-[#F4F8FA]">
         <PersonaEditEmptyState />
@@ -280,7 +354,7 @@ function PersonaEditContent() {
 
   return (
     <div className="min-h-screen bg-[#F4F8FA] pb-32">
-      <PersonaEditHeader />
+      <PersonaEditHeader mode={mode} />
 
       <div className="mx-auto max-w-3xl px-4 pt-6 sm:px-6">
         <AnimatePresence>
@@ -331,27 +405,30 @@ function PersonaEditContent() {
 
       <PersonaEditFooter
         isDirty={isDirty}
-        isSaving={updateMutation.isPending}
+        isSaving={updateMutation.isPending || createMutation.isPending}
         onSave={handleSave}
         onReset={handleReset}
-        onDelete={() => setShowDeleteModal(true)}
+        onDelete={isCreateMode ? undefined : () => setShowDeleteModal(true)}
+        saveLabel={isCreateMode ? 'Create Persona' : 'Save Changes'}
       />
 
-      <DeletePersonaModal
-        isOpen={showDeleteModal}
-        isDeleting={deleteMutation.isPending}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={handleDelete}
-      />
+      {!isCreateMode && (
+        <DeletePersonaModal
+          isOpen={showDeleteModal}
+          isDeleting={deleteMutation.isPending}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={handleDelete}
+        />
+      )}
     </div>
   );
 }
 
-export default function PersonaEditPage() {
+export default function PersonaEditPage({ mode = 'edit', personaId }: PersonaEditPageProps) {
   const [queryClient] = useState(() => new QueryClient());
   return (
     <QueryClientProvider client={queryClient}>
-      <PersonaEditContent />
+      <PersonaEditContent mode={mode} personaId={personaId} />
     </QueryClientProvider>
   );
 }
