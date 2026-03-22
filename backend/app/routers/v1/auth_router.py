@@ -69,7 +69,7 @@ async def _parse_login_payload(request: Request) -> LoginRequest | SimpleNamespa
     password = form.get("password")
     if not username or not password:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="email/username and password are required.",
         )
     return SimpleNamespace(username=str(username), password=str(password))

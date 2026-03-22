@@ -98,7 +98,11 @@ def _fulfillment_request_response(request: TaskRequest) -> FulfillmentRequestRes
     )
 
 
-@admin_router.get("/vendors", response_model=list[VendorAdminView])
+@admin_router.get(
+    "/vendors",
+    response_model=list[VendorAdminView],
+    operation_id="admin_list_vendors_vendor_router",
+)
 async def list_vendors(
     approval_status: str | None = Query(default=None),
     status: str | None = Query(default=None),
@@ -230,7 +234,11 @@ def respond_to_fulfillment_request(
     )
 
 
-@router.get("/tasks", response_model=PaginatedVendorTasksResponse)
+@router.get(
+    "/tasks",
+    response_model=PaginatedVendorTasksResponse,
+    operation_id="vendors_list_tasks_v1_vendor_router",
+)
 def list_vendor_tasks(
     status: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
