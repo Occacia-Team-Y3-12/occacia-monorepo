@@ -50,6 +50,7 @@ from app.models.persona import Persona
 from app.models.recommendation_package import RecommendationPackage
 from app.models.support_note import SupportNote
 from app.models.task import Task
+from app.models.task_offering import TaskOffering
 from app.models.task_recommendation import TaskRecommendation
 from app.models.task_request import TaskRequest
 from app.models.user import User
@@ -78,6 +79,7 @@ def clean_tables():
             TaskRequest,
             PackageItem,
             RecommendationPackage,
+            TaskOffering,
             TaskRecommendation,
             Task,
             EventPersona,

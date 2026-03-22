@@ -10,6 +10,14 @@ from .auth_schema import (
     VerifyEmailResponse,
 )
 from .planning_schema import PlanRequest, PlanResponse, VenueDisplay
+from .offering_schema import (
+    OfferingCreate,
+    OfferingListResponse,
+    OfferingResponse,
+    OfferingUpdate,
+    TaskOfferingListResponse,
+    TaskOfferingResponse,
+)
 from .vendor_schema import VendorLoginRequest, VendorRegisterRequest, VendorResponse
 
 __all__ = [
@@ -23,6 +31,12 @@ __all__ = [
     "RegisterResponse",
     "ResetPasswordRequest",
     "VenueDisplay",
+    "OfferingCreate",
+    "OfferingListResponse",
+    "OfferingResponse",
+    "OfferingUpdate",
+    "TaskOfferingListResponse",
+    "TaskOfferingResponse",
     "VendorLoginRequest",
     "VendorRegister",
     "VendorRegisterRequest",
