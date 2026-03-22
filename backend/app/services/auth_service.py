@@ -251,6 +251,12 @@ class AuthService:
         )
         return {"message": "If this email is registered, a reset code has been sent."}
 
+    def resend_customer_password_reset_otp(
+        self, db: Session, email: str,
+    ) -> dict[str, str]:
+        """Resend password reset OTP to customer email."""
+        return self.request_customer_password_reset_otp(db, email)
+
     def verify_customer_password_reset_otp(
         self, db: Session, email: str, otp_code: str,
     ) -> dict[str, str]:
@@ -282,6 +288,18 @@ class AuthService:
         db.add(customer)
         db.commit()
         logger.info("Customer password reset: %s", email)
+        return {"message": "Password updated successfully."}
+
+    def change_customer_password_authenticated(
+        self, db: Session, customer: Customer, current_password: str, new_password: str,
+    ) -> dict[str, str]:
+        """Change customer password for an authenticated session."""
+        if not customer.password_hash or not verify_password(current_password, customer.password_hash):
+            raise HTTPException(status_code=400, detail="Current password is incorrect.")
+        customer.password_hash = get_password_hash(new_password)
+        db.add(customer)
+        db.commit()
+        logger.info("Customer password changed (authenticated): %s", customer.email)
         return {"message": "Password updated successfully."}
 
     # ── Vendor registration & login ───────────────────────────────────────────
@@ -382,6 +400,12 @@ class AuthService:
         )
         return {"message": "If this email is registered, a reset code has been sent."}
 
+    def resend_vendor_password_reset_otp(
+        self, db: Session, email: str,
+    ) -> dict[str, str]:
+        """Resend password reset OTP to vendor email."""
+        return self.request_vendor_password_reset_otp(db, email)
+
     def verify_vendor_password_reset_otp(
         self, db: Session, email: str, otp_code: str,
     ) -> dict[str, str]:
@@ -413,6 +437,19 @@ class AuthService:
         db.add(vendor)
         db.commit()
         logger.info("Vendor password reset: %s", email)
+        return {"message": "Password updated successfully."}
+
+    def change_vendor_password_authenticated(
+        self, db: Session, vendor: Vendor, current_password: str, new_password: str,
+    ) -> dict[str, str]:
+        """Change vendor password for an authenticated session."""
+        vendor_password = getattr(vendor, "password_hash", None) or getattr(vendor, "hashed_password", None)
+        if not vendor_password or not verify_password(current_password, vendor_password):
+            raise HTTPException(status_code=400, detail="Current password is incorrect.")
+        vendor.password_hash = get_password_hash(new_password)
+        db.add(vendor)
+        db.commit()
+        logger.info("Vendor password changed (authenticated): %s", vendor.email)
         return {"message": "Password updated successfully."}
 
     # ── Session Invalidation [E05] Customer / [E06] Vendor ───────────────────

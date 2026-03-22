@@ -466,6 +466,25 @@ class TestCustomerPasswordReset:
                         json={"email": "nobody@test.com"})
         assert r.status_code == 200
 
+    def test_resend_otp_replaces_previous_customer_otp(self, client):
+        email = _customer_email()
+        _register_customer(client, email)
+        fake_redis = _make_fake_redis()
+        with patch("app.services.auth_service._get_redis", return_value=fake_redis), \
+             patch("app.services.auth_service._generate_otp", side_effect=["111111", "222222"]):
+            first = client.post("/api/v1/auth/customer/password/forgot",
+                                json={"email": email})
+            resend = client.post("/api/v1/auth/customer/password/forgot/resend-otp",
+                                 json={"email": email})
+            old_otp = client.post("/api/v1/auth/customer/password/verify-otp",
+                                  json={"email": email, "otp": "111111"})
+            new_otp = client.post("/api/v1/auth/customer/password/verify-otp",
+                                  json={"email": email, "otp": "222222"})
+        assert first.status_code == 200
+        assert resend.status_code == 200
+        assert old_otp.status_code == 400
+        assert new_otp.status_code == 200
+
     def test_reset_invalid_token(self, client):
         r = client.post("/api/v1/auth/customer/password/reset",
                         json={"reset_token": "bad", "new_password": "NewPass123!"})
@@ -790,6 +809,25 @@ class TestVendorPasswordReset:
                         json={"email": "nobody@vendor.com"})
         assert r.status_code == 200
 
+    def test_resend_otp_replaces_previous_vendor_otp(self, client):
+        email = _vendor_email()
+        _register_vendor(client, email)
+        fake_redis = _make_fake_redis()
+        with patch("app.services.auth_service._get_redis", return_value=fake_redis), \
+             patch("app.services.auth_service._generate_otp", side_effect=["333333", "444444"]):
+            first = client.post("/api/v1/auth/vendor/password/forgot",
+                                json={"email": email})
+            resend = client.post("/api/v1/auth/vendor/password/forgot/resend-otp",
+                                 json={"email": email})
+            old_otp = client.post("/api/v1/auth/vendor/password/verify-otp",
+                                  json={"email": email, "otp": "333333"})
+            new_otp = client.post("/api/v1/auth/vendor/password/verify-otp",
+                                  json={"email": email, "otp": "444444"})
+        assert first.status_code == 200
+        assert resend.status_code == 200
+        assert old_otp.status_code == 400
+        assert new_otp.status_code == 200
+
     def test_reset_invalid_token(self, client):
         r = client.post("/api/v1/auth/vendor/password/reset",
                         json={"reset_token": "bad", "new_password": "NewPass123!"})
@@ -1005,6 +1043,9 @@ class TestUnauthenticatedAccess:
     def test_no_token_vendor_logout(self, client):
         assert client.post("/api/v1/auth/vendor/logout").status_code in (401, 403)
 
+    def test_no_token_admin_logout(self, client):
+        assert client.post("/api/v1/auth/admin/logout").status_code in (401, 403)
+
     def test_malformed_bearer_header(self, client):
         r = client.get("/api/v1/customers/me",
                        headers={"Authorization": "NotBearer xyz"})
@@ -1079,6 +1120,82 @@ class TestAdminAuth:
                             json={"email": "nobody@admin.com"})
         assert r.status_code in (200, 404)
 
+    def test_admin_token_refresh_success(self, client):
+        from app.models.admin import Admin
+        db = SessionLocal()
+        try:
+            admin = Admin(
+                admin_id=f"ADM-{_uid()}",
+                email=f"admin-refresh-{_uid()}@test.com",
+                password_hash="hash",
+                staff_role="staff",
+            )
+            db.add(admin)
+            db.commit()
+            db.refresh(admin)
+            token = create_refresh_token({"sub": admin.admin_id, "role": "ADMIN"})
+        finally:
+            db.close()
+        r = client.post("/api/v1/auth/admin/token/refresh", json={"refreshToken": token})
+        assert r.status_code == 200
+        body = r.json()
+        assert "accessToken" in body
+        assert "refreshToken" in body
+        assert body["user"]["userId"] == admin.admin_id
+
+    def test_admin_token_refresh_invalid_token(self, client):
+        r = client.post("/api/v1/auth/admin/token/refresh", json={"refreshToken": "bad-token"})
+        assert r.status_code == 401
+
+    def test_admin_token_refresh_access_token_rejected(self, client):
+        token = create_access_token({"sub": "ADM-bad", "type": "admin", "role": "staff"})
+        r = client.post("/api/v1/auth/admin/token/refresh", json={"refreshToken": token})
+        assert r.status_code == 401
+
+    def test_admin_token_refresh_wrong_role_rejected(self, client):
+        token = create_refresh_token({"sub": "ADM-bad", "role": "CUSTOMER"})
+        r = client.post("/api/v1/auth/admin/token/refresh", json={"refreshToken": token})
+        assert r.status_code == 401
+
+    def test_admin_token_refresh_unknown_admin_rejected(self, client):
+        token = create_refresh_token({"sub": "ADM-UNKNOWN", "role": "ADMIN"})
+        r = client.post("/api/v1/auth/admin/token/refresh", json={"refreshToken": token})
+        assert r.status_code == 401
+
+    def test_admin_logout_success(self, client):
+        from app.models.admin import Admin
+        email, _ = self._create_admin()
+        db = SessionLocal()
+        try:
+            admin = db.query(Admin).filter(Admin.email == email).first()
+            assert admin is not None
+            access = create_access_token({"sub": admin.admin_id, "type": "admin", "role": "staff"})
+        finally:
+            db.close()
+        r = client.post("/api/v1/auth/admin/logout", headers={"Authorization": f"Bearer {access}"})
+        assert r.status_code == 200
+        assert "message" in r.json()
+
+    def test_admin_logout_blacklisted_token_rejected_on_reuse(self, client):
+        from app.models.admin import Admin
+        email, _ = self._create_admin()
+        db = SessionLocal()
+        try:
+            admin = db.query(Admin).filter(Admin.email == email).first()
+            assert admin is not None
+            access = create_access_token({"sub": admin.admin_id, "type": "admin", "role": "staff"})
+        finally:
+            db.close()
+
+        fake_redis = _make_fake_redis()
+        with patch("app.services.admin_service._get_redis", return_value=fake_redis), \
+             patch("app.core.security.is_token_blacklisted",
+                   side_effect=lambda t: bool(fake_redis.exists(f"blacklist:{t}"))):
+            first = client.post("/api/v1/auth/admin/logout", headers={"Authorization": f"Bearer {access}"})
+            second = client.post("/api/v1/auth/admin/logout", headers={"Authorization": f"Bearer {access}"})
+        assert first.status_code == 200
+        assert second.status_code == 401
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 17. SECURITY HARDENING
@@ -1135,3 +1252,63 @@ class TestSecurityHardening:
         r = client.post("/api/v1/auth/vendor/token/refresh",
                         json={"refreshToken": customer_refresh})
         assert r.status_code == 401
+
+
+class TestCustomerPasswordChange:
+
+    def test_change_password_success(self, client, monkeypatch):
+        monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
+        email = _customer_email()
+        _register_customer(client, email)
+        _activate_customer(email)
+        token = _login_customer(client, email, "Pass12345!").json()["accessToken"]
+        r = client.post(
+            "/api/v1/auth/customer/password/change",
+            json={"current_password": "Pass12345!", "new_password": "Pass54321!"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert _login_customer(client, email, "Pass12345!").status_code == 401
+        assert _login_customer(client, email, "Pass54321!").status_code == 200
+
+    def test_change_password_wrong_current_password(self, client, monkeypatch):
+        monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
+        email = _customer_email()
+        _register_customer(client, email)
+        _activate_customer(email)
+        token = _login_customer(client, email, "Pass12345!").json()["accessToken"]
+        r = client.post(
+            "/api/v1/auth/customer/password/change",
+            json={"current_password": "WrongPass123!", "new_password": "Pass54321!"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 400
+
+
+class TestVendorPasswordChange:
+
+    def test_change_password_success(self, client, monkeypatch):
+        monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
+        email = _vendor_email()
+        _register_vendor(client, email)
+        token = _login_vendor(client, email, "Pass123!").json()["accessToken"]
+        r = client.post(
+            "/api/v1/auth/vendor/password/change",
+            json={"current_password": "Pass123!", "new_password": "VendPass123!"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert _login_vendor(client, email, "Pass123!").status_code == 401
+        assert _login_vendor(client, email, "VendPass123!").status_code == 200
+
+    def test_change_password_wrong_current_password(self, client, monkeypatch):
+        monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
+        email = _vendor_email()
+        _register_vendor(client, email)
+        token = _login_vendor(client, email, "Pass123!").json()["accessToken"]
+        r = client.post(
+            "/api/v1/auth/vendor/password/change",
+            json={"current_password": "WrongPass123!", "new_password": "VendPass123!"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 400

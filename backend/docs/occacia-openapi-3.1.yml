@@ -1,7 +1,10 @@
+Here's the complete updated OpenAPI YAML with every change applied:
+
+```yaml
 openapi: 3.1.0
 info:
   title: Occacia API
-  version: 1.1.2
+  version: 1.1.3
   description: 'Occacia API contract aligned with use cases, EERD, and class diagram.
     Core flow: Event -> Tasks -> Recommendations -> Packages -> Confirm Package ->
     Package Order -> Vendor Fulfillment Requests -> Task execution.
@@ -17,6 +20,12 @@ info:
 
     Update 1.1.2: Updated customer/vendor forgot-password flow to email OTP
     verification with resend OTP support before password reset.
+
+
+    Update 1.1.3: Aligned all paths with actual router implementations. Added admin
+    OTP login flow, admin password reset flow, confirmed personas endpoints,
+    vendor package management endpoints, vendor pending stats, and organization
+    delete. Fixed customer/vendor password verify-otp paths.
 
     '
 servers:
@@ -161,9 +170,8 @@ paths:
       - Authentication
       summary: Change customer password (authenticated)
       description: Authenticated password change only (currentPassword + newPassword).
-        Use the /password/forgot, /password/forgot/verify-otp, and /password/reset
-        flow for forgotten passwords. /password/forgot/resend-otp can be used
-        when the OTP needs to be sent again.
+        Use the /password/forgot, /password/verify-otp, and /password/reset
+        flow for forgotten passwords.
       requestBody:
         required: true
         content:
@@ -201,7 +209,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
-  /auth/customer/password/forgot/verify-otp:
+  /auth/customer/password/verify-otp:
     post:
       tags:
       - Authentication
@@ -254,7 +262,7 @@ paths:
       - Authentication
       summary: Reset customer password after OTP verification
       description: Completes the forgot-password flow using the short-lived reset
-        token returned by /auth/customer/password/forgot/verify-otp.
+        token returned by /auth/customer/password/verify-otp.
       security: []
       requestBody:
         required: true
@@ -411,9 +419,8 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
       description: Authenticated password change only (currentPassword + newPassword).
-        Use the /password/forgot, /password/forgot/verify-otp, and /password/reset
-        flow for forgotten passwords. /password/forgot/resend-otp can be used
-        when the OTP needs to be sent again.
+        Use the /password/forgot, /password/verify-otp, and /password/reset
+        flow for forgotten passwords.
   /auth/vendor/password/forgot:
     post:
       tags:
@@ -436,7 +443,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
-  /auth/vendor/password/forgot/verify-otp:
+  /auth/vendor/password/verify-otp:
     post:
       tags:
       - Authentication
@@ -489,7 +496,7 @@ paths:
       - Authentication
       summary: Reset vendor password after OTP verification
       description: Completes the forgot-password flow using the short-lived reset
-        token returned by /auth/vendor/password/forgot/verify-otp.
+        token returned by /auth/vendor/password/verify-otp.
       security: []
       requestBody:
         required: true
@@ -527,7 +534,10 @@ paths:
     post:
       tags:
       - Authentication
-      summary: Admin login
+      summary: Admin login - Step 1
+      description: Validates email and password. Sends a 6-digit OTP to the admin
+        email. OTP expires in 5 minutes. After this call POST /auth/admin/login/verify-otp
+        with the OTP to receive the JWT token.
       security: []
       requestBody:
         required: true
@@ -537,11 +547,36 @@ paths:
               $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
-          description: Logged in (tokens issued)
+          description: OTP sent to admin email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/admin/login/verify-otp:
+    post:
+      tags:
+      - Authentication
+      summary: Admin login - Step 2 (verify OTP)
+      description: Submit the 6-digit OTP sent to the admin email. Returns JWT
+        access token on success. OTP is single-use.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminOTPVerifyRequest'
+      responses:
+        '200':
+          description: Logged in (JWT token issued)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /auth/admin/logout:
@@ -577,6 +612,74 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /auth/admin/password/forgot:
+    post:
+      tags:
+      - Authentication
+      summary: Send admin password reset OTP
+      description: Sends a 6-digit password reset OTP to the admin email.
+        OTP expires in 5 minutes.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Password reset OTP sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /auth/admin/password/verify-otp:
+    post:
+      tags:
+      - Authentication
+      summary: Verify admin password reset OTP
+      description: Submit the 6-digit OTP from the email. Returns a short-lived
+        reset token (valid 10 minutes) on success.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetOtpVerifyRequest'
+      responses:
+        '200':
+          description: OTP verified, reset token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordResetOtpVerificationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /auth/admin/password/reset:
+    post:
+      tags:
+      - Authentication
+      summary: Reset admin password after OTP verification
+      description: Submit the reset token from verify-otp and the new password.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /customers/me:
     get:
       tags:
@@ -635,6 +738,87 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VendorProfile'
+  /vendors/me/packages:
+    get:
+      tags:
+      - Vendor
+      summary: List current vendor's packages
+      description: Returns all packages belonging to the authenticated vendor.
+        Any logged-in vendor can view their own packages.
+      responses:
+        '200':
+          description: Vendor packages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorPackageListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags:
+      - Vendor
+      summary: Create a package
+      description: Only APPROVED vendors can create packages.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendorPackageCreateRequest'
+      responses:
+        '201':
+          description: Package created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorPackage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /vendors/me/packages/{packageId}:
+    parameters:
+    - name: packageId
+      in: path
+      required: true
+      schema:
+        type: integer
+    put:
+      tags:
+      - Vendor
+      summary: Update a package
+      description: Only APPROVED vendors can update their own packages.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendorPackageUpdateRequest'
+      responses:
+        '200':
+          description: Package updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorPackage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Vendor
+      summary: Delete a package
+      description: Only APPROVED vendors can delete their own packages.
+      responses:
+        '204':
+          description: Package deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /admin/me:
     get:
       tags:
@@ -672,6 +856,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedVendors'
+  /admin/vendors/stats/pending:
+    get:
+      tags:
+      - Admin
+      summary: Get pending vendor and organization counts
+      description: Returns counts of vendors and organizations currently in pending
+        approval state.
+      responses:
+        '200':
+          description: Pending stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorPendingStatsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /admin/vendors/{vendorId}:
     parameters:
     - $ref: '#/components/parameters/VendorId'
@@ -840,6 +1042,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Organization'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Admin
+      summary: Delete an organization
+      description: Permanently deletes an organization. Admin only.
+      responses:
+        '200':
+          description: Organization deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
   /admin/organizations/{orgId}/status:
@@ -1064,7 +1282,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedPersonas'
+                type: array
+                items:
+                  $ref: '#/components/schemas/Persona'
     post:
       tags:
       - Customer
@@ -1082,6 +1302,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Persona'
+  /customers/personas/confirmed:
+    get:
+      tags:
+      - Customer
+      summary: List confirmed personas
+      description: Returns only personas that have been confirmed for the current
+        customer.
+      responses:
+        '200':
+          description: Confirmed personas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Persona'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /customers/personas/{personaId}:
     parameters:
     - $ref: '#/components/parameters/PersonaId'
@@ -1122,6 +1360,37 @@ paths:
       responses:
         '204':
           description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /customers/personas/{personaId}/confirm:
+    parameters:
+    - $ref: '#/components/parameters/PersonaId'
+    post:
+      tags:
+      - Customer
+      summary: Confirm a persona
+      description: Marks a persona as confirmed for the current planning session.
+      responses:
+        '200':
+          description: Persona confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Persona'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Customer
+      summary: Unconfirm a persona
+      description: Removes the confirmed state from a persona.
+      responses:
+        '200':
+          description: Persona unconfirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Persona'
         '404':
           $ref: '#/components/responses/NotFound'
   /customers/events:
@@ -2427,6 +2696,19 @@ components:
       - OPEN
       - IN_PROGRESS
       - RESOLVED
+    AdminOTPVerifyRequest:
+      type: object
+      required:
+      - email
+      - otp
+      properties:
+        email:
+          type: string
+          format: email
+        otp:
+          type: string
+          minLength: 6
+          maxLength: 6
     LoginRequest:
       type: object
       required:
@@ -2549,29 +2831,6 @@ components:
       properties:
         message:
           type: string
-    PasswordChangeOrResetRequest:
-      oneOf:
-      - type: object
-        required:
-        - currentPassword
-        - newPassword
-        properties:
-          currentPassword:
-            type: string
-            minLength: 8
-          newPassword:
-            type: string
-            minLength: 8
-      - type: object
-        required:
-        - resetToken
-        - newPassword
-        properties:
-          resetToken:
-            type: string
-          newPassword:
-            type: string
-            minLength: 8
     AuthResponse:
       type: object
       required:
@@ -2764,6 +3023,119 @@ components:
       properties:
         reason:
           type: string
+    VendorPendingStatsResponse:
+      type: object
+      properties:
+        pendingVendors:
+          type: integer
+          description: Number of vendors awaiting admin approval
+        pendingOrganizations:
+          type: integer
+          description: Number of organizations awaiting admin approval
+    VendorPackage:
+      type: object
+      required:
+      - id
+      - vendorId
+      - name
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        pricePerHead:
+          type: number
+        price:
+          type: number
+        tags:
+          type: array
+          items:
+            type: string
+        locationCoverage:
+          type: string
+        minGuests:
+          type: integer
+        maxGuests:
+          type: integer
+        blockedDates:
+          type: array
+          items:
+            type: string
+            format: date
+        isActive:
+          type: boolean
+    VendorPackageCreateRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        pricePerHead:
+          type: number
+        price:
+          type: number
+        tags:
+          type: array
+          items:
+            type: string
+        locationCoverage:
+          type: string
+        minGuests:
+          type: integer
+        maxGuests:
+          type: integer
+        blockedDates:
+          type: array
+          items:
+            type: string
+            format: date
+        isActive:
+          type: boolean
+          default: true
+    VendorPackageUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        pricePerHead:
+          type: number
+        price:
+          type: number
+        tags:
+          type: array
+          items:
+            type: string
+        locationCoverage:
+          type: string
+        minGuests:
+          type: integer
+        maxGuests:
+          type: integer
+        blockedDates:
+          type: array
+          items:
+            type: string
+            format: date
+        isActive:
+          type: boolean
+    VendorPackageListResponse:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/VendorPackage'
     CustomerAdminView:
       type: object
       required:
@@ -2816,7 +3188,6 @@ components:
       - personaId
       - customerId
       - name
-      - preferences
       - isConfirmed
       - createdAt
       - updatedAt
@@ -2827,11 +3198,26 @@ components:
           $ref: '#/components/schemas/UUID'
         name:
           type: string
-        description:
+        relationship:
           type: string
-        preferences:
-          type: object
-          additionalProperties: true
+        personality:
+          type: string
+        foodPreferences:
+          type: array
+          items:
+            type: string
+        musicPreferences:
+          type: array
+          items:
+            type: string
+        colorPreferences:
+          type: array
+          items:
+            type: string
+        personalityTags:
+          type: array
+          items:
+            type: string
         isConfirmed:
           type: boolean
         confirmedAt:
@@ -2847,21 +3233,51 @@ components:
       properties:
         name:
           type: string
-        description:
+        relationship:
           type: string
-        preferences:
-          type: object
-          additionalProperties: true
+        personality:
+          type: string
+        foodPreferences:
+          type: array
+          items:
+            type: string
+        musicPreferences:
+          type: array
+          items:
+            type: string
+        colorPreferences:
+          type: array
+          items:
+            type: string
+        personalityTags:
+          type: array
+          items:
+            type: string
     PersonaUpdateRequest:
       type: object
       properties:
         name:
           type: string
-        description:
+        relationship:
           type: string
-        preferences:
-          type: object
-          additionalProperties: true
+        personality:
+          type: string
+        foodPreferences:
+          type: array
+          items:
+            type: string
+        musicPreferences:
+          type: array
+          items:
+            type: string
+        colorPreferences:
+          type: array
+          items:
+            type: string
+        personalityTags:
+          type: array
+          items:
+            type: string
     PaginatedPersonas:
       type: object
       required:
@@ -4007,3 +4423,4 @@ components:
           $ref: '#/components/schemas/CalendarProviderType'
         calendarId:
           type: string
+```
