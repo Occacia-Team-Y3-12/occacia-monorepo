@@ -140,22 +140,14 @@ export const useVendorRegister = () => {
         organizationType: orgChoice as 'join' | 'create',
       });
 
-<<<<<<< Updated upstream
-      if (ok && data.status === 'pending_verification') {
-        const mockToken = featureFlags.useVendorAuthMock
-          ? data.data?.token || `mock_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
-          : data.data?.token;
-
-        if (!mockToken) {
-          router.push(ROUTES.VENDOR.PENDING_APPROVAL);
+      if (result.ok) {
+        if (featureFlags.useVendorAuthMock) {
+          const mockToken =
+            result.data?.data?.token || `mock_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+          router.push(`${ROUTES.VENDOR.VERIFY_EMAIL}?token=${mockToken}`);
           return;
         }
-
-        router.push(`${ROUTES.VENDOR.VERIFY_EMAIL}?token=${mockToken}`);
-=======
-      if (result.ok) {
         router.push(`${ROUTES.VENDOR.LOGIN}?registered=1`);
->>>>>>> Stashed changes
       } else {
         setSubmitError(result.message || result.data?.detail || 'Registration failed. Please try again.');
       }

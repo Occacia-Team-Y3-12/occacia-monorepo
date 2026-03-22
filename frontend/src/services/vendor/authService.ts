@@ -23,9 +23,14 @@ type RegisterResponse = {
 	detail?: string;
 };
 
+type RegisterResult = {
+	ok: boolean;
+	data: RegisterResponse;
+	message?: string;
+};
+
 export const vendorAuthService = {
 	async login(payload: { email: string; password: string }) {
-<<<<<<< Updated upstream
 		if (featureFlags.useVendorAuthMock) {
 			await new Promise((resolve) => setTimeout(resolve, 350));
 			return {
@@ -34,18 +39,18 @@ export const vendorAuthService = {
 		}
 
 		const response = await fetch(`${API_BASE_URL}/auth/vendor/login`, {
-=======
-		const response = await fetch('/api/v1/auth/vendor/login', {
->>>>>>> Stashed changes
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(payload),
 		});
 
-<<<<<<< Updated upstream
-		return { ok: response.ok };
-=======
-		const data = (await response.json()) as VendorLoginResponse;
+		let data: VendorLoginResponse = {};
+		try {
+			data = (await response.json()) as VendorLoginResponse;
+		} catch {
+			data = {};
+		}
+
 		const accessToken =
 			data.access_token ||
 			data.accessToken ||
@@ -66,10 +71,9 @@ export const vendorAuthService = {
 		localStorage.removeItem('admin_token');
 
 		return { ok: true };
->>>>>>> Stashed changes
 	},
 
-	async register(payload: VendorFormData & { organizationType: 'join' | 'create' }) {
+	async register(payload: VendorFormData & { organizationType: 'join' | 'create' }): Promise<RegisterResult> {
 		// Map frontend form fields → backend expected schema
 		const backendPayload = {
 			email: payload.email,
@@ -82,13 +86,14 @@ export const vendorAuthService = {
 		};
 
 		if (featureFlags.useVendorAuthMock) {
+			const mockData: RegisterResponse = {
+				status: 'pending_verification',
+				message: 'Please verify your email',
+				data: { token: `mock_${Date.now()}` },
+			};
 			return {
 				ok: true,
-				data: {
-					status: 'pending_verification',
-					message: 'Please verify your email',
-					data: { token: `mock_${Date.now()}` },
-				},
+				data: mockData,
 			};
 		}
 
@@ -98,21 +103,6 @@ export const vendorAuthService = {
 			body: JSON.stringify(backendPayload),
 		});
 
-<<<<<<< Updated upstream
-		const responseData = (await response.json()) as Record<string, unknown>;
-		const data: RegisterResponse = {
-			status: response.ok ? 'pending_verification' : 'error',
-			message:
-				typeof responseData.detail === 'string'
-					? responseData.detail
-					: typeof responseData.message === 'string'
-						? responseData.message
-						: response.ok
-							? 'Please verify your email'
-							: 'Registration failed',
-		};
-		return { ok: response.ok, data };
-=======
 		let data: RegisterResponse = {};
 		try {
 			data = (await response.json()) as RegisterResponse;
@@ -133,7 +123,6 @@ export const vendorAuthService = {
 			data,
 			message: 'Registration successful. Please login.',
 		};
->>>>>>> Stashed changes
 	},
 
 	async forgotPassword(email: string) {
