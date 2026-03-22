@@ -5,14 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Package, Clock, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
 import { ROUTES } from '@/lib/routes';
 import type { PackageOrder } from '@/types/customer/order';
-import axios from 'axios';
-
-const api = axios.create({ baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1' });
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('customerToken');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+import { customerOrderService } from '@/services/customer/orderServices';
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; className: string }> = {
   CREATED: {
@@ -38,8 +31,8 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get<{ items: PackageOrder[] }>('/customers/package-orders')
-      .then(r => setOrders(r.data.items ?? []))
+    customerOrderService.listOrders()
+      .then(setOrders)
       .catch(() => setOrders([]))
       .finally(() => setLoading(false));
   }, []);

@@ -1,4 +1,6 @@
 import axios, { AxiosError } from 'axios';
+import { featureFlags } from '@/config/featureFlags';
+import { mockVendorTaskApi } from '@/mocks/vendor/vendorTaskApi';
 import { TaskListResponse, TaskListItem } from '@/types/vendorTasks';
 
 type VendorTaskStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'DONE' | string;
@@ -122,13 +124,20 @@ function mapTaskStatusToLegacy(status: VendorTaskStatus): TaskListItem['status']
   return 'assigned';
 }
 
+function inferLegacyPriority(task: Pick<VendorTaskItem, 'budgetMax' | 'budgetMin'>): TaskListItem['priority'] {
+  const maxBudget = task.budgetMax ?? task.budgetMin ?? 0;
+  if (maxBudget >= 5000) return 'high';
+  if (maxBudget >= 2500) return 'medium';
+  return 'low';
+}
+
 function mapTaskToLegacy(task: VendorTaskItem): TaskListItem {
   const dueDate = task.dueAt ?? task.expiresAt;
   return {
     id: Number.parseInt(task.taskId, 10) || 0,
     title: task.name,
     status: mapTaskStatusToLegacy(task.status),
-    priority: 'medium',
+    priority: inferLegacyPriority(task),
     due_date: dueDate ?? undefined,
     expiry_date: task.expiresAt ?? undefined,
     budget_range:
@@ -178,7 +187,7 @@ vendorApi.interceptors.request.use((config) => {
   return config;
 });
 
-export const vendorTaskApi = {
+const apiVendorTaskApi = {
   async getFulfillmentRequests(params?: {
     status?: string;
     limit?: number;
@@ -303,3 +312,7 @@ export const vendorTaskApi = {
     };
   },
 };
+
+export const vendorTaskApi = featureFlags.useVendorTasksMock
+  ? mockVendorTaskApi
+  : apiVendorTaskApi;

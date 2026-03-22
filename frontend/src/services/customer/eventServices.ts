@@ -3,6 +3,7 @@ import {
   CreateCustomerEventResponse,
   DeleteDraftEventResponse,
   EventTypesResponse,
+  PaginatedCustomerEventsResponse,
   ServiceResult,
   UpdateEventPersonasPayload,
   UpdateEventPersonasResponse,
@@ -85,6 +86,33 @@ const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise
 };
 
 export const customerEventService = {
+  listEvents(params?: {
+    status?: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<ServiceResult<PaginatedCustomerEventsResponse>> {
+    const searchParams = new URLSearchParams();
+
+    if (params?.status) {
+      searchParams.set('status', params.status);
+    }
+
+    if (typeof params?.limit === 'number') {
+      searchParams.set('limit', String(params.limit));
+    }
+
+    if (params?.cursor) {
+      searchParams.set('cursor', params.cursor);
+    }
+
+    const query = searchParams.toString();
+    const endpoint = query
+      ? `/api/v1/customers/events?${query}`
+      : '/api/v1/customers/events';
+
+    return request<PaginatedCustomerEventsResponse>(endpoint);
+  },
+
   // Fetches available event types and UI examples.
   getEventTypes(): Promise<ServiceResult<EventTypesResponse>> {
     return request<EventTypesResponse>('/api/v1/event-types');

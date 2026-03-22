@@ -1,7 +1,9 @@
+import { featureFlags } from '@/config/featureFlags';
+import { mockDashboardService } from '@/mocks/admin/dashboardService';
 import { api } from '@/services/api';
 import type { AdminDashboardMetricsResponse, HealthStatusResponse } from '@/types/admin';
 
-export const dashboardService = {
+const apiDashboardService = {
   async getAdminDashboardMetrics(): Promise<AdminDashboardMetricsResponse> {
     const { data } = await api.get<AdminDashboardMetricsResponse>('/admin/dashboard');
     return data;
@@ -12,3 +14,7 @@ export const dashboardService = {
     return data;
   },
 };
+
+export const dashboardService = featureFlags.useAdminDashboardMock
+  ? mockDashboardService
+  : apiDashboardService;

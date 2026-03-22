@@ -1,8 +1,22 @@
+import { featureFlags } from '@/config/featureFlags';
+import { mockCustomerPersonaService } from '@/mocks/customer/personaService';
 import { ServiceResult } from '@/types/customer';
 import {
   CustomerPersona,
   CustomerPersonaUpdatePayload,
 } from '@/types/customer/persona';
+
+type CustomerPersonaService = {
+  listPersonas(): Promise<ServiceResult<CustomerPersona[]>>;
+  getPersona(personaId: string): Promise<ServiceResult<CustomerPersona>>;
+  updatePersona(
+    personaId: string,
+    payload: CustomerPersonaUpdatePayload
+  ): Promise<ServiceResult<CustomerPersona>>;
+  confirmPersona(personaId: string): Promise<ServiceResult<CustomerPersona | null>>;
+  unconfirmPersona(personaId: string): Promise<ServiceResult<CustomerPersona | null>>;
+  deletePersona(personaId: string): Promise<ServiceResult<void>>;
+};
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
@@ -155,7 +169,7 @@ const extractPersona = (value: unknown): CustomerPersona | null | undefined => {
   return undefined;
 };
 
-export const customerPersonaService = {
+const apiCustomerPersonaService: CustomerPersonaService = {
   async listPersonas(): Promise<ServiceResult<CustomerPersona[]>> {
     const result = await request('/api/v1/customers/personas/');
     return {
@@ -232,3 +246,7 @@ export const customerPersonaService = {
     };
   },
 };
+
+export const customerPersonaService: CustomerPersonaService = featureFlags.useCustomerPersonaMock
+  ? mockCustomerPersonaService
+  : apiCustomerPersonaService;
