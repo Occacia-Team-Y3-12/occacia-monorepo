@@ -17,6 +17,7 @@ from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.models.vendor import Vendor
 from app.schemas.auth_schema import (
     AuthMessageResponse,
     AuthResponse,
@@ -30,6 +31,7 @@ from app.schemas.auth_schema import (
 )
 from app.schemas.vendor_schema import VendorRegisterRequest, VendorResponse
 from app.services.auth_service import auth_service
+from app.services.notification_service import notification_service
 from app.services.vendor_service import vendor_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -52,32 +54,55 @@ async def _parse_login_payload(request: Request) -> LoginRequest | SimpleNamespa
         )
     return SimpleNamespace(username=str(username), password=str(password))
 
-# --- Vendor Routes ---
+
+# ── Vendor Routes ─────────────────────────────────────────────────────────────
 
 @router.post("/vendor/register", response_model=VendorResponse, status_code=201)
 def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(get_db)):
     if vendor_service.get_vendor_by_email(db, email=vendor_data.email):
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Email already taken!")
     if vendor_service.get_vendor_by_display_name(db, name=vendor_data.business_name):
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Business name already in use!")
-        
+
     vendor = vendor_service.create_vendor(db, vendor_data)
     auth_service.register_vendor_verification(db, vendor)
     return vendor
+
 
 @router.post("/vendor/login", tags=["Authentication"])
 async def login_vendor(request: Request, db: Session = Depends(get_db)):
     payload = await _parse_login_payload(request)
     return auth_service.login_vendor(db, payload)
 
+
 @router.get("/vendor/verify-email")
 def verify_vendor_email(token: str = Query(...), db: Session = Depends(get_db)):
     return auth_service.verify_vendor_email(db, token)
 
 
-# --- Customer Routes ---
+@router.post("/vendor/email-verification/resend", response_model=AuthMessageResponse)
+def resend_vendor_verification_email(
+    payload: ResendVerificationRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Resend the verification email to a vendor who hasn't verified yet.
+    """
+    vendor = db.query(Vendor).filter(Vendor.email == str(payload.email)).first()
+
+    if not vendor:
+        raise HTTPException(status_code=400, detail="Vendor account not found.")
+
+    if getattr(vendor, "is_verified", False):
+        raise HTTPException(status_code=400, detail="Email already verified.")
+
+    # Re-trigger verification email via auth_service helper
+    auth_service.register_vendor_verification(db, vendor)
+
+    return {"message": "Verification email resent successfully."}
+
+
+# ── Customer Routes ───────────────────────────────────────────────────────────
 
 @router.post("/customer/register", response_model=RegisterResponse, status_code=201)
 def register_customer(payload: CustomerRegister, db: Session = Depends(get_db)):
@@ -99,20 +124,27 @@ async def login_customer(request: Request, db: Session = Depends(get_db)):
 def refresh_customer_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
     return auth_service.refresh_customer_token(db, payload)
 
+
 @router.get("/customer/verify-email")
 def verify_customer_email(token: str = Query(...), db: Session = Depends(get_db)):
     return auth_service.verify_customer_email(db, token)
+
 
 @router.post("/customer/email-verification/resend", response_model=AuthMessageResponse)
 def resend_customer_verification_email(
     payload: ResendVerificationRequest,
     db: Session = Depends(get_db),
 ):
+    """
+    Resend the verification email to a customer who hasn't verified yet.
+    """
     return auth_service.resend_customer_verification_email(db, payload)
+
 
 @router.post("/customer/password/forgot", response_model=AuthMessageResponse)
 def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
     return auth_service.request_password_reset(db, request)
+
 
 @router.post("/customer/password/reset", response_model=AuthMessageResponse)
 def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
