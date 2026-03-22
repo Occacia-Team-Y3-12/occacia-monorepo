@@ -137,9 +137,10 @@ const EMPTY_DRAFT: CustomerPersonaDraft = {
 
 type PersonaEditPageProps = {
   mode?: 'create' | 'edit';
+  personaId?: string;
 };
 
-function PersonaEditContent({ mode = 'edit' }: PersonaEditPageProps) {
+function PersonaEditContent({ mode = 'edit', personaId }: PersonaEditPageProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const isCreateMode = mode === 'create';
@@ -162,10 +163,11 @@ function PersonaEditContent({ mode = 'edit' }: PersonaEditPageProps) {
 
   const selectedPersonaId = useMemo(() => {
     if (isCreateMode) return null;
+    if (personaId) return personaId;
     const personas = personasQuery.data ?? [];
     if (!personas.length) return null;
     return personas[0].persona_id;
-  }, [isCreateMode, personasQuery.data]);
+  }, [isCreateMode, personaId, personasQuery.data]);
 
   const personaQuery = useQuery({
     queryKey: ['customer-persona', selectedPersonaId],
@@ -235,7 +237,7 @@ function PersonaEditContent({ mode = 'edit' }: PersonaEditPageProps) {
       setDraft(buildDraft(created));
       setSuccessMessage('Persona created successfully');
       setErrorMessage(null);
-      router.push(ROUTES.CUSTOMER.PERSONA_DETAIL(created.persona_id));
+      router.push(ROUTES.CUSTOMER.PERSONA);
     },
     onError: (error: Error) => {
       setErrorMessage(error.message || 'Failed to create persona');
@@ -422,11 +424,11 @@ function PersonaEditContent({ mode = 'edit' }: PersonaEditPageProps) {
   );
 }
 
-export default function PersonaEditPage({ mode = 'edit' }: PersonaEditPageProps) {
+export default function PersonaEditPage({ mode = 'edit', personaId }: PersonaEditPageProps) {
   const [queryClient] = useState(() => new QueryClient());
   return (
     <QueryClientProvider client={queryClient}>
-      <PersonaEditContent mode={mode} />
+      <PersonaEditContent mode={mode} personaId={personaId} />
     </QueryClientProvider>
   );
 }

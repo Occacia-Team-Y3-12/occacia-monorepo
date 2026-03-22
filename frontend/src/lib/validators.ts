@@ -4,10 +4,6 @@ import { emailRegex, fullNameRegex, strongPasswordRegex } from './validation';
 
 // Customer Registration Schema
 export const registerSchema = z.object({
-  username: z.string()
-    .min(1, 'Username is required')
-    .trim(),
-  
   fullName: z.string()
     .min(1, 'Full name is required')
     .refine(val => val.trim().length > 0, 'Full name is required')

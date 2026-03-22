@@ -162,7 +162,7 @@ function PersonaListContent() {
                     href={ROUTES.CUSTOMER.PERSONA_DETAIL(persona.persona_id)}
                     className="inline-flex items-center gap-2 rounded-full border border-[#D7DFEC] bg-[#F8FBFF] px-4 py-2 text-sm font-semibold text-[#0D47A1] transition hover:border-[#BFD0EE] hover:bg-[#EEF5FF]"
                   >
-                    View
+                    Edit
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>

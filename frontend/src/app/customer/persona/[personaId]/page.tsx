@@ -1,4 +1,4 @@
-import CustomerPersonaPage from '@/components/features/customer/persona/CustomerPersonaPage';
+import PersonaEditPage from '@/components/features/customer/persona/PersonaEditPage';
 
 type CustomerPersonaDetailRouteProps = {
   params: Promise<{
@@ -11,5 +11,5 @@ export default async function CustomerPersonaDetailRoute({
 }: CustomerPersonaDetailRouteProps) {
   const { personaId } = await params;
 
-  return <CustomerPersonaPage personaId={personaId} />;
+  return <PersonaEditPage mode="edit" personaId={personaId} />;
 }
