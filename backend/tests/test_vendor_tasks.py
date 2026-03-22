@@ -62,7 +62,6 @@ async def sample_tasks(db: AsyncSession, approved_vendor):
     await db.commit()
     return tasks
 
-@pytest.mark.asyncio
 async def test_list_vendor_tasks(
     client: AsyncClient,
     approved_vendor,
@@ -84,7 +83,6 @@ async def test_list_vendor_tasks(
     assert len(data["completed"]) == 1
     assert data["total_count"] == 3
 
-@pytest.mark.asyncio
 async def test_unapproved_vendor_blocked(
     client: AsyncClient,
     db: AsyncSession
@@ -111,7 +109,6 @@ async def test_unapproved_vendor_blocked(
     assert response.status_code == 403
     assert "pending" in response.json()["detail"].lower()
 
-@pytest.mark.asyncio
 async def test_empty_state(
     client: AsyncClient,
     approved_vendor,
