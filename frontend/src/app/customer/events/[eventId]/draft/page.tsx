@@ -82,7 +82,7 @@ export default function CustomerEventDraftPage() {
     return `${normalized.map(offsetLabel).join(' & ')} before`;
   }, [offsets]);
 
-  const displayTasks = useMemo(() => tasks.slice(0, 4), [tasks]);
+  const displayTasks = useMemo(() => tasks, [tasks]);
 
   if (!eventId) {
     return <section className="rounded-2xl border border-[#E4E8F2] bg-white p-6 text-sm text-[#D64545]">Invalid event id.</section>;
