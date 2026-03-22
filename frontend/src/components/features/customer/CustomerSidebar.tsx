@@ -24,6 +24,7 @@ const CustomerSidebar = ({ isOpen, isDesktopCollapsed, onToggleDesktopSidebar }:
   const navItems = [
     { href: '/customer/dashboard', label: 'Dashboard', icon: '/icons/customer/dashboard/dashboard.svg' },
     { href: '/customer/events', label: 'My Events', icon: '/icons/customer/dashboard/my_events.svg' },
+    { href: '/customer/persona', label: 'Persona', icon: '/icons/customer/dashboard/people.svg' },
     { href: '/customer/people', label: 'People', icon: '/icons/customer/dashboard/people.svg' },
     { href: '/customer/settings', label: 'Settings', icon: '/icons/customer/dashboard/settings.svg' },
   ];
