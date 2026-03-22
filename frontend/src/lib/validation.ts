@@ -24,6 +24,40 @@ export const fullNameRegex = /^[A-Za-z\s]+$/; // letters and spaces only
 // strong password: 8+ characters, upper, lower, number, special
 export const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 
+const envFlag = (value: string | undefined, defaultValue = false) => {
+  if (value == null) {
+    return defaultValue;
+  }
+
+  return value.trim().toLowerCase() === 'true';
+};
+
+const enableFrontendMocks = envFlag(
+  process.env.NEXT_PUBLIC_ENABLE_FRONTEND_MOCKS
+);
+
+const useVendorAuthMock = envFlag(
+  process.env.NEXT_PUBLIC_USE_VENDOR_AUTH_MOCK,
+  enableFrontendMocks
+);
+
+const isMockEmailValid = (value: string) => value.trim().length > 0;
+const isMockPasswordValid = (value: string) => value.trim().length > 0;
+const isMockNicValid = (value: string) => value.trim().length > 0;
+const isMockFullNameValid = (value: string) => value.trim().length > 0;
+
+const isVendorEmailValid = (value: string) =>
+  useVendorAuthMock ? isMockEmailValid(value) : emailRegex.test(value);
+
+const isVendorPasswordValid = (value: string) =>
+  useVendorAuthMock ? isMockPasswordValid(value) : strongPasswordRegex.test(value);
+
+const isVendorNicValid = (value: string) =>
+  useVendorAuthMock ? isMockNicValid(value) : nicRegex.test(value);
+
+const isVendorFullNameValid = (value: string) =>
+  useVendorAuthMock ? isMockFullNameValid(value) : fullNameRegex.test(value);
+
 // field-level validator returns error message or empty string
 export function validateVendorField(
   name: keyof VendorFormData,
@@ -38,16 +72,16 @@ export function validateVendorField(
       break;
     case 'fullName':
       if (!value.trim()) error = 'Full name is required';
-      else if (!fullNameRegex.test(value))
+      else if (!isVendorFullNameValid(value))
         error = 'Full name can contain only letters';
       break;
     case 'email':
       if (!value.trim()) error = 'Email is required';
-      else if (!emailRegex.test(value)) error = 'Invalid email format';
+      else if (!isVendorEmailValid(value)) error = 'Invalid email format';
       break;
     case 'password':
       if (!value) error = 'Password is required';
-      else if (!strongPasswordRegex.test(value))
+      else if (!isVendorPasswordValid(value))
         error =
           'Password must be at least 8 characters and include uppercase, lowercase, number, and special character';
       else if (data.confirmPassword && data.confirmPassword !== value)
@@ -63,7 +97,7 @@ export function validateVendorField(
       break;
     case 'nicNumber':
       if (!value.trim()) error = 'NIC number is required';
-      else if (!nicRegex.test(value)) error = 'Invalid NIC number';
+      else if (!isVendorNicValid(value)) error = 'Invalid NIC number';
       break;
     case 'gender':
       if (!value) error = 'Gender is required';
@@ -91,7 +125,7 @@ export function validateVendorField(
     case 'businessEmail':
       if (orgChoice === 'create') {
         if (!value.trim()) error = 'Business email is required';
-        else if (!emailRegex.test(value)) error = 'Invalid email format';
+        else if (!isVendorEmailValid(value)) error = 'Invalid email format';
       }
       break;
   }
@@ -101,12 +135,12 @@ export function validateVendorField(
 export function isVendorAccountValid(data: VendorFormData): boolean {
   return (
     data.username.trim() !== '' &&
-    fullNameRegex.test(data.fullName) &&
-    emailRegex.test(data.email) &&
-    strongPasswordRegex.test(data.password) &&
+    isVendorFullNameValid(data.fullName) &&
+    isVendorEmailValid(data.email) &&
+    isVendorPasswordValid(data.password) &&
     data.password === data.confirmPassword &&
     data.address.trim() !== '' &&
-    nicRegex.test(data.nicNumber) &&
+    isVendorNicValid(data.nicNumber) &&
     data.gender !== ''
   );
 }
@@ -124,7 +158,7 @@ export function isVendorFinalValid(
       data.businessRegNumber.trim() !== '' &&
       data.businessAddress.trim() !== '' &&
       data.businessPhone.trim() !== '' &&
-      emailRegex.test(data.businessEmail)
+      isVendorEmailValid(data.businessEmail)
     );
   }
   return false;
