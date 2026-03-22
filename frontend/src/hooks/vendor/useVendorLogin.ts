@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ROUTES } from '@/lib/routes';
 import { vendorAuthService } from '@/services/vendor/authService';
 
 export const useVendorLogin = () => {
@@ -21,9 +20,9 @@ export const useVendorLogin = () => {
     try {
       const result = await vendorAuthService.login(formData);
       if (result.ok) {
-        router.push(ROUTES.VENDOR.DASHBOARD);
+        router.push('/vendors/tasks');
       } else {
-        setError('Invalid credentials. Please try again.');
+        setError(result.message || 'Invalid credentials. Please try again.');
       }
     } catch {
       setError('Login failed. Please try again.');

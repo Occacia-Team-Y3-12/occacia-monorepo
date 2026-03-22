@@ -3,10 +3,8 @@
 import { useMemo } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
-import { featureFlags } from '@/config/featureFlags';
 import { useEventChatPlanner } from '@/hooks/customer/useEventChatPlanner';
 import { ROUTES } from '@/lib/routes';
-import { MOCK_DRAFT_TASKS } from '@/mocks/customerExperience';
 
 const formatDateLabel = (date: string): string => {
   if (!date) {
@@ -84,13 +82,7 @@ export default function CustomerEventDraftPage() {
     return `${normalized.map(offsetLabel).join(' & ')} before`;
   }, [offsets]);
 
-  const displayTasks = useMemo(() => {
-    if (tasks.length) {
-      return tasks.slice(0, 4);
-    }
-
-    return featureFlags.useCustomerPlanningMockApi ? MOCK_DRAFT_TASKS : [];
-  }, [tasks]);
+  const displayTasks = useMemo(() => tasks.slice(0, 4), [tasks]);
 
   if (!eventId) {
     return <section className="rounded-2xl border border-[#E4E8F2] bg-white p-6 text-sm text-[#D64545]">Invalid event id.</section>;
@@ -195,32 +187,34 @@ export default function CustomerEventDraftPage() {
           </button>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-          {displayTasks.map((task) => (
-            <label key={task.id} className="flex min-h-[90px] items-center gap-3 rounded-[14px] border border-[#D7DFEC] bg-white px-4 py-3.5">
-              <input
-                type="checkbox"
-                checked={task.completed}
-                onChange={(event) => {
-                  if (String(task.id).startsWith('fallback-')) {
-                    return;
-                  }
+        {displayTasks.length === 0 ? (
+          <div className="mt-5 rounded-[14px] border border-dashed border-[#D7DFEC] bg-white px-5 py-8 text-center text-sm text-[#74839D]">
+            No tasks have been generated for this event yet. Go back to chat to add planning details and tasks.
+          </div>
+        ) : (
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {displayTasks.map((task) => (
+              <label key={task.id} className="flex min-h-[90px] items-center gap-3 rounded-[14px] border border-[#D7DFEC] bg-white px-4 py-3.5">
+                <input
+                  type="checkbox"
+                  checked={task.completed}
+                  onChange={(event) => {
+                    void updateTaskCompletion(task.id, event.target.checked);
+                  }}
+                  className="mt-0.5 h-[18px] w-[18px] rounded-[4px] border border-[#C2CDE1] accent-[#0F4FB7]"
+                />
 
-                  void updateTaskCompletion(task.id, event.target.checked);
-                }}
-                className="mt-0.5 h-[18px] w-[18px] rounded-[4px] border border-[#C2CDE1] accent-[#0F4FB7]"
-              />
-
-              <span className="min-w-0">
-                <span className="block text-[16px] font-semibold leading-tight text-[#1D273C] sm:text-[17px] lg:text-[18px]">{task.title}</span>
-                <span className="mt-1 inline-flex items-center gap-1 rounded-[4px] bg-[#F3F6FB] px-2 py-0.5 text-[10px] font-medium text-[#7988A3] sm:text-[11px] lg:text-[12px]">
-                  <Image src="/icons/customer/event_draft/calander_icon.svg" alt="task" width={14} height={15} className="h-[12px] w-[12px]" />
-                  {task.category || 'Planning'}
+                <span className="min-w-0">
+                  <span className="block text-[16px] font-semibold leading-tight text-[#1D273C] sm:text-[17px] lg:text-[18px]">{task.title}</span>
+                  <span className="mt-1 inline-flex items-center gap-1 rounded-[4px] bg-[#F3F6FB] px-2 py-0.5 text-[10px] font-medium text-[#7988A3] sm:text-[11px] lg:text-[12px]">
+                    <Image src="/icons/customer/event_draft/calander_icon.svg" alt="task" width={14} height={15} className="h-[12px] w-[12px]" />
+                    {task.category || 'Planning'}
+                  </span>
                 </span>
-              </span>
-            </label>
-          ))}
-        </div>
+              </label>
+            ))}
+          </div>
+        )}
       </div>
 
        <footer className="fixed inset-x-0 bottom-0 border-t border-[#D6DEEC] bg-white/95 backdrop-blur">

@@ -1,8 +1,22 @@
+import { featureFlags } from '@/config/featureFlags';
+import { mockCustomerPersonaService } from '@/mocks/customer/personaService';
 import { ServiceResult } from '@/types/customer';
 import {
   CustomerPersona,
   CustomerPersonaUpdatePayload,
 } from '@/types/customer/persona';
+
+type CustomerPersonaService = {
+  listPersonas(): Promise<ServiceResult<CustomerPersona[]>>;
+  getPersona(personaId: string): Promise<ServiceResult<CustomerPersona>>;
+  updatePersona(
+    personaId: string,
+    payload: CustomerPersonaUpdatePayload
+  ): Promise<ServiceResult<CustomerPersona>>;
+  confirmPersona(personaId: string): Promise<ServiceResult<CustomerPersona | null>>;
+  unconfirmPersona(personaId: string): Promise<ServiceResult<CustomerPersona | null>>;
+  deletePersona(personaId: string): Promise<ServiceResult<void>>;
+};
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
@@ -155,9 +169,9 @@ const extractPersona = (value: unknown): CustomerPersona | null | undefined => {
   return undefined;
 };
 
-export const customerPersonaService = {
+const apiCustomerPersonaService: CustomerPersonaService = {
   async listPersonas(): Promise<ServiceResult<CustomerPersona[]>> {
-    const result = await request('/v1/customers/personas/');
+    const result = await request('/api/v1/customers/personas/');
     return {
       ...result,
       data: extractPersonaList(result.data) ?? [],
@@ -166,7 +180,7 @@ export const customerPersonaService = {
   },
 
   async getPersona(personaId: string): Promise<ServiceResult<CustomerPersona>> {
-    const result = await request(`/v1/customers/personas/${personaId}`);
+    const result = await request(`/api/v1/customers/personas/${personaId}`);
     const persona = extractPersona(result.data);
 
     if (result.ok && !persona) {
@@ -187,7 +201,7 @@ export const customerPersonaService = {
     personaId: string,
     payload: CustomerPersonaUpdatePayload
   ): Promise<ServiceResult<CustomerPersona>> {
-    const result = await request(`/v1/customers/personas/${personaId}`, {
+    const result = await request(`/api/v1/customers/personas/${personaId}`, {
       method: 'PUT',
       headers: JSON_HEADERS,
       body: JSON.stringify(payload),
@@ -200,7 +214,7 @@ export const customerPersonaService = {
   },
 
   async confirmPersona(personaId: string): Promise<ServiceResult<CustomerPersona | null>> {
-    const result = await request(`/v1/customers/personas/${personaId}/confirm`, {
+    const result = await request(`/api/v1/customers/personas/${personaId}/confirm`, {
       method: 'POST',
     });
 
@@ -211,7 +225,7 @@ export const customerPersonaService = {
   },
 
   async unconfirmPersona(personaId: string): Promise<ServiceResult<CustomerPersona | null>> {
-    const result = await request(`/v1/customers/personas/${personaId}/confirm`, {
+    const result = await request(`/api/v1/customers/personas/${personaId}/confirm`, {
       method: 'DELETE',
     });
 
@@ -220,4 +234,19 @@ export const customerPersonaService = {
       data: extractPersona(result.data),
     };
   },
+
+  async deletePersona(personaId: string): Promise<ServiceResult<void>> {
+    const result = await request(`/api/v1/customers/personas/${personaId}`, {
+      method: 'DELETE',
+    });
+
+    return {
+      ...result,
+      data: undefined,
+    };
+  },
 };
+
+export const customerPersonaService: CustomerPersonaService = featureFlags.useCustomerPersonaMock
+  ? mockCustomerPersonaService
+  : apiCustomerPersonaService;

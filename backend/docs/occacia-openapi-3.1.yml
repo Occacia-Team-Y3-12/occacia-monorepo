@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Occacia API
-  version: 1.1.1
+  version: 1.1.2
   description: 'Occacia API contract aligned with use cases, EERD, and class diagram.
     Core flow: Event -> Tasks -> Recommendations -> Packages -> Confirm Package ->
     Package Order -> Vendor Fulfillment Requests -> Task execution.
@@ -13,6 +13,10 @@ info:
 
     Update 1.1.1: Added customer/vendor inquiry read endpoints, package deletion,
     package order cancellation, and vendor fulfillment request detail endpoint.
+
+
+    Update 1.1.2: Updated customer/vendor forgot-password flow to email OTP
+    verification with resend OTP support before password reset.
 
     '
 servers:
@@ -157,7 +161,9 @@ paths:
       - Authentication
       summary: Change customer password (authenticated)
       description: Authenticated password change only (currentPassword + newPassword).
-        Use the /password/forgot and /password/reset flow for forgotten passwords.
+        Use the /password/forgot, /password/forgot/verify-otp, and /password/reset
+        flow for forgotten passwords. /password/forgot/resend-otp can be used
+        when the OTP needs to be sent again.
       requestBody:
         required: true
         content:
@@ -177,7 +183,10 @@ paths:
     post:
       tags:
       - Authentication
-      summary: Request customer password reset email
+      summary: Send customer password reset OTP
+      description: Sends a one-time password (OTP) to the customer's email address.
+        After success, the frontend should navigate the user to the OTP entry
+        screen.
       security: []
       requestBody:
         required: true
@@ -187,16 +196,65 @@ paths:
               $ref: '#/components/schemas/ForgotPasswordRequest'
       responses:
         '200':
-          description: Password reset email requested
+          description: Password reset OTP sent
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+  /auth/customer/password/forgot/verify-otp:
+    post:
+      tags:
+      - Authentication
+      summary: Verify customer password reset OTP
+      description: Verifies the OTP sent to the customer's email and returns a
+        short-lived reset token. After success, the frontend should redirect
+        the user to the password reset screen.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetOtpVerifyRequest'
+      responses:
+        '200':
+          description: Password reset OTP verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordResetOtpVerificationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /auth/customer/password/forgot/resend-otp:
+    post:
+      tags:
+      - Authentication
+      summary: Resend customer password reset OTP
+      description: Resends the password reset OTP to the customer's email address
+        for an in-progress forgot-password flow.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Password reset OTP resent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /auth/customer/password/reset:
     post:
       tags:
       - Authentication
-      summary: Reset customer password using token
+      summary: Reset customer password after OTP verification
+      description: Completes the forgot-password flow using the short-lived reset
+        token returned by /auth/customer/password/forgot/verify-otp.
       security: []
       requestBody:
         required: true
@@ -353,12 +411,17 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
       description: Authenticated password change only (currentPassword + newPassword).
-        Use the /password/forgot and /password/reset flow for forgotten passwords.
+        Use the /password/forgot, /password/forgot/verify-otp, and /password/reset
+        flow for forgotten passwords. /password/forgot/resend-otp can be used
+        when the OTP needs to be sent again.
   /auth/vendor/password/forgot:
     post:
       tags:
       - Authentication
-      summary: Request vendor password reset email
+      summary: Send vendor password reset OTP
+      description: Sends a one-time password (OTP) to the vendor's email address.
+        After success, the frontend should navigate the user to the OTP entry
+        screen.
       security: []
       requestBody:
         required: true
@@ -368,16 +431,65 @@ paths:
               $ref: '#/components/schemas/ForgotPasswordRequest'
       responses:
         '200':
-          description: Password reset email requested
+          description: Password reset OTP sent
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+  /auth/vendor/password/forgot/verify-otp:
+    post:
+      tags:
+      - Authentication
+      summary: Verify vendor password reset OTP
+      description: Verifies the OTP sent to the vendor's email and returns a short-lived
+        reset token. After success, the frontend should redirect the user to
+        the password reset screen.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetOtpVerifyRequest'
+      responses:
+        '200':
+          description: Password reset OTP verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordResetOtpVerificationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /auth/vendor/password/forgot/resend-otp:
+    post:
+      tags:
+      - Authentication
+      summary: Resend vendor password reset OTP
+      description: Resends the password reset OTP to the vendor's email address
+        for an in-progress forgot-password flow.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Password reset OTP resent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /auth/vendor/password/reset:
     post:
       tags:
       - Authentication
-      summary: Reset vendor password using token
+      summary: Reset vendor password after OTP verification
+      description: Completes the forgot-password flow using the short-lived reset
+        token returned by /auth/vendor/password/forgot/verify-otp.
       security: []
       requestBody:
         required: true
@@ -2398,13 +2510,34 @@ components:
         email:
           type: string
           format: email
+    PasswordResetOtpVerifyRequest:
+      type: object
+      required:
+      - email
+      - otp
+      properties:
+        email:
+          type: string
+          format: email
+        otp:
+          type: string
+    PasswordResetOtpVerificationResponse:
+      type: object
+      required:
+      - message
+      - resetToken
+      properties:
+        message:
+          type: string
+        resetToken:
+          type: string
     ResetPasswordRequest:
       type: object
       required:
-      - token
+      - resetToken
       - newPassword
       properties:
-        token:
+        resetToken:
           type: string
         newPassword:
           type: string

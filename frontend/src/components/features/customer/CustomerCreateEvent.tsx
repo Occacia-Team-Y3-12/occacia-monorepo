@@ -5,7 +5,11 @@ import { useCreateEvent } from '@/hooks/customer/useCreateEvent';
 
 const DEFAULT_PERSONA_IMAGE = '/icons/customer/dashboard/profile.svg';
 
-const CustomerCreateEvent = () => {
+type CustomerCreateEventProps = {
+  initialTemplate?: string;
+};
+
+const CustomerCreateEvent = ({ initialTemplate }: CustomerCreateEventProps) => {
   const {
     eventType,
     eventTypes,
@@ -24,7 +28,7 @@ const CustomerCreateEvent = () => {
     addNewPersona,
     handleCreate,
     handleCancel,
-  } = useCreateEvent();
+  } = useCreateEvent(initialTemplate);
 
   const [isAddPersonOpen, setIsAddPersonOpen] = useState(false);
   const [newPersonName, setNewPersonName] = useState('');
@@ -70,10 +74,10 @@ const CustomerCreateEvent = () => {
                   disabled={isLoadingEventTypes}
                   className="h-11 w-full rounded-xl border border-[#CCCCCC] bg-[#FAFAFA] px-3 text-sm text-[#666666] outline-none transition-colors focus:border-[#4285F4]"
                 >
-                  <option value="">{isLoadingEventTypes ? 'Loading event types...' : 'Select event type'}</option>
+                  <option value="" disabled hidden>{isLoadingEventTypes ? 'Loading event types...' : 'Select event type'}</option>
                   {eventTypes.map((type) => (
                     <option key={type.id} value={type.value}>
-                      {`${type.label} (e.g., ${type.example})`}
+                      {`${type.label === 'Other' ? 'Others' : type.label} (e.g., ${type.example})`}
                     </option>
                   ))}
                 </select>
@@ -216,5 +220,4 @@ const CustomerCreateEvent = () => {
 };
 
 export default CustomerCreateEvent;
-
 

@@ -1,235 +1,215 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { AlertCircle, CheckCircle2, Clock, XCircle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
+import { CheckCircle2, Clock3, PlayCircle, XCircle } from 'lucide-react';
+import {
+  vendorTaskApi,
+  FulfillmentRequestItem,
+  VendorTaskItem,
+} from '@/services/vendorTaskApi';
 
-interface TaskListItem {
-  id: number;
-  title: string;
-  status: 'pending_response' | 'assigned' | 'completed' | 'rejected' | 'expired';
-  priority: 'high' | 'medium' | 'low';
-  due_date: string | null;
-  expiry_date: string | null;
-  budget_range: string | null;
-  customer: { id: number; name: string; email: string };
-  event: { id: number; title: string; occasion_type: string; event_date: string } | null;
-  created_at: string;
-  is_urgent: boolean;
-}
+type LoadingMap = Record<string, boolean>;
 
-interface TaskListResponse {
-  pending_response: TaskListItem[];
-  assigned: TaskListItem[];
-  completed: TaskListItem[];
-  rejected_expired: TaskListItem[];
-  total_count: number;
-}
-
-type TaskSectionStatus = 'pending_response' | 'assigned' | 'completed' | 'rejected_expired';
-
-const statusConfig = {
-  pending_response: {
-    label: 'Needs Response',
-    icon: AlertCircle,
-    color: 'bg-amber-100 text-amber-800',
-    badgeColor: 'bg-amber-200',
-  },
-  assigned: {
-    label: 'In Progress',
-    icon: Clock,
-    color: 'bg-blue-100 text-blue-800',
-    badgeColor: 'bg-blue-200',
-  },
-  completed: {
-    label: 'Completed',
-    icon: CheckCircle2,
-    color: 'bg-green-100 text-green-800',
-    badgeColor: 'bg-green-200',
-  },
-  rejected_expired: {
-    label: 'Rejected/Expired',
-    icon: XCircle,
-    color: 'bg-red-100 text-red-800',
-    badgeColor: 'bg-red-200',
-  },
-};
-
-const priorityConfig = {
-  high: { label: 'High', color: 'bg-red-100 text-red-700' },
-  medium: { label: 'Medium', color: 'bg-yellow-100 text-yellow-700' },
-  low: { label: 'Low', color: 'bg-green-100 text-green-700' },
-};
-
-const badgeClass = 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold';
-
-const getTaskStatusConfig = (status: TaskListItem['status']) => {
-  if (status === 'rejected' || status === 'expired') {
-    return statusConfig.rejected_expired;
+function formatCountdown(remainingMs: number): string {
+  if (remainingMs <= 0) {
+    return 'Expired';
   }
-  return statusConfig[status];
-};
-
-interface TaskCardProps {
-  task: TaskListItem;
-  onViewDetail: (taskId: number) => void;
-}
-
-const TaskCard: React.FC<TaskCardProps> = ({ task, onViewDetail }) => {
-  const config = getTaskStatusConfig(task.status);
-  const Icon = config.icon;
-
-  return (
-    <Card className={`${config.color} border-none cursor-pointer hover:shadow-lg transition-shadow`}>
-      <CardBody className="pt-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <Icon className="h-5 w-5" />
-              <h3 className="font-semibold text-lg">{task.title}</h3>
-              {task.is_urgent && <span className={`${badgeClass} bg-red-500 text-white`}>Urgent</span>}
-            </div>
-
-            <div className="space-y-2 text-sm">
-              <p>
-                <span className="font-medium">Customer:</span> {task.customer.name}
-              </p>
-              {task.event && (
-                <p>
-                  <span className="font-medium">Event:</span> {task.event.title} ({task.event.occasion_type})
-                </p>
-              )}
-              {task.budget_range && (
-                <p>
-                  <span className="font-medium">Budget:</span> {task.budget_range}
-                </p>
-              )}
-              {task.due_date && (
-                <p>
-                  <span className="font-medium">Due:</span> {formatDistanceToNow(new Date(task.due_date), { addSuffix: true })}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 items-end">
-            <span className={`${badgeClass} ${priorityConfig[task.priority].color}`}>
-              {priorityConfig[task.priority].label}
-            </span>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => onViewDetail(task.id)}
-              className="mt-2"
-            >
-              View Details
-            </Button>
-          </div>
-        </div>
-      </CardBody>
-    </Card>
-  );
-};
-
-interface TaskSectionProps {
-  title: string;
-  tasks: TaskListItem[];
-  status: TaskSectionStatus;
-  onViewDetail: (taskId: number) => void;
-}
-
-const TaskSection: React.FC<TaskSectionProps> = ({ title, tasks, status, onViewDetail }) => {
-  const config = statusConfig[status];
-
-  if (tasks.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <config.icon className="h-5 w-5" />
-            {title}
-          </h2>
-          <p className="text-sm text-gray-600">No tasks in this category</p>
-        </CardHeader>
-      </Card>
-    );
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, '0')}m`;
   }
-
-  return (
-    <div>
-      <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-        <config.icon className="h-6 w-6" />
-        {title}
-        <span className={`${badgeClass} bg-gray-200 text-gray-700`}>{tasks.length}</span>
-      </h2>
-      <div className="space-y-4">
-        {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} onViewDetail={onViewDetail} />
-        ))}
-      </div>
-    </div>
-  );
-};
-
-interface VendorTasksDashboardProps {
-  onTaskSelect?: (taskId: number) => void;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-export function VendorTasksDashboard({ onTaskSelect }: VendorTasksDashboardProps) {
-  const [tasks, setTasks] = useState<TaskListResponse | null>(null);
+function isExpired(respondBy: string | null, nowMs: number): boolean {
+  if (!respondBy) {
+    return false;
+  }
+  return new Date(respondBy).getTime() <= nowMs;
+}
+
+function partitionTasks(items: VendorTaskItem[]) {
+  const assigned: VendorTaskItem[] = [];
+  const inProgress: VendorTaskItem[] = [];
+  const done: VendorTaskItem[] = [];
+
+  items.forEach((task) => {
+    const normalized = String(task.status).toUpperCase();
+    if (normalized === 'ASSIGNED') {
+      assigned.push(task);
+      return;
+    }
+    if (normalized === 'IN_PROGRESS') {
+      inProgress.push(task);
+      return;
+    }
+    if (normalized === 'DONE') {
+      done.push(task);
+    }
+  });
+
+  return { assigned, inProgress, done };
+}
+
+function taskMeta(task: VendorTaskItem): string {
+  const budget =
+    task.budgetMin !== null && task.budgetMax !== null
+      ? `Budget: ${task.currency} ${task.budgetMin} - ${task.budgetMax}`
+      : 'Budget: N/A';
+  return `${task.vendorCategory ?? 'General'} • ${budget}`;
+}
+
+function requestLabel(request: FulfillmentRequestItem): string {
+  return `Task ${request.taskId} • Attempt ${request.attemptNo}`;
+}
+
+export function VendorTasksDashboard() {
+  const [pendingRequests, setPendingRequests] = useState<FulfillmentRequestItem[]>([]);
+  const [assignedTasks, setAssignedTasks] = useState<VendorTaskItem[]>([]);
+  const [inProgressTasks, setInProgressTasks] = useState<VendorTaskItem[]>([]);
+  const [doneTasks, setDoneTasks] = useState<VendorTaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<LoadingMap>({});
+  const [nowMs, setNowMs] = useState(Date.now());
 
   useEffect(() => {
-    fetchTasks();
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
-  const fetchTasks = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/vendors/tasks', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('access_token')}`,
-        },
-      });
+      setError(null);
+      const [requestsResponse, tasksResponse] = await Promise.all([
+        vendorTaskApi.getFulfillmentRequests({ status: 'SENT', limit: 100 }),
+        vendorTaskApi.getVendorTasks({ limit: 100 }),
+      ]);
 
-      if (!response.ok) throw new Error('Failed to load tasks');
-
-      const data: TaskListResponse = await response.json();
-      setTasks(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      setPendingRequests(requestsResponse.items);
+      const grouped = partitionTasks(tasksResponse.items);
+      setAssignedTasks(grouped.assigned);
+      setInProgressTasks(grouped.inProgress);
+      setDoneTasks(grouped.done);
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : 'Failed to load vendor dashboard';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const totalTasks = useMemo(
+    () => pendingRequests.length + assignedTasks.length + inProgressTasks.length + doneTasks.length,
+    [pendingRequests.length, assignedTasks.length, inProgressTasks.length, doneTasks.length]
+  );
+
+  const setBusy = (id: string, value: boolean) => {
+    setActionLoading((previous) => ({ ...previous, [id]: value }));
   };
 
-  const handleViewDetail = (taskId: number) => {
-    // Navigate to task detail or call callback
-    if (onTaskSelect) {
-      onTaskSelect(taskId);
+  const handleRespond = async (request: FulfillmentRequestItem, decision: 'ACCEPT' | 'REJECT') => {
+    const requestId = request.fulfillmentRequestId;
+    if (isExpired(request.respondBy, nowMs)) {
+      toast.error('This request is expired and can no longer be updated.');
+      return;
+    }
+
+    setBusy(`request:${requestId}`, true);
+    try {
+      const response = await vendorTaskApi.respondToFulfillmentRequest(requestId, { decision });
+      setPendingRequests((items) => items.filter((item) => item.fulfillmentRequestId !== requestId));
+
+      if (decision === 'ACCEPT') {
+        const normalizedStatus = String(response.task.status).toUpperCase();
+        if (normalizedStatus === 'ASSIGNED') {
+          setAssignedTasks((items) => [response.task, ...items.filter((item) => item.taskId !== response.task.taskId)]);
+        } else if (normalizedStatus === 'IN_PROGRESS') {
+          setInProgressTasks((items) => [response.task, ...items.filter((item) => item.taskId !== response.task.taskId)]);
+        } else if (normalizedStatus === 'DONE') {
+          setDoneTasks((items) => [response.task, ...items.filter((item) => item.taskId !== response.task.taskId)]);
+        }
+        toast.success('Request accepted. Task moved to your assigned tasks.');
+      } else {
+        toast.success('Request rejected successfully.');
+      }
+    } catch (responseError) {
+      const message = responseError instanceof Error ? responseError.message : 'Unable to update request';
+      toast.error(message);
+    } finally {
+      setBusy(`request:${requestId}`, false);
+    }
+  };
+
+  const handleTaskTransition = async (task: VendorTaskItem, nextStatus: 'IN_PROGRESS' | 'DONE') => {
+    const taskId = task.taskId;
+    const snapshotAssigned = assignedTasks;
+    const snapshotInProgress = inProgressTasks;
+    const snapshotDone = doneTasks;
+
+    setBusy(`task:${taskId}`, true);
+    if (nextStatus === 'IN_PROGRESS') {
+      setAssignedTasks((items) => items.filter((item) => item.taskId !== taskId));
+      setInProgressTasks((items) => [{ ...task, status: 'IN_PROGRESS' }, ...items]);
+    } else {
+      setInProgressTasks((items) => items.filter((item) => item.taskId !== taskId));
+      setDoneTasks((items) => [{ ...task, status: 'DONE' }, ...items]);
+    }
+
+    try {
+      const updatedTask = await vendorTaskApi.updateVendorTaskStatus(taskId, { status: nextStatus });
+      if (nextStatus === 'IN_PROGRESS') {
+        setInProgressTasks((items) =>
+          items.map((item) => (item.taskId === taskId ? updatedTask : item))
+        );
+        toast.success('Task started and moved to In Progress.');
+      } else {
+        setDoneTasks((items) => items.map((item) => (item.taskId === taskId ? updatedTask : item)));
+        toast.success('Task marked as Done.');
+      }
+    } catch (updateError) {
+      setAssignedTasks(snapshotAssigned);
+      setInProgressTasks(snapshotInProgress);
+      setDoneTasks(snapshotDone);
+      const message = updateError instanceof Error ? updateError.message : 'Failed to update task status';
+      toast.error(message);
+    } finally {
+      setBusy(`task:${taskId}`, false);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p>Loading tasks...</p>
+      <div className="flex min-h-[320px] items-center justify-center">
+        <p className="text-gray-600">Loading vendor workboard...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <Card className="border-red-200 bg-red-50">
+      <Card className="border border-red-200 bg-red-50">
         <CardHeader>
-          <h2 className="text-xl font-semibold text-red-700">Error Loading Tasks</h2>
+          <h2 className="text-xl font-semibold text-red-700">Failed to load vendor tasks</h2>
         </CardHeader>
         <CardBody>
           <p className="text-red-600">{error}</p>
-          <Button onClick={fetchTasks} className="mt-4">
+          <Button className="mt-4" onClick={loadDashboardData}>
             Retry
           </Button>
         </CardBody>
@@ -237,48 +217,177 @@ export function VendorTasksDashboard({ onTaskSelect }: VendorTasksDashboardProps
     );
   }
 
-  if (!tasks) return null;
-
   return (
     <div className="space-y-8 p-6">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">Your Tasks</h1>
-        <p className="text-gray-600">
-          Total: <span className="font-semibold">{tasks.total_count}</span> tasks
-        </p>
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Vendor Task Board</h1>
+        <p className="mt-1 text-sm text-gray-600">{totalTasks} total items</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href="/vendor/dashboard" className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white">
+            Dashboard
+          </Link>
+          <Link href="/vendor/activities" className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
+            Activities
+          </Link>
+          <Link href="/vendor/offerings" className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
+            Offerings
+          </Link>
+          <Link href="/vendor/orders" className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
+            Orders
+          </Link>
+          <Link href="/vendor/products" className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
+            Products
+          </Link>
+          <Link href="/vendors/tasks" className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white">
+            Tasks
+          </Link>
+        </div>
       </div>
 
-      {/* Needs Response Section */}
-      <TaskSection
-        title="Actions Required"
-        tasks={tasks.pending_response}
-        status="pending_response"
-        onViewDetail={handleViewDetail}
-      />
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold text-gray-900">Requests ({pendingRequests.length})</h2>
+        {pendingRequests.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-gray-600">No pending requests right now.</p>
+            </CardBody>
+          </Card>
+        ) : (
+          pendingRequests.map((request) => {
+            const expired = isExpired(request.respondBy, nowMs);
+            const busy = actionLoading[`request:${request.fulfillmentRequestId}`] ?? false;
+            const remainingMs = request.respondBy
+              ? new Date(request.respondBy).getTime() - nowMs
+              : Number.POSITIVE_INFINITY;
 
-      {/* In Progress Section */}
-      <TaskSection
-        title="In Progress"
-        tasks={tasks.assigned}
-        status="assigned"
-        onViewDetail={handleViewDetail}
-      />
+            return (
+              <Card key={request.fulfillmentRequestId} className="border border-amber-200 bg-amber-50/50">
+                <CardBody className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900">{requestLabel(request)}</p>
+                    <p className="text-xs text-amber-700">
+                      Expires in: {formatCountdown(remainingMs)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      disabled={busy || expired}
+                      onClick={() => handleRespond(request, 'ACCEPT')}
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      Accept
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={busy || expired}
+                      onClick={() => handleRespond(request, 'REJECT')}
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Reject
+                    </Button>
+                  </div>
+                </CardBody>
+              </Card>
+            );
+          })
+        )}
+      </section>
 
-      {/* Completed Section */}
-      <TaskSection
-        title="Completed"
-        tasks={tasks.completed}
-        status="completed"
-        onViewDetail={handleViewDetail}
-      />
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold text-gray-900">Assigned ({assignedTasks.length})</h2>
+        {assignedTasks.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-gray-600">No assigned tasks yet.</p>
+            </CardBody>
+          </Card>
+        ) : (
+          assignedTasks.map((task) => {
+            const busy = actionLoading[`task:${task.taskId}`] ?? false;
+            return (
+              <Card key={task.taskId}>
+                <CardBody className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900">{task.name}</p>
+                    <p className="text-xs text-gray-600">{taskMeta(task)}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => handleTaskTransition(task, 'IN_PROGRESS')}
+                  >
+                    <PlayCircle className="h-4 w-4" />
+                    Start Task
+                  </Button>
+                </CardBody>
+              </Card>
+            );
+          })
+        )}
+      </section>
 
-      {/* Rejected/Expired Section */}
-      <TaskSection
-        title="Rejected & Expired"
-        tasks={tasks.rejected_expired}
-        status="rejected_expired"
-        onViewDetail={handleViewDetail}
-      />
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold text-gray-900">In Progress ({inProgressTasks.length})</h2>
+        {inProgressTasks.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-gray-600">No tasks in progress.</p>
+            </CardBody>
+          </Card>
+        ) : (
+          inProgressTasks.map((task) => {
+            const busy = actionLoading[`task:${task.taskId}`] ?? false;
+            return (
+              <Card key={task.taskId} className="border border-blue-100">
+                <CardBody className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900">{task.name}</p>
+                    <p className="text-xs text-gray-600">{taskMeta(task)}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    disabled={busy}
+                    onClick={() => handleTaskTransition(task, 'DONE')}
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Mark Done
+                  </Button>
+                </CardBody>
+              </Card>
+            );
+          })
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold text-gray-900">Done ({doneTasks.length})</h2>
+        {doneTasks.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-gray-600">No completed tasks yet.</p>
+            </CardBody>
+          </Card>
+        ) : (
+          doneTasks.map((task) => (
+            <Card key={task.taskId} className="border border-green-100 bg-green-50/40">
+              <CardBody className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-green-900">{task.name}</p>
+                  <p className="text-xs text-green-700">{taskMeta(task)}</p>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                  <Clock3 className="h-3.5 w-3.5" />
+                  Completed
+                </span>
+              </CardBody>
+            </Card>
+          ))
+        )}
+      </section>
     </div>
   );
 }

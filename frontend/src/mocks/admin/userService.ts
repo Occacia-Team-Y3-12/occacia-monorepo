@@ -1,11 +1,13 @@
-import {
+import type {
   AdminCustomer,
-  CustomerAccountStatus,
   PaginatedCustomersResponse,
   UpdateCustomerStatusRequest,
 } from '@/types/admin';
-
-import { CustomerListParams, CustomerUserService } from './userService.types';
+import { CustomerAccountStatus } from '@/types/admin';
+import type {
+  CustomerListParams,
+  CustomerUserService,
+} from '@/services/admin/userService.types';
 
 const MOCK_STORAGE_KEY = 'occacia_admin_customers_mock';
 

@@ -1,6 +1,6 @@
-// frontend/src/services/adminService.ts
-
-import {api} from './api';
+import { featureFlags } from '@/config/featureFlags';
+import { mockAdminService } from '@/mocks/admin/adminService';
+import { api } from './api';
 import {
   Vendor,
   Organization,
@@ -47,7 +47,7 @@ function mapVendor(raw: any): Vendor {
   };
 }
 
-export const adminService = {
+const apiAdminService = {
   // Vendors
   getVendors: async (params: ListParams = {}): Promise<VendorListResponse> => {
     const { status, page = 1, limit = 20 } = params;
@@ -139,3 +139,7 @@ export const adminService = {
     return mapVendor(data);
   },
 };
+
+export const adminService = featureFlags.useAdminOperationsMock
+  ? mockAdminService
+  : apiAdminService;

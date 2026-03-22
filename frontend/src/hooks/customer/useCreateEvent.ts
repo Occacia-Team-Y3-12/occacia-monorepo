@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import { customerEventService } from '@/services/customer/eventServices';
 import { ROUTES } from '@/lib/routes';
 import { CreateCustomerEventPayload, CustomerPersonaOption, CustomerEventType, EventTypeOption } from '@/types/customer';
-import { EVENT_TYPE_FALLBACKS } from '@/mocks/customerExperience';
+import {
+  getEventTypeKey,
+  getFallbackEventTypes,
+  normalizeEventTypes,
+} from '@/lib/customerEventTypeOptions';
 
 type CustomerEventFormType = CustomerEventType | string;
 
@@ -17,12 +21,12 @@ export const PERSONA_OPTIONS: CustomerPersonaOption[] = [
   { id: 'michael-chen', name: 'Michael Chen', role: 'Vendor Manager', imageUrl: '/images/customer/events/Micheal.svg' },
 ];
 
-export const useCreateEvent = () => {
+export const useCreateEvent = (initialTemplate?: string) => {
   const router = useRouter();
   const [eventType, setEventType] = useState<CustomerEventFormType>(DEFAULT_EVENT_TYPE);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [eventTypes, setEventTypes] = useState<EventTypeOption[]>(EVENT_TYPE_FALLBACKS);
+  const [eventTypes, setEventTypes] = useState<EventTypeOption[]>(getFallbackEventTypes());
   const [personas, setPersonas] = useState<CustomerPersonaOption[]>(PERSONA_OPTIONS);
   const [selectedPersonaIds, setSelectedPersonaIds] = useState<string[]>([]);
   const [errors, setErrors] = useState<{ eventType?: string; title?: string; form?: string }>({});
@@ -30,6 +34,7 @@ export const useCreateEvent = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [draftEventId, setDraftEventId] = useState<string | null>(null);
+  const requestedTemplate = initialTemplate?.trim().toLowerCase() || '';
 
   const selectedEventType = useMemo(
     () => eventTypes.find((type) => type.value === eventType),
@@ -45,14 +50,25 @@ export const useCreateEvent = () => {
     const loadEventTypes = async () => {
       setIsLoadingEventTypes(true);
       const result = await customerEventService.getEventTypes();
+      let nextEventTypes = getFallbackEventTypes();
 
       if (result.ok && result.data?.data?.eventTypes?.length) {
-        setEventTypes(result.data.data.eventTypes);
+        nextEventTypes = normalizeEventTypes(result.data.data.eventTypes);
       } else {
-        setEventTypes(EVENT_TYPE_FALLBACKS);
-
         if (!result.ok) {
-        setErrors((prev) => ({ ...prev, form: result.error || 'Unable to load event types right now.' }));
+          setErrors((prev) => ({ ...prev, form: result.error || 'Unable to load event types right now.' }));
+        }
+      }
+
+      setEventTypes(nextEventTypes);
+
+      if (requestedTemplate) {
+        const matchedType = nextEventTypes.find(
+          (type) => getEventTypeKey(type) === requestedTemplate
+        );
+
+        if (matchedType) {
+          setEventType(matchedType.value);
         }
       }
 
@@ -60,7 +76,7 @@ export const useCreateEvent = () => {
     };
 
     void loadEventTypes();
-  }, []);
+  }, [requestedTemplate]);
 
   const togglePersona = (personaId: string) => {
     setSelectedPersonaIds((prev) =>
@@ -125,12 +141,22 @@ export const useCreateEvent = () => {
 
       const createResult = await customerEventService.createEvent(payload);
 
-      if (!createResult.ok || !createResult.data?.data?.eventId) {
+      const responseData = createResult.data as unknown as Record<string, any> | undefined;
+      const nestedData = responseData?.data as Record<string, any> | undefined;
+      const eventIdRaw =
+        nestedData?.eventId ||
+        nestedData?.event_id ||
+        nestedData?.id ||
+        responseData?.eventId ||
+        responseData?.event_id ||
+        responseData?.id;
+      const eventId = eventIdRaw ? String(eventIdRaw) : '';
+
+      if (!createResult.ok || !eventId) {
         setErrors({ form: createResult.error || createResult.data?.message || 'Unable to create event. Please try again.' });
         return;
       }
 
-      const eventId = createResult.data.data.eventId;
       setDraftEventId(eventId);
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem('customer:lastEventTitle', title.trim());

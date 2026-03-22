@@ -1,3 +1,5 @@
+import { featureFlags } from '@/config/featureFlags';
+import { mockTaskService } from '@/mocks/customer/taskService';
 import { ServiceResult } from '@/types/customer';
 import {
   EventWithTasks,
@@ -32,7 +34,7 @@ const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise
   }
 };
 
-export const taskService = {
+const apiTaskService = {
   getEventWithTasks(eventId: string): Promise<ServiceResult<EventWithTasks>> {
     return request<EventWithTasks>(`/api/v1/customers/events/${eventId}/tasks`);
   },
@@ -59,3 +61,8 @@ export const taskService = {
     });
   },
 };
+
+export const taskService =
+  featureFlags.enableFrontendMocks || featureFlags.useCustomerPlanningMockApi
+    ? mockTaskService
+    : apiTaskService;
