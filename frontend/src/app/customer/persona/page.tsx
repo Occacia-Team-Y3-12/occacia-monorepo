@@ -1,5 +1,5 @@
-import CustomerPersonaPage from '@/components/features/customer/persona/CustomerPersonaPage';
+import PersonaEditPage from '@/components/features/customer/persona/PersonaEditPage';
 
 export default function CustomerPersonaRoute() {
-  return <CustomerPersonaPage />;
+  return <PersonaEditPage />;
 }
