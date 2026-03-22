@@ -4,7 +4,7 @@ app/schemas/vendor_schema.py
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Optional, Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -54,7 +54,7 @@ class VendorResponse(BaseModel):
     contact_phone: Optional[str] = None
     is_verified: bool
     approval_status: str
-    task_summary: Optional[dict] = None
+    task_summary: Optional[VendorTaskSummary] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -125,18 +125,31 @@ class VendorTaskUpdateRequest(BaseModel):
         return trimmed or None
 
 
+class VendorTaskSummary(BaseModel):
+    """Summary of a vendor's task counts by status."""
+    pending: int = Field(0, description="Count of tasks pending acceptance.")
+    accepted: int = Field(
+        0, description="Count of tasks accepted by the vendor.")
+    in_progress: int = Field(
+        0, description="Count of tasks currently in progress.")
+    completed: int = Field(0, description="Count of tasks completed.")
+    cancelled: int = Field(0, description="Count of tasks cancelled.")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class VendorResponse(BaseModel):
     id: int
-    vendor_id: Optional[str] = None
+    user_id: int
     business_name: str
     email: EmailStr
     location_base: Optional[str] = None
-    is_verified: bool
     phone: Optional[str] = None
     display_name: Optional[str] = None
     contact_phone: Optional[str] = None
-    approval_status: Optional[str] = None
-    approved_at: Optional[datetime] = None
+    is_verified: bool
+    approval_status: str
+    task_summary: Optional[VendorTaskSummary] = None
 
     model_config = ConfigDict(from_attributes=True)
 

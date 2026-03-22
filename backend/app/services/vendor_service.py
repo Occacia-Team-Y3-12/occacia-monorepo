@@ -18,6 +18,7 @@ from app.models.user import User
 from app.models.vendor import Vendor
 from app.schemas.vendor_schema import VendorRegisterRequest as VendorCreate
 from app.schemas.vendor_schema import VendorUpdate
+from app.schemas.vendor_schema import VendorResponse, VendorTaskSummary
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +197,21 @@ class VendorService:
 
     def get_vendor_by_user_id(self, db: Session, user_id: int) -> Optional[Vendor]:
         return db.query(Vendor).filter(Vendor.user_id == user_id).first()
+
+    def get_vendor_profile(self, db: Session, vendor: Vendor) -> VendorResponse:
+        """
+        Returns a vendor's profile with an added task summary.
+        """
+        summary_counts = self.get_task_summary_for_vendor(db, vendor.id)
+        
+        # Create a dictionary from the vendor ORM model
+        vendor_data = vendor.__dict__
+        
+        # Add the summary to the dictionary
+        vendor_data["task_summary"] = VendorTaskSummary(**summary_counts)
+        
+        # Validate the entire structure with Pydantic
+        return VendorResponse.model_validate(vendor_data)
 
     def get_vendor_task_summary(self, db: Session, vendor_id: int) -> dict:
         """

@@ -169,10 +169,10 @@ def get_vendor_me(
     task_summary = vendor_service.get_vendor_task_summary(
         db, vendor_id=current_vendor.id)
 
-    vendor_response = VendorResponse.model_validate(current_vendor)
-    vendor_response.task_summary = task_summary
+    vendor_data = current_vendor.__dict__
+    vendor_data['task_summary'] = task_summary
 
-    return vendor_response
+    return VendorResponse.model_validate(vendor_data)
 
 
 @router.put("/me", response_model=VendorResponse)
