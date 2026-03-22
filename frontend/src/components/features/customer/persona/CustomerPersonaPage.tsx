@@ -327,7 +327,7 @@ function CustomerPersonaContent() {
         throw new Error(response.error || 'Unable to confirm persona.');
       }
 
-      return response.data;
+      return response.data ?? null;
     },
     onSuccess: (confirmedPersona: CustomerPersona | null) => {
       if (confirmedPersona) {
@@ -363,7 +363,7 @@ function CustomerPersonaContent() {
         throw new Error(response.error || 'Unable to remove confirmation.');
       }
 
-      return response.data;
+      return response.data ?? null;
     },
     onSuccess: (updatedPersona: CustomerPersona | null) => {
       if (updatedPersona) {
