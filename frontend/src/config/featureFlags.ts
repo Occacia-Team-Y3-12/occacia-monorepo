@@ -18,6 +18,7 @@ export const featureFlags = {
     process.env.NEXT_PUBLIC_USE_CUSTOMER_PACKAGES_MOCK
   ),
   useCustomerPlanningMockApi: envFlag(
-    process.env.NEXT_PUBLIC_USE_CUSTOMER_PLANNING_MOCK_API
+    process.env.NEXT_PUBLIC_USE_CUSTOMER_PLANNING_MOCK_API,
+    true
   ),
 } as const;
