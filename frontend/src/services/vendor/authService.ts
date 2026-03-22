@@ -2,9 +2,30 @@ import { VendorFormData } from '@/lib/validation';
 import { featureFlags } from '@/config/featureFlags';
 import { API_BASE_URL } from '@/services/api';
 
+type VendorLoginResponse = {
+	access_token?: string;
+	accessToken?: string;
+	token_type?: string;
+	data?: {
+		access_token?: string;
+		accessToken?: string;
+		token_type?: string;
+		role?: string;
+	};
+	role?: string;
+	message?: string;
+};
+
 type RegisterResponse = {
 	status?: string;
 	data?: { token?: string };
+	message?: string;
+	detail?: string;
+};
+
+type RegisterResult = {
+	ok: boolean;
+	data: RegisterResponse;
 	message?: string;
 };
 
@@ -23,10 +44,36 @@ export const vendorAuthService = {
 			body: JSON.stringify(payload),
 		});
 
-		return { ok: response.ok };
+		let data: VendorLoginResponse = {};
+		try {
+			data = (await response.json()) as VendorLoginResponse;
+		} catch {
+			data = {};
+		}
+
+		const accessToken =
+			data.access_token ||
+			data.accessToken ||
+			data.data?.access_token ||
+			data.data?.accessToken;
+
+		if (!response.ok || !accessToken) {
+			return {
+				ok: false,
+				message: data.message || 'Invalid credentials. Please try again.',
+			};
+		}
+
+		localStorage.setItem('vendorToken', accessToken);
+		localStorage.setItem('access_token', accessToken);
+		localStorage.setItem('accessToken', accessToken);
+		localStorage.setItem('vendor_role', 'VENDOR');
+		localStorage.removeItem('admin_token');
+
+		return { ok: true };
 	},
 
-	async register(payload: VendorFormData & { organizationType: 'join' | 'create' }) {
+	async register(payload: VendorFormData & { organizationType: 'join' | 'create' }): Promise<RegisterResult> {
 		// Map frontend form fields → backend expected schema
 		const backendPayload = {
 			email: payload.email,
@@ -39,13 +86,14 @@ export const vendorAuthService = {
 		};
 
 		if (featureFlags.useVendorAuthMock) {
+			const mockData: RegisterResponse = {
+				status: 'pending_verification',
+				message: 'Please verify your email',
+				data: { token: `mock_${Date.now()}` },
+			};
 			return {
 				ok: true,
-				data: {
-					status: 'pending_verification',
-					message: 'Please verify your email',
-					data: { token: `mock_${Date.now()}` },
-				},
+				data: mockData,
 			};
 		}
 
@@ -55,19 +103,26 @@ export const vendorAuthService = {
 			body: JSON.stringify(backendPayload),
 		});
 
-		const responseData = (await response.json()) as Record<string, unknown>;
-		const data: RegisterResponse = {
-			status: response.ok ? 'pending_verification' : 'error',
-			message:
-				typeof responseData.detail === 'string'
-					? responseData.detail
-					: typeof responseData.message === 'string'
-						? responseData.message
-						: response.ok
-							? 'Please verify your email'
-							: 'Registration failed',
+		let data: RegisterResponse = {};
+		try {
+			data = (await response.json()) as RegisterResponse;
+		} catch {
+			data = {};
+		}
+
+		if (!response.ok) {
+			return {
+				ok: false,
+				data,
+				message: data.detail || data.message || 'Registration failed. Please try again.',
+			};
+		}
+
+		return {
+			ok: true,
+			data,
+			message: 'Registration successful. Please login.',
 		};
-		return { ok: response.ok, data };
 	},
 
 	async forgotPassword(email: string) {

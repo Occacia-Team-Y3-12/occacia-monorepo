@@ -135,24 +135,21 @@ export const useVendorRegister = () => {
 
     setSubmitting(true);
     try {
-      const { ok, data } = await vendorAuthService.register({
+      const result = await vendorAuthService.register({
         ...formData,
         organizationType: orgChoice as 'join' | 'create',
       });
 
-      if (ok && data.status === 'pending_verification') {
-        const mockToken = featureFlags.useVendorAuthMock
-          ? data.data?.token || `mock_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
-          : data.data?.token;
-
-        if (!mockToken) {
-          router.push(ROUTES.VENDOR.PENDING_APPROVAL);
+      if (result.ok) {
+        if (featureFlags.useVendorAuthMock) {
+          const mockToken =
+            result.data?.data?.token || `mock_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+          router.push(`${ROUTES.VENDOR.VERIFY_EMAIL}?token=${mockToken}`);
           return;
         }
-
-        router.push(`${ROUTES.VENDOR.VERIFY_EMAIL}?token=${mockToken}`);
+        router.push(`${ROUTES.VENDOR.LOGIN}?registered=1`);
       } else {
-        setSubmitError(data.message || 'Registration failed. Please try again.');
+        setSubmitError(result.message || result.data?.detail || 'Registration failed. Please try again.');
       }
     } catch {
       setSubmitError('Registration failed. Please try again.');
