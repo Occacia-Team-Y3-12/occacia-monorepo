@@ -220,4 +220,15 @@ export const customerPersonaService = {
       data: extractPersona(result.data),
     };
   },
+
+  async deletePersona(personaId: string): Promise<ServiceResult<void>> {
+    const result = await request(`/api/v1/customers/personas/${personaId}`, {
+      method: 'DELETE',
+    });
+
+    return {
+      ...result,
+      data: undefined,
+    };
+  },
 };
