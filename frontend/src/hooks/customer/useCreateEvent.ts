@@ -10,6 +10,64 @@ import { EVENT_TYPE_FALLBACKS } from '@/mocks/customerExperience';
 type CustomerEventFormType = CustomerEventType | string;
 
 const DEFAULT_EVENT_TYPE: CustomerEventFormType = '';
+const CURATED_EVENT_TYPES: EventTypeOption[] = [
+  {
+    id: 'individual',
+    value: 'individual',
+    label: 'Individual',
+    example: 'Visit someone',
+    titlePlaceholder: 'e.g., Visiting to see sick mom',
+  },
+  {
+    id: 'group',
+    value: 'group',
+    label: 'Group',
+    example: 'Celebration',
+    titlePlaceholder: 'e.g., Family dinner planning',
+  },
+  {
+    id: 'other',
+    value: 'others',
+    label: 'Other',
+    example: 'Appointment',
+    titlePlaceholder: 'e.g., Doctor appointment this Saturday',
+  },
+];
+
+const getEventTypeKey = (type: EventTypeOption) => {
+  const normalizedValue = String(type.value || '').trim().toLowerCase();
+  const normalizedLabel = type.label.trim().toLowerCase();
+  const source = normalizedValue || normalizedLabel;
+
+  if (source === 'individual') return 'individual';
+  if (source === 'group') return 'group';
+  if (source === 'other' || source === 'others') return 'other';
+  return '';
+};
+
+const normalizeEventTypes = (types: EventTypeOption[]) => {
+  const map = new Map<string, EventTypeOption>();
+
+  CURATED_EVENT_TYPES.forEach((type) => {
+    map.set(getEventTypeKey(type), type);
+  });
+
+  types.forEach((type) => {
+    const key = getEventTypeKey(type);
+    if (!key) return;
+
+    map.set(key, {
+      ...type,
+      id: key,
+      value: key === 'other' ? 'others' : key,
+      label: key === 'other' ? 'Other' : key === 'group' ? 'Group' : 'Individual',
+    });
+  });
+
+  return ['individual', 'group', 'other']
+    .map((key) => map.get(key))
+    .filter((type): type is EventTypeOption => Boolean(type));
+};
 
 export const PERSONA_OPTIONS: CustomerPersonaOption[] = [
   { id: 'john-cena', name: 'John Cena', role: 'Professional Athlete', imageUrl: '/images/customer/events/Jhon.svg' },
@@ -22,7 +80,7 @@ export const useCreateEvent = () => {
   const [eventType, setEventType] = useState<CustomerEventFormType>(DEFAULT_EVENT_TYPE);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [eventTypes, setEventTypes] = useState<EventTypeOption[]>(EVENT_TYPE_FALLBACKS);
+  const [eventTypes, setEventTypes] = useState<EventTypeOption[]>(normalizeEventTypes(EVENT_TYPE_FALLBACKS));
   const [personas, setPersonas] = useState<CustomerPersonaOption[]>(PERSONA_OPTIONS);
   const [selectedPersonaIds, setSelectedPersonaIds] = useState<string[]>([]);
   const [errors, setErrors] = useState<{ eventType?: string; title?: string; form?: string }>({});
@@ -47,9 +105,9 @@ export const useCreateEvent = () => {
       const result = await customerEventService.getEventTypes();
 
       if (result.ok && result.data?.data?.eventTypes?.length) {
-        setEventTypes(result.data.data.eventTypes);
+        setEventTypes(normalizeEventTypes(result.data.data.eventTypes));
       } else {
-        setEventTypes(EVENT_TYPE_FALLBACKS);
+        setEventTypes(normalizeEventTypes(EVENT_TYPE_FALLBACKS));
 
         if (!result.ok) {
         setErrors((prev) => ({ ...prev, form: result.error || 'Unable to load event types right now.' }));
@@ -125,12 +183,22 @@ export const useCreateEvent = () => {
 
       const createResult = await customerEventService.createEvent(payload);
 
-      if (!createResult.ok || !createResult.data?.data?.eventId) {
+      const responseData = createResult.data as unknown as Record<string, any> | undefined;
+      const nestedData = responseData?.data as Record<string, any> | undefined;
+      const eventIdRaw =
+        nestedData?.eventId ||
+        nestedData?.event_id ||
+        nestedData?.id ||
+        responseData?.eventId ||
+        responseData?.event_id ||
+        responseData?.id;
+      const eventId = eventIdRaw ? String(eventIdRaw) : '';
+
+      if (!createResult.ok || !eventId) {
         setErrors({ form: createResult.error || createResult.data?.message || 'Unable to create event. Please try again.' });
         return;
       }
 
-      const eventId = createResult.data.data.eventId;
       setDraftEventId(eventId);
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem('customer:lastEventTitle', title.trim());

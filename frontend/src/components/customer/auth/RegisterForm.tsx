@@ -22,22 +22,31 @@ export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    const fieldName = name as keyof RegisterFormValues;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
-    if (errors[name as keyof RegisterFormValues]) {
-      setErrors(prev => ({ ...prev, [name]: undefined }));
+
+    if (value.trim()) {
+      validateField(fieldName, value);
+      return;
+    }
+
+    if (errors[fieldName]) {
+      setErrors(prev => ({ ...prev, [fieldName]: undefined }));
     }
   };
 
   const validateField = (name: keyof RegisterFormValues, value: string) => {
-    try {
-      const fieldSchema = registerSchema.shape[name];
-      fieldSchema.parse(value);
+    const fieldSchema = registerSchema.shape[name];
+    const result = fieldSchema.safeParse(value);
+
+    if (result.success) {
       setErrors(prev => ({ ...prev, [name]: undefined }));
-    } catch (error: any) {
-      if (error.errors?.[0]) {
-        setErrors(prev => ({ ...prev, [name]: error.errors[0].message }));
-      }
+      return;
+    }
+
+    const message = result.error.issues[0]?.message;
+    if (message) {
+      setErrors(prev => ({ ...prev, [name]: message }));
     }
   };
 
@@ -50,19 +59,21 @@ export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    try {
-      const validatedData = registerSchema.parse(formData);
-      await onSubmit(validatedData);
-    } catch (error: any) {
-      if (error.errors) {
-        const fieldErrors: Partial<Record<keyof RegisterFormValues, string>> = {};
-        error.errors.forEach((err: any) => {
-          fieldErrors[err.path[0] as keyof RegisterFormValues] = err.message;
-        });
-        setErrors(fieldErrors);
-      }
+
+    const result = registerSchema.safeParse(formData);
+    if (!result.success) {
+      const fieldErrors: Partial<Record<keyof RegisterFormValues, string>> = {};
+      result.error.issues.forEach((issue) => {
+        const field = issue.path[0] as keyof RegisterFormValues | undefined;
+        if (field && !fieldErrors[field]) {
+          fieldErrors[field] = issue.message;
+        }
+      });
+      setErrors(fieldErrors);
+      return;
     }
+
+    await onSubmit(result.data);
   };
 
   return (
@@ -110,12 +121,15 @@ export default function RegisterForm({ onSubmit, isLoading }: RegisterFormProps)
       {errors.email && <p className="text-xs text-red-500 -mt-2">{errors.email}</p>}
 
       <input
-        type="tel"
+        type="text"
         name="mobileNumber"
         value={formData.mobileNumber}
         onChange={handleChange}
         onBlur={handleBlur}
         placeholder="Mobile Number"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        maxLength={15}
         disabled={isLoading}
         className={`w-full border rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 disabled:bg-gray-100 ${
           errors.mobileNumber ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'

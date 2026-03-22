@@ -485,7 +485,7 @@ function CustomerPersonaContent() {
     router.push(ROUTES.CUSTOMER.DASHBOARD);
   };
 
-  if (isLoading || !draft) {
+  if (isLoading) {
     return (
       <div className="min-h-[calc(100vh-160px)] rounded-[40px] bg-[#080b14] p-4 sm:p-6 lg:p-8">
         <PersonaReviewSkeleton />
@@ -523,6 +523,14 @@ function CustomerPersonaContent() {
     return (
       <div className="min-h-[calc(100vh-160px)] rounded-[40px] bg-[#080b14] p-4 sm:p-6 lg:p-8">
         <PersonaEmptyState />
+      </div>
+    );
+  }
+
+  if (!draft) {
+    return (
+      <div className="min-h-[calc(100vh-160px)] rounded-[40px] bg-[#080b14] p-4 sm:p-6 lg:p-8">
+        <PersonaReviewSkeleton />
       </div>
     );
   }

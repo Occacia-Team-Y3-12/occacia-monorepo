@@ -13,7 +13,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const stepMeta: Record<Exclude<Step, 4>, { title: string; subtitle: string }> = {
   1: {
     title: 'Forgot your password?',
-    subtitle: 'Enter your vendor account email and we will send a verification code.',
+    subtitle: 'Enter your customer account email and we will send a verification code.',
   },
   2: {
     title: 'Verify your email',
@@ -21,11 +21,11 @@ const stepMeta: Record<Exclude<Step, 4>, { title: string; subtitle: string }> = 
   },
   3: {
     title: 'Create a new password',
-    subtitle: 'Set a secure password for your vendor account.',
+    subtitle: 'Set a secure password for your customer account.',
   },
 };
 
-export default function VendorForgotPasswordForm() {
+export default function ForgotPasswordPage() {
   const [step, setStep] = useState<Step>(1);
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -180,7 +180,7 @@ export default function VendorForgotPasswordForm() {
       <section className="relative z-10 w-full max-w-md rounded-3xl border border-[#EAEAEA] bg-[#FFFFFF]/85 p-6 shadow-[0_20px_60px_-32px_rgba(13,71,161,0.45)] backdrop-blur-xl sm:p-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#4285F4]">Vendor Security</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#4285F4]">Customer Security</p>
             <h1 className="mt-2 text-2xl font-bold text-[#0D47A1] sm:text-[30px]">Password Recovery</h1>
           </div>
           {step !== 4 && (
@@ -396,10 +396,10 @@ export default function VendorForgotPasswordForm() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-[#0D47A1]">Password Reset Successful</h2>
-                  <p className="mt-2 text-sm text-[#666666]">Your password has been updated. You can now log in to your vendor account.</p>
+                  <p className="mt-2 text-sm text-[#666666]">Your password has been updated. You can now log in to your customer account.</p>
                 </div>
                 <Link
-                  href="/vendor/auth/login"
+                  href="/customer/auth/login"
                   className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#0D47A1] text-sm font-semibold text-[#FFFFFF] transition hover:bg-[#4285F4]"
                 >
                   Back to Login
@@ -419,7 +419,7 @@ export default function VendorForgotPasswordForm() {
         {step !== 4 && (
           <div className="mt-7 text-center text-sm text-[#666666]">
             Remember your password?{' '}
-            <Link href="/vendor/auth/login" className="font-semibold text-[#4285F4] hover:text-[#0D47A1]">
+            <Link href="/customer/auth/login" className="font-semibold text-[#4285F4] hover:text-[#0D47A1]">
               Back to Login
             </Link>
           </div>
