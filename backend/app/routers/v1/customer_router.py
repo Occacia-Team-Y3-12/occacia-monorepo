@@ -64,6 +64,7 @@ from app.schemas.recommendation_schema import (
     TaskRecommendationListResponse,
     UpdateCustomPackageRequest,
 )
+from app.schemas.offering_schema import TaskOfferingListResponse, TaskOfferingResponse
 from app.schemas.package_schema import (
     ConfirmPackageOrderResponse,
     FulfillmentRequestResponse,
@@ -78,6 +79,7 @@ from app.services.event_planning_service import event_planning_service
 from app.services.package_order_service import package_order_service
 from app.services.recommendation_service import recommendation_service
 from app.services.event_chat_service import event_chat_service
+from app.services.offering_service import offering_service
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -599,6 +601,107 @@ def reassign_event_task(
     return ReassignTaskResponse(
         task=_task_response(task),
         fulfillmentRequest=_fulfillment_request_response(fulfillment_request),
+    )
+
+
+@router.get(
+    "/customers/events/{event_id}/tasks/{task_id}/offerings",
+    response_model=TaskOfferingListResponse,
+    response_model_by_alias=True,
+)
+def get_task_offerings(
+    event_id: str,
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    event_planning_service.get_event_for_customer(
+        db,
+        customer_id=str(current_customer.customer_id),
+        event_id=event_id,
+    )
+    task = db.query(Task).filter(Task.task_id == task_id, Task.event_id == event_id).first()
+    if not task:
+        from fastapi import HTTPException as _HTTPEx
+        raise _HTTPEx(status_code=404, detail="Task not found")
+    task_offerings = offering_service.get_task_offerings(db, task_id=task_id)
+    items = []
+    for task_offering in task_offerings:
+        offering = task_offering.offering
+        vendor_name = None
+        if offering and offering.vendor:
+            vendor_name = getattr(offering.vendor, "display_name", None) or getattr(
+                offering.vendor, "business_name", None
+            )
+        items.append(
+            TaskOfferingResponse(
+                offeringId=offering.offering_id,
+                name=offering.name,
+                category=offering.category,
+                description=offering.description,
+                price=offering.price,
+                currency=offering.currency,
+                unit=offering.unit,
+                qualityTier=offering.quality_tier,
+                vendorId=offering.vendor_id,
+                vendorName=vendor_name,
+                rank=task_offering.rank,
+                score=task_offering.score,
+                isSelected=task_offering.is_selected,
+                selectedAt=task_offering.selected_at,
+            )
+        )
+    return TaskOfferingListResponse(items=items)
+
+
+@router.post(
+    "/customers/events/{event_id}/tasks/{task_id}/offerings/{offering_id}/select",
+    response_model=TaskOfferingResponse,
+    response_model_by_alias=True,
+)
+def select_task_offering(
+    event_id: str,
+    task_id: str,
+    offering_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    event_planning_service.get_event_for_customer(
+        db,
+        customer_id=str(current_customer.customer_id),
+        event_id=event_id,
+    )
+    task = db.query(Task).filter(Task.task_id == task_id, Task.event_id == event_id).first()
+    if not task:
+        from fastapi import HTTPException as _HTTPEx
+        raise _HTTPEx(status_code=404, detail="Task not found")
+    task_offering = offering_service.select_offering(
+        db,
+        task_id=task_id,
+        offering_id=offering_id,
+        customer_id=str(current_customer.customer_id),
+    )
+    offering = task_offering.offering
+    vendor_name = None
+    if offering and offering.vendor:
+        vendor_name = getattr(offering.vendor, "display_name", None) or getattr(
+            offering.vendor, "business_name", None
+        )
+    return TaskOfferingResponse(
+        offeringId=offering.offering_id,
+        name=offering.name,
+        category=offering.category,
+        description=offering.description,
+        price=offering.price,
+        currency=offering.currency,
+        unit=offering.unit,
+        qualityTier=offering.quality_tier,
+        vendorId=offering.vendor_id,
+        vendorName=vendor_name,
+        rank=task_offering.rank,
+        score=task_offering.score,
+        isSelected=task_offering.is_selected,
+        selectedAt=task_offering.selected_at,
     )
 
 

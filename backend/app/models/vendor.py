@@ -28,6 +28,6 @@ class Vendor(Base):
     password_hash = Column(String, nullable=True)
 
     # Relationships
+    offerings = relationship("Offering", back_populates="vendor", cascade="all, delete-orphan")
     vendor_tasks = relationship("VendorTask", back_populates="vendor", cascade="all, delete-orphan")
-
 

@@ -16,6 +16,7 @@ from .recommendation_package import RecommendationPackage
 from .support_note import SupportNote
 from .task import Task
 from .task_models import VendorTask, VendorTaskMessage
+from .task_offering import TaskOffering
 from .task_recommendation import TaskRecommendation
 from .task_request import TaskRequest
 from .user import User
@@ -37,6 +38,7 @@ __all__ = [
     "RecommendationPackage",
     "SupportNote",
     "Task",
+    "TaskOffering",
     "VendorTask",
     "VendorTaskMessage",
     "TaskRecommendation",
