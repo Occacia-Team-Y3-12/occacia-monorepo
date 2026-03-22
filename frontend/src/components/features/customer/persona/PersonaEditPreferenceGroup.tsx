@@ -44,22 +44,22 @@ export function PersonaEditPreferenceGroup({
     <motion.section
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mt-4 rounded-3xl border border-white/10 bg-[#0d1117] p-5 sm:p-6"
+      className="mt-4 rounded-3xl border border-[#DCE4F2] bg-white p-5 shadow-[0_18px_48px_-32px_rgba(13,71,161,0.16)] sm:p-6"
     >
       <div className="mb-5 flex items-start justify-between">
         <div className="flex items-center gap-3">
           <span className="text-2xl">{icon}</span>
           <div>
-            <h2 className="text-lg font-semibold text-white">{title}</h2>
-            <p className="text-sm text-white/60">{subtitle}</p>
+            <h2 className="text-lg font-semibold text-[#0D47A1]">{title}</h2>
+            <p className="text-sm text-[#5B6780]">{subtitle}</p>
           </div>
         </div>
-        <div className="rounded-full bg-[#f5c871]/10 px-3 py-1 text-sm font-semibold text-[#f5c871]">
+        <div className="rounded-full bg-[#EAF2FF] px-3 py-1 text-sm font-semibold text-[#0D47A1]">
           {values.length}
         </div>
       </div>
 
-      <div className="mb-4 flex gap-2 rounded-xl border border-dashed border-white/10 bg-black/20 p-3">
+      <div className="mb-4 flex gap-2 rounded-xl border border-dashed border-[#D7DFEC] bg-[#FAFBFE] p-3">
         <input
           value={customValue}
           onChange={(e) => setCustomValue(e.target.value)}
@@ -70,13 +70,13 @@ export function PersonaEditPreferenceGroup({
             }
           }}
           placeholder="Add custom preference..."
-          className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/30"
+          className="flex-1 bg-transparent text-sm text-[#24324A] outline-none placeholder:text-[#8A96AE]"
         />
         <button
           type="button"
           onClick={handleAdd}
           disabled={!canAdd}
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f5c871]/10 text-[#f5c871] transition hover:bg-[#f5c871]/20 disabled:opacity-40"
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EAF2FF] text-[#0D47A1] transition hover:bg-[#D7E7FF] disabled:opacity-40"
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -98,8 +98,8 @@ export function PersonaEditPreferenceGroup({
                 onClick={() => onToggle(option)}
                 className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
                   isSelected
-                    ? 'border-[#f5c871] bg-[#f5c871] text-[#0a0d14] shadow-lg'
-                    : 'border-white/10 bg-white/5 text-white/80 hover:border-white/20 hover:bg-white/10'
+                    ? 'border-[#4285F4] bg-[#EAF2FF] text-[#0D47A1] shadow-[0_12px_24px_-18px_rgba(13,71,161,0.5)]'
+                    : 'border-[#D7DFEC] bg-[#F8FBFF] text-[#4A5976] hover:border-[#BFD0EE] hover:bg-[#F1F6FE]'
                 }`}
               >
                 <span>{option}</span>
@@ -114,7 +114,7 @@ export function PersonaEditPreferenceGroup({
         <button
           type="button"
           onClick={() => setShowAll(!showAll)}
-          className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[#f5c871] transition hover:text-[#ffe2a2]"
+          className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[#0D47A1] transition hover:text-[#4285F4]"
         >
           <span>{showAll ? 'Show less' : `Show ${allOptions.length - 12} more`}</span>
           <ChevronDown className={`h-4 w-4 transition ${showAll ? 'rotate-180' : ''}`} />
