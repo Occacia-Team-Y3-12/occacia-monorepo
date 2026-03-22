@@ -1,4 +1,4 @@
-"""
+﻿"""
 tests/Integration/test_25_contracts.py
 Full test suite for all 25 implemented OpenAPI contracts.
 """
@@ -215,7 +215,7 @@ class TestCustomerLogin:
 
     def test_login_wrong_password_401(self, client, db_session):
         cust = _make_customer(db_session)
-        # 💥 THE FIX
+        # ðŸ’¥ THE FIX
         resp = client.post(
             self.URL,
             data={"username": cust.email, "password": "WrongPass999!"},
@@ -223,7 +223,7 @@ class TestCustomerLogin:
         assert resp.status_code == 401
 
     def test_login_unknown_email_401(self, client):
-        # 💥 THE FIX
+        # ðŸ’¥ THE FIX
         resp = client.post(
             self.URL,
             data={"username": "nobody@test.com", "password": "Password1!"},
@@ -232,7 +232,7 @@ class TestCustomerLogin:
 
     def test_login_unverified_customer_403(self, client, db_session):
         cust = _make_customer(db_session, verified=False, status="PENDING")
-        # 💥 THE FIX
+        # ðŸ’¥ THE FIX
         resp = client.post(
             self.URL,
             data={"username": cust.email, "password": "Password1!"},
@@ -242,7 +242,7 @@ class TestCustomerLogin:
     def test_login_inactive_customer_403(self, client, db_session):
         cust = _make_customer(db_session, verified=True, status="SUSPENDED")
         with patch.dict("os.environ", {"SKIP_EMAIL_VERIFICATION": "true"}):
-            # 💥 THE FIX
+            # ðŸ’¥ THE FIX
             resp = client.post(
                 self.URL,
                 data={"username": cust.email, "password": "Password1!"},
@@ -250,7 +250,7 @@ class TestCustomerLogin:
         assert resp.status_code == 403
 
     def test_login_path_is_singular(self, client):
-        # 💥 THE FIX
+        # ðŸ’¥ THE FIX
         resp = client.post("/api/v1/auth/customers/login",
                            data={"username": "x@x.com", "password": "Password1!"})
         assert resp.status_code in (404, 405)
@@ -336,7 +336,7 @@ class TestVendorRegister:
              patch("app.services.vendor_service.vendor_service.get_vendor_by_display_name", return_value=None), \
              patch("app.services.vendor_service.vendor_service.create_vendor") as mock_cv, \
              patch("app.services.auth_service.auth_service.register_vendor_verification"):
-            # 💥 FIX: Add missing string fields so Pydantic validation passes
+            # ðŸ’¥ FIX: Add missing string fields so Pydantic validation passes
             mock_cv.return_value = MagicMock(
                 vendor_id=f"VEN-{_uid()}",
                 email=f"v_{_uid()}@test.com",
@@ -803,7 +803,7 @@ class TestAdminApproveVendor:
     def test_approve_pending_vendor(self, client, db_session):
         adm = _make_admin(db_session)
         v = _make_vendor(db_session, approval_status="PENDING")
-        # 💥 FIX: Correct path to the router where _send_email is imported
+        # ðŸ’¥ FIX: Correct path to the router where _send_email is imported
         with patch("app.routers.v1.admin_router._send_email"):
             resp = client.post(
                 f"/api/v1/admin/vendors/{v.id}/approve",
@@ -816,7 +816,7 @@ class TestAdminApproveVendor:
     def test_approve_already_approved_400(self, client, db_session):
         adm = _make_admin(db_session)
         v = _make_vendor(db_session, approval_status="APPROVED")
-        # 💥 FIX: Correct patch path
+        # ðŸ’¥ FIX: Correct patch path
         with patch("app.routers.v1.admin_router._send_email"):
             resp = client.post(
                 f"/api/v1/admin/vendors/{v.id}/approve",
@@ -826,7 +826,7 @@ class TestAdminApproveVendor:
 
     def test_approve_not_found_404(self, client, db_session):
         adm = _make_admin(db_session)
-        # 💥 FIX: Correct patch path
+        # ðŸ’¥ FIX: Correct patch path
         with patch("app.routers.v1.admin_router._send_email"):
             resp = client.post(
                 "/api/v1/admin/vendors/99999/approve",
@@ -849,7 +849,7 @@ class TestAdminRejectVendor:
     def test_reject_pending_vendor(self, client, db_session):
         adm = _make_admin(db_session)
         v = _make_vendor(db_session, approval_status="PENDING")
-        # 💥 FIX: Correct patch path
+        # ðŸ’¥ FIX: Correct patch path
         with patch("app.routers.v1.admin_router._send_email"):
             resp = client.post(
                 f"/api/v1/admin/vendors/{v.id}/reject",
@@ -862,7 +862,7 @@ class TestAdminRejectVendor:
     def test_reject_with_default_reason(self, client, db_session):
         adm = _make_admin(db_session)
         v = _make_vendor(db_session, approval_status="PENDING")
-        # 💥 FIX: Correct patch path
+        # ðŸ’¥ FIX: Correct patch path
         with patch("app.routers.v1.admin_router._send_email"):
             resp = client.post(
                 f"/api/v1/admin/vendors/{v.id}/reject",
@@ -874,7 +874,7 @@ class TestAdminRejectVendor:
     def test_reject_already_rejected_400(self, client, db_session):
         adm = _make_admin(db_session)
         v = _make_vendor(db_session, approval_status="REJECTED")
-        # 💥 FIX: Correct patch path
+        # ðŸ’¥ FIX: Correct patch path
         with patch("app.routers.v1.admin_router._send_email"):
             resp = client.post(
                 f"/api/v1/admin/vendors/{v.id}/reject",
@@ -885,7 +885,7 @@ class TestAdminRejectVendor:
 
     def test_reject_not_found_404(self, client, db_session):
         adm = _make_admin(db_session)
-        # 💥 FIX: Correct patch path
+        # ðŸ’¥ FIX: Correct patch path
         with patch("app.routers.v1.admin_router._send_email"):
             resp = client.post(
                 "/api/v1/admin/vendors/99999/reject",
@@ -1248,3 +1248,4 @@ class TestPathAlignment:
         resp = client.get("/api/v1/personas/",
                           headers={"Authorization": "Bearer garbage"})
         assert resp.status_code in (401, 404)
+
