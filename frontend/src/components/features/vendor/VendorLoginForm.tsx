@@ -102,9 +102,6 @@ export default function VendorLoginForm() {
               </p>
             </div>
 
-            <div className="mt-8 text-center text-xs text-[#666666]">
-              Copyright © 2025 Occacia
-            </div>
           </div>
         </div>
       </div>

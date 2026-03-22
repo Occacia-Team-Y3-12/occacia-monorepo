@@ -70,10 +70,10 @@ const CustomerCreateEvent = () => {
                   disabled={isLoadingEventTypes}
                   className="h-11 w-full rounded-xl border border-[#CCCCCC] bg-[#FAFAFA] px-3 text-sm text-[#666666] outline-none transition-colors focus:border-[#4285F4]"
                 >
-                  <option value="">{isLoadingEventTypes ? 'Loading event types...' : 'Select event type'}</option>
+                  <option value="" disabled hidden>{isLoadingEventTypes ? 'Loading event types...' : 'Select event type'}</option>
                   {eventTypes.map((type) => (
                     <option key={type.id} value={type.value}>
-                      {`${type.label} (e.g., ${type.example})`}
+                      {`${type.label === 'Other' ? 'Others' : type.label} (e.g., ${type.example})`}
                     </option>
                   ))}
                 </select>

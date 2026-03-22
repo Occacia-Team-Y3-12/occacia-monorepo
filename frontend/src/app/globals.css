@@ -19,3 +19,16 @@ body {
 .customer-portal-font {
   font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
 }
+
+@keyframes portalBarSweep {
+  0% {
+    right: 0;
+    width: 100%;
+    opacity: 1;
+  }
+  100% {
+    right: calc(100% - 8.5rem);
+    width: 8.5rem;
+    opacity: 1;
+  }
+}
