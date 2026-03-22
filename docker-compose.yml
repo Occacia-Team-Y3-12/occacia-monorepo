@@ -15,7 +15,6 @@ services:
       POSTGRES_USER: ${DB_USER:-admin}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME:-occacia_db}
-    # Port mapping kept for local alembic connectivity from host machine
     ports:
       - "5432:5432"
     volumes:
@@ -33,7 +32,6 @@ services:
     image: redis:7-alpine
     container_name: occacia-redis
     restart: always
-    # Password set via command; memory limits removed for high-performance environment
     command: redis-server --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
@@ -69,6 +67,17 @@ services:
       LANGFLOW_ORG_ID: ${LANGFLOW_ORG_ID}
       REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379
       DISABLE_ADMIN_REGISTER: ${DISABLE_ADMIN_REGISTER:-true}
+      # ── Email / SMTP ──────────────────────────────────────────
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@occacia.com}
+      SMTP_HOST: ${SMTP_HOST:-host.docker.internal}
+      SMTP_PORT: ${SMTP_PORT:-25}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-false}
+      SKIP_EMAIL_VERIFICATION: ${SKIP_EMAIL_VERIFICATION:-false}
+    extra_hosts:
+      # Allows backend container to reach Postfix on the host machine
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     healthcheck:
@@ -117,7 +126,7 @@ services:
       - ./nginx.https.conf:/etc/nginx/templates/nginx.https.conf:ro
       - ./nginx-start.sh:/etc/nginx/start.sh:ro
       - ./certbot/www:/var/www/certbot:ro
-    command: ["/bin/sh", "/etc/nginx/start.sh"]
+    command: [ "/bin/sh", "/etc/nginx/start.sh" ]
     depends_on:
       frontend:
         condition: service_healthy
@@ -135,7 +144,6 @@ services:
       PGPASSWORD: ${DB_PASSWORD}
     volumes:
       - db_backups:/backups
-    # Script for recurring backups; retention set to 7 days
     entrypoint: >
       sh -c "while true; do
         FILENAME=/backups/backup_$$(date +%Y%m%d_%H%M%S).sql.gz;
@@ -159,7 +167,6 @@ services:
     ports:
       - "9443:9443"
     volumes:
-      # Cross-platform socket mounting for Windows and Linux
       - ${DOCKER_SOCKET:-//./pipe/docker_engine}:/var/run/docker.sock
       - portainer_data:/data
     networks:

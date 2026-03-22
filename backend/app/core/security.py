@@ -1,3 +1,6 @@
+"""
+app/core/security.py
+"""
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -12,18 +15,16 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.vendor import Vendor
 
-# Configure password hashing
+# ── Password hashing ──────────────────────────────────────────────────────────
 # Prefers Argon2 (industry standard), falls back to Passlib/bcrypt if unavailable
 try:
     from argon2 import PasswordHasher
     from argon2.exceptions import VerifyMismatchError
-
     _hasher = PasswordHasher()
     _hasher_kind = "argon2"
 except ModuleNotFoundError:
     try:
         from passlib.context import CryptContext
-
         _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         _hasher_kind = "bcrypt"
     except ModuleNotFoundError as e:
@@ -32,7 +33,7 @@ except ModuleNotFoundError:
         ) from e
 
 SECRET_KEY = settings.SECRET_KEY
-ALGORITHM = settings.ALGORITHM
+ALGORITHM  = settings.ALGORITHM
 
 
 def get_password_hash(password: str) -> str:
@@ -78,13 +79,35 @@ def generate_reset_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def is_token_blacklisted(token: str) -> bool:
+    """
+    Return True if the token has been invalidated via logout.
+    Uses Redis blacklist with key pattern: blacklist:{token}
+    Fails open (returns False) if Redis is unavailable so the app keeps working.
+    """
+    try:
+        import redis as redis_lib
+        client = redis_lib.from_url(
+            getattr(settings, "REDIS_URL", "redis://redis:6379"),
+            decode_responses=True,
+            socket_connect_timeout=2,
+        )
+        return bool(client.exists(f"blacklist:{token}"))
+    except Exception:
+        # Redis unavailable — fail open, do not block the request
+        return False
+
+
+# ── OAuth2 schemes ────────────────────────────────────────────────────────────
+
 oauth2_vendor_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/vendor/login", scheme_name="VendorAuthSecurity"
 )
 
 
 def get_current_vendor(
-    token: str = Depends(oauth2_vendor_scheme), db: Session = Depends(get_db)
+    token: str = Depends(oauth2_vendor_scheme),
+    db: Session = Depends(get_db),
 ) -> Vendor:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -99,18 +122,21 @@ def get_current_vendor(
     except JWTError:
         raise credentials_exception
 
+    # [E06] Reject blacklisted (logged-out) tokens
+    if is_token_blacklisted(token):
+        raise credentials_exception
+
     vendor = db.query(Vendor).filter(Vendor.email == email).first()
     if vendor is None:
         raise credentials_exception
-
     return vendor
 
 
 def require_vendor_approved(vendor: Vendor = Depends(get_current_vendor)) -> Vendor:
-    """Ensure vendor is approved before accessing task features"""
+    """Ensure vendor is approved before accessing task features."""
     if vendor.approval_status != "APPROVED":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Account approval status is {vendor.approval_status}. Approval required to view tasks."
+            detail=f"Account approval status is {vendor.approval_status}. Approval required to view tasks.",
         )
     return vendor

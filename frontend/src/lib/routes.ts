@@ -17,6 +17,7 @@ export const ROUTES = {
     PRODUCTS: '/customer/products',
     CART: '/customer/cart',
     ORDERS: '/customer/orders',
+    PERSONA: '/customer/persona',
   },
   VENDOR: {
     LOGIN: '/vendor/auth/login',
