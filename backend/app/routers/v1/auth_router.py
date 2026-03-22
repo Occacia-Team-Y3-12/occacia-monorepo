@@ -11,6 +11,7 @@ form_data.username (i.e. the email address).  JSON-body clients should
 send the email value in the 'username' form field.
 """
 from types import SimpleNamespace
+import logging
 
 from fastapi import APIRouter, Depends, Query
 from fastapi import HTTPException, Request, status
@@ -33,6 +34,7 @@ from app.services.auth_service import auth_service
 from app.services.vendor_service import vendor_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+logger = logging.getLogger(__name__)
 
 
 async def _parse_login_payload(request: Request) -> LoginRequest | SimpleNamespace:
@@ -64,7 +66,11 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
         raise HTTPException(status_code=400, detail="Business name already in use!")
         
     vendor = vendor_service.create_vendor(db, vendor_data)
-    auth_service.register_vendor_verification(db, vendor)
+    try:
+        auth_service.register_vendor_verification(db, vendor)
+    except Exception:
+        # Do not fail registration when notification queueing is unavailable in local preview.
+        logger.exception("Vendor verification notification enqueue failed for vendor=%s", vendor.email)
     return vendor
 
 @router.post("/vendor/login", tags=["Authentication"])
