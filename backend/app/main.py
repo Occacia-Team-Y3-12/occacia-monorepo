@@ -76,39 +76,15 @@ async def lifespan(_: FastAPI):
         except Exception as exc:
             logger.warning("Notification worker startup skipped: %s", exc)
 
-    # Start long-running background jobs after startup completes.
-    cleanup_task = asyncio.create_task(_run_cleanup_job())
-    logger.info("Chat history cleanup job started.")
-
     yield
 
     # Cancel background jobs during shutdown.
-    cleanup_task.cancel()
-    try:
-        await cleanup_task
-    except asyncio.CancelledError:
-        pass
     if notification_task:
         notification_task.cancel()
         try:
             await notification_task
         except asyncio.CancelledError:
             pass
-
-async def _run_cleanup_job():
-    """Delete chat messages older than 30 days once every 24 hours."""
-    from app.core.database import SessionLocal
-    from app.services.chat_service import chat_service
-
-    while True:
-        await asyncio.sleep(86400)  # 24 hours
-        try:
-            db = SessionLocal()
-            chat_service.cleanup_old_sessions(db, days=30)
-            db.close()
-        except Exception as e:
-            logger.error("Cleanup job error: %s", e)
-
 
 async def _run_notification_worker():
     from app.core.database import SessionLocal
