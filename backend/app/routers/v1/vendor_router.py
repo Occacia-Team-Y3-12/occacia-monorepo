@@ -156,20 +156,41 @@ async def get_vendor_pending_stats(
 # --- Profile Routes ---
 
 @router.get("/me", response_model=VendorResponse)
-def get_my_profile(vendor: Vendor = Depends(get_current_vendor)):
-    """Get current vendor profile."""
-    return vendor
+def get_vendor_me(
+    current_vendor: Vendor = Depends(get_current_vendor),
+    db: Session = Depends(get_db),
+):
+    """
+    Get current vendor's profile and performance metrics.
+    """
+    if not current_vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    task_summary = vendor_service.get_vendor_task_summary(
+        db, vendor_id=current_vendor.id)
+
+    vendor_data = current_vendor.__dict__
+    vendor_data['task_summary'] = task_summary
+
+    return VendorResponse.model_validate(vendor_data)
 
 
 @router.put("/me", response_model=VendorResponse)
-def update_my_profile(
-    body: VendorUpdate,
-    vendor: Vendor = Depends(get_current_vendor),
+def update_vendor_me(
+    vendor_data: VendorUpdate,
+    current_vendor: Vendor = Depends(get_current_vendor),
     db: Session = Depends(get_db),
 ):
-    """Update current vendor profile."""
-    # Add by_alias=True to the model_dump call
-    return vendor_service.update_profile(db, vendor, body.model_dump(exclude_unset=True, by_alias=True))
+    """
+    Update current vendor's profile.
+    """
+    if not current_vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    updated_vendor = vendor_service.update_vendor(
+        db, vendor_id=current_vendor.id, vendor_data=vendor_data
+    )
+    return updated_vendor
 
 
 @router.get("/fulfillment-requests", response_model=PaginatedFulfillmentRequestsResponse)

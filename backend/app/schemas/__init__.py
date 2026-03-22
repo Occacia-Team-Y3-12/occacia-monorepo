@@ -10,7 +10,7 @@ from .auth_schema import (
     VerifyEmailResponse,
 )
 from .planning_schema import PlanRequest, PlanResponse, VenueDisplay
-from .vendor_schema import Token, VendorLoginRequest, VendorRegisterRequest, VendorResponse
+from .vendor_schema import VendorLoginRequest, VendorRegisterRequest, VendorResponse
 
 __all__ = [
     "AuthMessageResponse",
@@ -22,7 +22,6 @@ __all__ = [
     "RegisterRequest",
     "RegisterResponse",
     "ResetPasswordRequest",
-    "Token",
     "VenueDisplay",
     "VendorLoginRequest",
     "VendorRegister",

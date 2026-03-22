@@ -174,6 +174,7 @@ def customer_verify_password_otp(
     return auth_service.verify_customer_password_reset_otp(db, str(payload.email), payload.otp)
 
 
+
 @router.post("/customer/password/reset", response_model=AuthMessageResponse)
 def customer_reset_password(
     payload: ResetPasswordRequest,
