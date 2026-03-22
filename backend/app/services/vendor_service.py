@@ -17,6 +17,8 @@ from app.models.task_request import TaskRequest
 from app.models.user import User
 from app.models.vendor import Vendor
 from app.schemas.vendor_schema import VendorRegisterRequest as VendorCreate
+from app.schemas.vendor_schema import VendorUpdate
+from app.schemas.vendor_schema import VendorResponse, VendorTaskSummary
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +195,67 @@ class VendorService:
 
     # --- Vendor Management ---
 
+    def get_vendor_by_user_id(self, db: Session, user_id: int) -> Optional[Vendor]:
+        return db.query(Vendor).filter(Vendor.user_id == user_id).first()
+
+    def get_vendor_profile(self, db: Session, vendor: Vendor) -> VendorResponse:
+        """
+        Returns a vendor's profile with an added task summary.
+        """
+        summary_counts = self.get_task_summary_for_vendor(db, vendor.id)
+        
+        # Create a dictionary from the vendor ORM model
+        vendor_data = vendor.__dict__
+        
+        # Add the summary to the dictionary
+        vendor_data["task_summary"] = VendorTaskSummary(**summary_counts)
+        
+        # Validate the entire structure with Pydantic
+        return VendorResponse.model_validate(vendor_data)
+
+    def get_vendor_task_summary(self, db: Session, vendor_id: int) -> dict:
+        """
+        Get a summary of tasks for a vendor for the current month.
+        """
+        today = date.today()
+        start_of_month = today.replace(day=1)
+        end_of_month = (start_of_month + timedelta(days=31)).replace(
+            day=1
+        ) - timedelta(days=1)
+
+        statuses = ["PENDING", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELLED"]
+        summary = {}
+
+        for status in statuses:
+            count = (
+                db.query(Task)
+                .filter(
+                    Task.assigned_vendor_id == vendor_id,
+                    Task.status == status,
+                    Task.created_at >= start_of_month,
+                    Task.created_at <= end_of_month,
+                )
+                .count()
+            )
+            summary[status.lower()] = count
+
+        return summary
+
+    def update_vendor(
+        self, db: Session, vendor_id: int, vendor_data: VendorUpdate
+    ) -> Optional[Vendor]:
+        vendor = self.get_vendor_by_id(db, vendor_id)
+        if not vendor:
+            return None
+
+        update_data = vendor_data.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(vendor, key, value)
+
+        db.commit()
+        db.refresh(vendor)
+        return vendor
+
     def create_vendor(self, db: Session, vendor_data):
         from app.core.security import get_password_hash
 
@@ -353,7 +416,9 @@ class VendorService:
 
         all_pkgs = q.all()
 
-        def blocked(p): return event_date and event_date in (p.blocked_dates or [])
+        def blocked(p): return event_date and event_date in (
+            p.blocked_dates or [])
+
         def score(p): return len(set(tags) & set(p.tags or []))
 
         if canonical_loc:
@@ -362,11 +427,13 @@ class VendorService:
             if t1:
                 return t1[:limit]
 
-        t2 = [p for p in all_pkgs if set(tags).issubset(set(p.tags or [])) and not blocked(p)]
+        t2 = [p for p in all_pkgs if set(tags).issubset(
+            set(p.tags or [])) and not blocked(p)]
         if t2:
             return t2[:limit]
 
-        t3 = sorted([p for p in all_pkgs if score(p) >= 1 and not blocked(p)], key=score, reverse=True)
+        t3 = sorted([p for p in all_pkgs if score(p) >=
+                    1 and not blocked(p)], key=score, reverse=True)
         return t3[:limit]
 
     def find_gift_matches(
@@ -381,19 +448,19 @@ class VendorService:
         return self.find_venue_matches(db, tags=gift_tags, budget=budget, location=location)
 
     def find_perfect_matches(self, db: Session, criteria: dict, limit: int = 10) -> List[Package]:
-        tags            = criteria.get("venue_tags", [])
-        guest_count     = criteria.get("guest_count")
+        tags = criteria.get("venue_tags", [])
+        guest_count = criteria.get("guest_count")
         budget_per_head = criteria.get("budget_per_head")
-        location        = criteria.get("location")
+        location = criteria.get("location")
 
         if not tags:
             return []
 
         canonical_loc = _normalise_city(location)
-        active_ids    = _active_vendor_ids(db)
+        active_ids = _active_vendor_ids(db)
 
         pkg_query = db.query(Package).options(joinedload(Package.vendor))
-        all_pkgs  = [
+        all_pkgs = [
             p for p in pkg_query.all()
             if str(p.vendor_id) in active_ids
         ]
@@ -420,7 +487,8 @@ class VendorService:
             """Return False if p.min_guests is set and guest_count is below it."""
             if guest_count is None:
                 return True
-            raw = p.__dict__.get("min_guests") if hasattr(p, "__dict__") else getattr(p, "min_guests", None)
+            raw = p.__dict__.get("min_guests") if hasattr(
+                p, "__dict__") else getattr(p, "min_guests", None)
             if raw is None:
                 return True
             try:
@@ -433,7 +501,8 @@ class VendorService:
             """Return False if p.price_per_head is set and exceeds budget_per_head."""
             if budget_per_head is None:
                 return True
-            raw = p.__dict__.get("price_per_head") if hasattr(p, "__dict__") else getattr(p, "price_per_head", None)
+            raw = p.__dict__.get("price_per_head") if hasattr(
+                p, "__dict__") else getattr(p, "price_per_head", None)
             if raw is None:
                 return True
             try:
@@ -443,12 +512,14 @@ class VendorService:
             return pph <= float(budget_per_head)
 
         def _score_package(p) -> float:
-            pkg_tags  = set(_get_tags(p))
-            req_tags  = set(tags)
-            tag_score = len(req_tags & pkg_tags) / len(req_tags) if req_tags else 0.0
-            raw_pph   = getattr(p, "price_per_head", None)
+            pkg_tags = set(_get_tags(p))
+            req_tags = set(tags)
+            tag_score = len(req_tags & pkg_tags) / \
+                len(req_tags) if req_tags else 0.0
+            raw_pph = getattr(p, "price_per_head", None)
             if budget_per_head and raw_pph is not None and float(budget_per_head) > 0:
-                budget_score = max(0.0, min(1.0, float(raw_pph) / float(budget_per_head)))
+                budget_score = max(
+                    0.0, min(1.0, float(raw_pph) / float(budget_per_head)))
             else:
                 budget_score = 0.0
             raw_min_g = getattr(p, "min_guests", None)
@@ -516,13 +587,14 @@ class VendorService:
     def get_availability_block(self, db: Session, tags: List[str], lookahead_days: int = 30) -> str:
         if not tags:
             return ""
-        today      = date.today()
+        today = date.today()
         window_end = today + timedelta(days=lookahead_days)
-        lines      = []
+        lines = []
         for pkg in db.query(Package).all():
             if not (set(tags) & set(pkg.tags or [])):
                 continue
-            blocked = [d for d in (pkg.blocked_dates or []) if isinstance(d, date) and today <= d <= window_end]
+            blocked = [d for d in (pkg.blocked_dates or []) if isinstance(
+                d, date) and today <= d <= window_end]
             if blocked:
                 blocked_str = ', '.join(str(d) for d in sorted(blocked))
                 lines.append(f"- '{pkg.name}' NOT available on: {blocked_str}")
@@ -556,7 +628,8 @@ class VendorService:
     ) -> tuple[list[TaskRequest], str | None]:
         self._expire_overdue_fulfillment_requests(db, vendor_id=vendor_id)
 
-        query = db.query(TaskRequest).filter(TaskRequest.vendor_id == vendor_id)
+        query = db.query(TaskRequest).filter(
+            TaskRequest.vendor_id == vendor_id)
         normalized_status = status_filter.upper() if status_filter else "SENT"
         query = query.filter(TaskRequest.status == normalized_status)
 
@@ -581,7 +654,8 @@ class VendorService:
                 )
 
         items = (
-            query.order_by(TaskRequest.requested_at.desc(), TaskRequest.id.asc())
+            query.order_by(TaskRequest.requested_at.desc(),
+                           TaskRequest.id.asc())
             .limit(limit + 1)
             .all()
         )
@@ -660,7 +734,8 @@ class VendorService:
         if status_filter:
             query = query.filter(Task.status == status_filter.upper())
         else:
-            query = query.filter(Task.status.in_(self._DEFAULT_VENDOR_TASK_STATUSES))
+            query = query.filter(Task.status.in_(
+                self._DEFAULT_VENDOR_TASK_STATUSES))
 
         if cursor:
             cursor_task = (
@@ -798,7 +873,8 @@ class VendorService:
             .first()
         )
         if not request:
-            raise HTTPException(status_code=404, detail="Fulfillment request not found")
+            raise HTTPException(
+                status_code=404, detail="Fulfillment request not found")
         return request
 
     def _get_task_or_404(self, db: Session, *, task_id: str) -> Task:
@@ -809,9 +885,11 @@ class VendorService:
 
     def _ensure_request_actionable(self, request: TaskRequest) -> None:
         if request.status == "EXPIRED":
-            raise HTTPException(status_code=409, detail="Fulfillment request has expired")
+            raise HTTPException(
+                status_code=409, detail="Fulfillment request has expired")
         if request.status != "SENT":
-            raise HTTPException(status_code=409, detail="Fulfillment request has already been responded to")
+            raise HTTPException(
+                status_code=409, detail="Fulfillment request has already been responded to")
 
 
 class AdminVendorService:
@@ -825,7 +903,8 @@ class AdminVendorService:
     ) -> list[Vendor]:
         query = self.db.query(Vendor)
         if approval_status:
-            query = query.filter(Vendor.approval_status == approval_status.upper())
+            query = query.filter(Vendor.approval_status ==
+                                 approval_status.upper())
         if status and hasattr(Vendor, "status"):
             query = query.filter(Vendor.status == status.upper())
         return query.order_by(Vendor.id.desc()).all()
@@ -838,21 +917,25 @@ class AdminVendorService:
 
     def update_vendor_status(self, vendor_id: int, new_status: str, admin_email: str) -> Vendor:
         if not new_status or new_status.upper() not in ("ACTIVE", "SUSPENDED", "DISABLED"):
-            raise HTTPException(status_code=400, detail="status must be ACTIVE, SUSPENDED, or DISABLED")
+            raise HTTPException(
+                status_code=400, detail="status must be ACTIVE, SUSPENDED, or DISABLED")
         vendor = self.get_vendor(vendor_id)
         if hasattr(vendor, "status"):
             vendor.status = new_status.upper()
         else:
-            logger.warning("Vendor model has no .status column yet. Skipping admin status write.")
+            logger.warning(
+                "Vendor model has no .status column yet. Skipping admin status write.")
         if hasattr(vendor, "is_verified"):
             vendor.is_verified = (new_status.upper() == "APPROVED")
         self.db.commit()
         self.db.refresh(vendor)
-        logger.info("Admin %s set vendor %s status to %s", admin_email, vendor_id, new_status)
+        logger.info("Admin %s set vendor %s status to %s",
+                    admin_email, vendor_id, new_status)
         return vendor
 
     def get_pending_counts(self) -> dict:
-        vendor_pending = self.db.query(Vendor).filter(Vendor.approval_status == "PENDING").count()
+        vendor_pending = self.db.query(Vendor).filter(
+            Vendor.approval_status == "PENDING").count()
         return {
             "vendors_pending":       vendor_pending,
             "organizations_pending": 0,

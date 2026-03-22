@@ -4,9 +4,10 @@ app/schemas/vendor_schema.py
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Optional, Any
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import ConfigDict
 
 from app.schemas.event_planning_schema import TaskResponse
 from app.schemas.package_schema import FulfillmentRequestResponse
@@ -43,6 +44,35 @@ class VendorUpdate(BaseModel):
 # 3. Standard Output (Safe Response)
 
 
+class VendorTaskSummary(BaseModel):
+    """Summary of a vendor's task counts by status."""
+    pending: int = Field(0, description="Count of tasks pending acceptance.")
+    accepted: int = Field(
+        0, description="Count of tasks accepted by the vendor.")
+    in_progress: int = Field(
+        0, description="Count of tasks currently in progress.")
+    completed: int = Field(0, description="Count of tasks completed.")
+    cancelled: int = Field(0, description="Count of tasks cancelled.")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class VendorResponse(BaseModel):
+    id: int
+    user_id: int | None = None  # Make this field optional
+    business_name: str
+    email: EmailStr
+    location_base: Optional[str] = None
+    phone: Optional[str] = None
+    display_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    is_verified: bool
+    approval_status: str
+    task_summary: Optional[VendorTaskSummary] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PaginatedFulfillmentRequestsResponse(BaseModel):
     items: list[FulfillmentRequestResponse]
     next_cursor: str | None = Field(default=None, alias="nextCursor")
@@ -74,7 +104,8 @@ class RespondFulfillmentRequestRequest(BaseModel):
 
 
 class RespondFulfillmentRequestResponse(BaseModel):
-    fulfillment_request: FulfillmentRequestResponse = Field(alias="fulfillmentRequest")
+    fulfillment_request: FulfillmentRequestResponse = Field(
+        alias="fulfillmentRequest")
     task: TaskResponse
 
     model_config = ConfigDict(populate_by_name=True)
@@ -106,26 +137,3 @@ class VendorTaskUpdateRequest(BaseModel):
             return None
         trimmed = value.strip()
         return trimmed or None
-
-
-class VendorResponse(BaseModel):
-    id: int
-    vendor_id: Optional[str] = None
-    business_name: str
-    email: EmailStr
-    location_base: Optional[str] = None
-    is_verified: bool
-    phone: Optional[str] = None
-    display_name: Optional[str] = None
-    contact_phone: Optional[str] = None
-    approval_status: Optional[str] = None
-    approved_at: Optional[datetime] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-# 4. Token Output
-
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str

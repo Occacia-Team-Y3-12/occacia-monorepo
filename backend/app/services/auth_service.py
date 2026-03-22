@@ -83,9 +83,11 @@ class AuthService:
     # ── Customer registration & login ─────────────────────────────────────────
 
     def register_customer(self, db: Session, payload: CustomerRegister) -> dict[str, str]:
-        existing = db.query(Customer).filter(Customer.email == str(payload.email)).first()
+        existing = db.query(Customer).filter(
+            Customer.email == str(payload.email)).first()
         if existing:
-            raise HTTPException(status_code=400, detail="This email is already registered.")
+            raise HTTPException(
+                status_code=400, detail="This email is already registered.")
 
         verification_token, expires_at = self._create_verification_token(
             str(payload.email), token_type="verify_customer_email",
@@ -123,7 +125,8 @@ class AuthService:
         if os.getenv("SKIP_EMAIL_VERIFICATION") != "true" and not customer.email_verified:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified.")
         if customer.status != "ACTIVE":
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Customer account is not active.")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Customer account is not active.")
 
         access_token  = create_access_token(
             data={"sub": customer.email, "role": "CUSTOMER"}, expires_delta=timedelta(minutes=60),
@@ -203,7 +206,8 @@ class AuthService:
     def resend_customer_verification_email(
         self, db: Session, payload: ResendVerificationRequest,
     ) -> dict[str, str]:
-        customer = db.query(Customer).filter(Customer.email == str(payload.email)).first()
+        customer = db.query(Customer).filter(
+            Customer.email == str(payload.email)).first()
         if not customer:
             raise HTTPException(status_code=400, detail="Customer account not found.")
         if customer.email_verified or customer.status == "ACTIVE":
@@ -496,7 +500,8 @@ class AuthService:
         except PyJWTError as exc:
             raise HTTPException(status_code=400, detail="Invalid verification token.") from exc
         if claims.get("type") != expected_type:
-            raise HTTPException(status_code=400, detail="Invalid verification token.")
+            raise HTTPException(
+                status_code=400, detail="Invalid verification token.")
         return claims
 
 
