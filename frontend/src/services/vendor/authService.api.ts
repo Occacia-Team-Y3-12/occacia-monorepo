@@ -1,5 +1,3 @@
-import { API_BASE_URL } from '@/services/api';
-
 import type {
   RegisterResponse,
   VendorAuthService,
@@ -10,9 +8,11 @@ import {
   persistVendorSession,
 } from './authService.shared';
 
+const VENDOR_AUTH_API_BASE = '/api/v1/auth/vendor';
+
 export const apiVendorAuthService: VendorAuthService = {
   async login(payload) {
-    const response = await fetch(`${API_BASE_URL}/auth/vendor/login`, {
+    const response = await fetch(`${VENDOR_AUTH_API_BASE}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -51,7 +51,7 @@ export const apiVendorAuthService: VendorAuthService = {
       location_base: payload.businessAddress,
     };
 
-    const response = await fetch(`${API_BASE_URL}/auth/vendor/register`, {
+    const response = await fetch(`${VENDOR_AUTH_API_BASE}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(backendPayload),
@@ -79,19 +79,22 @@ export const apiVendorAuthService: VendorAuthService = {
     };
   },
 
-  async forgotPassword() {
-    return { ok: false };
+  async forgotPassword(email) {
+    const response = await fetch(`${VENDOR_AUTH_API_BASE}/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+
+    return { ok: response.ok };
   },
 
   async resetPassword(payload) {
-    const response = await fetch(
-      `${API_BASE_URL}/auth/vendor/reset-password`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }
-    );
+    const response = await fetch(`${VENDOR_AUTH_API_BASE}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
     let data: { message?: string } = {};
     try {
@@ -112,7 +115,7 @@ export const apiVendorAuthService: VendorAuthService = {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/auth/vendor/verify-email?token=${encodeURIComponent(token)}`
+      `${VENDOR_AUTH_API_BASE}/verify-email?token=${encodeURIComponent(token)}`
     );
 
     return { ok: response.ok };

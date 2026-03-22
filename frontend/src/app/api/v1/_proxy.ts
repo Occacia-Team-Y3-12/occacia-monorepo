@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 function getBackendApiBaseUrl() {
   const configuredBaseUrl =
-    process.env.NEXT_PUBLIC_API_URL?.trim() || 'http://localhost:8000';
+    process.env.NEXT_PUBLIC_BACKEND_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_URL?.trim() ||
+    'http://localhost:8000';
   const normalizedBaseUrl = configuredBaseUrl.replace(/\/+$/, '');
 
   return normalizedBaseUrl.endsWith('/api/v1')
@@ -10,7 +12,7 @@ function getBackendApiBaseUrl() {
     : `${normalizedBaseUrl}/api/v1`;
 }
 
-const envFlag = (value: string | undefined, defaultValue = false) => {
+export const envFlag = (value: string | undefined, defaultValue = false) => {
   if (value == null) {
     return defaultValue;
   }
@@ -25,6 +27,17 @@ export const shouldUseCustomerPlanningMockApi = () => {
 
   return envFlag(
     process.env.NEXT_PUBLIC_USE_CUSTOMER_PLANNING_MOCK_API,
+    enableFrontendMocks
+  );
+};
+
+export const shouldUseVendorAuthMock = () => {
+  const enableFrontendMocks = envFlag(
+    process.env.NEXT_PUBLIC_ENABLE_FRONTEND_MOCKS
+  );
+
+  return envFlag(
+    process.env.NEXT_PUBLIC_USE_VENDOR_AUTH_MOCK,
     enableFrontendMocks
   );
 };
@@ -53,14 +66,26 @@ export async function proxyApiRequest(
     init.body = await request.arrayBuffer();
   }
 
-  const response = await fetch(targetUrl, init);
-  const responseHeaders = new Headers(response.headers);
-  responseHeaders.delete('content-length');
-  responseHeaders.delete('connection');
-  responseHeaders.delete('content-encoding');
+  try {
+    const response = await fetch(targetUrl, init);
+    const responseHeaders = new Headers(response.headers);
+    responseHeaders.delete('content-length');
+    responseHeaders.delete('connection');
+    responseHeaders.delete('content-encoding');
 
-  return new NextResponse(response.body, {
-    status: response.status,
-    headers: responseHeaders,
-  });
+    return new NextResponse(response.body, {
+      status: response.status,
+      headers: responseHeaders,
+    });
+  } catch (error) {
+    console.error(`Failed to proxy ${targetUrl.toString()}`, error);
+
+    return NextResponse.json(
+      {
+        message: 'Unable to reach backend API.',
+        backendUrl: targetUrl.toString(),
+      },
+      { status: 502 }
+    );
+  }
 }

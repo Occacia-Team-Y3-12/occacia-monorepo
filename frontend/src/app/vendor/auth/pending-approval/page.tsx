@@ -11,7 +11,7 @@ export default function PendingApproval() {
 
       <div className="bg-white rounded-3xl shadow-2xl p-8 sm:p-10 md:p-12 max-w-md sm:max-w-lg w-full relative z-10 text-center">
         <div className="mb-6 md:mb-8 flex justify-center">
-          <Image src="/images/logo.png" alt="Occacia Logo" width={100} height={100} priority className="sm:w-[120px] sm:h-[120px] md:w-[140px] md:h-[140px]" />
+          <Image src="/icons/logo.svg" alt="Occacia Logo" width={100} height={100} priority className="sm:w-[120px] sm:h-[120px] md:w-[140px] md:h-[140px]" />
         </div>
 
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#2c3e50] mb-3 md:mb-4">Pending Approval</h1>
