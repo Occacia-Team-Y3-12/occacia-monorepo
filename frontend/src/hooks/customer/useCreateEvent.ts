@@ -5,69 +5,15 @@ import { useRouter } from 'next/navigation';
 import { customerEventService } from '@/services/customer/eventServices';
 import { ROUTES } from '@/lib/routes';
 import { CreateCustomerEventPayload, CustomerPersonaOption, CustomerEventType, EventTypeOption } from '@/types/customer';
-import { EVENT_TYPE_FALLBACKS } from '@/mocks/customerExperience';
+import {
+  getEventTypeKey,
+  getFallbackEventTypes,
+  normalizeEventTypes,
+} from '@/lib/customerEventTypeOptions';
 
 type CustomerEventFormType = CustomerEventType | string;
 
 const DEFAULT_EVENT_TYPE: CustomerEventFormType = '';
-const CURATED_EVENT_TYPES: EventTypeOption[] = [
-  {
-    id: 'individual',
-    value: 'individual',
-    label: 'Individual',
-    example: 'Visit someone',
-    titlePlaceholder: 'e.g., Visiting to see sick mom',
-  },
-  {
-    id: 'group',
-    value: 'group',
-    label: 'Group',
-    example: 'Celebration',
-    titlePlaceholder: 'e.g., Family dinner planning',
-  },
-  {
-    id: 'other',
-    value: 'others',
-    label: 'Other',
-    example: 'Appointment',
-    titlePlaceholder: 'e.g., Doctor appointment this Saturday',
-  },
-];
-
-const getEventTypeKey = (type: EventTypeOption) => {
-  const normalizedValue = String(type.value || '').trim().toLowerCase();
-  const normalizedLabel = type.label.trim().toLowerCase();
-  const source = normalizedValue || normalizedLabel;
-
-  if (source === 'individual') return 'individual';
-  if (source === 'group') return 'group';
-  if (source === 'other' || source === 'others') return 'other';
-  return '';
-};
-
-const normalizeEventTypes = (types: EventTypeOption[]) => {
-  const map = new Map<string, EventTypeOption>();
-
-  CURATED_EVENT_TYPES.forEach((type) => {
-    map.set(getEventTypeKey(type), type);
-  });
-
-  types.forEach((type) => {
-    const key = getEventTypeKey(type);
-    if (!key) return;
-
-    map.set(key, {
-      ...type,
-      id: key,
-      value: key === 'other' ? 'others' : key,
-      label: key === 'other' ? 'Other' : key === 'group' ? 'Group' : 'Individual',
-    });
-  });
-
-  return ['individual', 'group', 'other']
-    .map((key) => map.get(key))
-    .filter((type): type is EventTypeOption => Boolean(type));
-};
 
 export const PERSONA_OPTIONS: CustomerPersonaOption[] = [
   { id: 'john-cena', name: 'John Cena', role: 'Professional Athlete', imageUrl: '/images/customer/events/Jhon.svg' },
@@ -75,12 +21,12 @@ export const PERSONA_OPTIONS: CustomerPersonaOption[] = [
   { id: 'michael-chen', name: 'Michael Chen', role: 'Vendor Manager', imageUrl: '/images/customer/events/Micheal.svg' },
 ];
 
-export const useCreateEvent = () => {
+export const useCreateEvent = (initialTemplate?: string) => {
   const router = useRouter();
   const [eventType, setEventType] = useState<CustomerEventFormType>(DEFAULT_EVENT_TYPE);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [eventTypes, setEventTypes] = useState<EventTypeOption[]>(normalizeEventTypes(EVENT_TYPE_FALLBACKS));
+  const [eventTypes, setEventTypes] = useState<EventTypeOption[]>(getFallbackEventTypes());
   const [personas, setPersonas] = useState<CustomerPersonaOption[]>(PERSONA_OPTIONS);
   const [selectedPersonaIds, setSelectedPersonaIds] = useState<string[]>([]);
   const [errors, setErrors] = useState<{ eventType?: string; title?: string; form?: string }>({});
@@ -88,6 +34,7 @@ export const useCreateEvent = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [draftEventId, setDraftEventId] = useState<string | null>(null);
+  const requestedTemplate = initialTemplate?.trim().toLowerCase() || '';
 
   const selectedEventType = useMemo(
     () => eventTypes.find((type) => type.value === eventType),
@@ -103,14 +50,25 @@ export const useCreateEvent = () => {
     const loadEventTypes = async () => {
       setIsLoadingEventTypes(true);
       const result = await customerEventService.getEventTypes();
+      let nextEventTypes = getFallbackEventTypes();
 
       if (result.ok && result.data?.data?.eventTypes?.length) {
-        setEventTypes(normalizeEventTypes(result.data.data.eventTypes));
+        nextEventTypes = normalizeEventTypes(result.data.data.eventTypes);
       } else {
-        setEventTypes(normalizeEventTypes(EVENT_TYPE_FALLBACKS));
-
         if (!result.ok) {
-        setErrors((prev) => ({ ...prev, form: result.error || 'Unable to load event types right now.' }));
+          setErrors((prev) => ({ ...prev, form: result.error || 'Unable to load event types right now.' }));
+        }
+      }
+
+      setEventTypes(nextEventTypes);
+
+      if (requestedTemplate) {
+        const matchedType = nextEventTypes.find(
+          (type) => getEventTypeKey(type) === requestedTemplate
+        );
+
+        if (matchedType) {
+          setEventType(matchedType.value);
         }
       }
 
@@ -118,7 +76,7 @@ export const useCreateEvent = () => {
     };
 
     void loadEventTypes();
-  }, []);
+  }, [requestedTemplate]);
 
   const togglePersona = (personaId: string) => {
     setSelectedPersonaIds((prev) =>

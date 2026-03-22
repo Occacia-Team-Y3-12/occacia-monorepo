@@ -55,6 +55,29 @@ export const persistVendorSession = (accessToken: string) => {
   localStorage.removeItem('admin_token');
 };
 
+export const getStoredVendorToken = (): string | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return (
+    localStorage.getItem('vendorToken') ||
+    localStorage.getItem('access_token') ||
+    localStorage.getItem('accessToken')
+  );
+};
+
+export const isVendorAuthenticated = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const vendorRole = localStorage.getItem('vendor_role');
+  const token = getStoredVendorToken();
+
+  return Boolean(token && (!vendorRole || vendorRole === 'VENDOR'));
+};
+
 export const getVendorAccessToken = (data: VendorLoginResponse) =>
   data.access_token ||
   data.accessToken ||
