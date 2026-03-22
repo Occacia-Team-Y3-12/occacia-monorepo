@@ -46,12 +46,6 @@ export default function ConfirmPackagePage() {
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem(`packages_${eventId}`);
-    if (stored) {
-      const parsed: RecommendationPackage[] = JSON.parse(stored);
-      const found = parsed.find(p => p.packageId === packageId) ?? null;
-      if (found) { setPkg(found); setLoading(false); return; }
-    }
     packageService.getPackageById(eventId, packageId)
       .then(data => setPkg(data))
       .catch(() => toast.error('Could not load package. Please go back and try again.'))

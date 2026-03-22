@@ -4,9 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Sparkles, CheckCircle2, Clock, RefreshCw } from 'lucide-react';
-import { featureFlags } from '@/config/featureFlags';
 import { ROUTES } from '@/lib/routes';
-import { MOCK_EVENT, createMockPackages } from '@/mocks/customerExperience';
+import { MOCK_EVENT } from '@/mocks/customerExperience';
 import { packageService } from '@/services/customer/packageService';
 import type { RecommendationPackage, PackageType } from '@/types/customer/package';
 
@@ -148,43 +147,58 @@ export default function CustomerEventPackagesPage() {
   const [packages, setPackages] = useState<RecommendationPackage[]>([]);
   const [event] = useState(MOCK_EVENT);
 
-  // Check sessionStorage for cached packages
   useEffect(() => {
-    const stored = sessionStorage.getItem(`packages_${eventId}`);
-    if (stored) {
-      const parsed: RecommendationPackage[] = JSON.parse(stored);
-      const stillValid = parsed.every(p => new Date(p.expiresAt).getTime() > Date.now());
-      if (stillValid) { setPackages(parsed); setPhase('packages'); }
-      else setPhase('expired');
-    }
+    let active = true;
+
+    const loadPackages = async () => {
+      try {
+        const existingPackages = await packageService.getPackages(eventId);
+
+        if (!active || existingPackages.length === 0) {
+          return;
+        }
+
+        const stillValid = existingPackages.every(
+          (pkg) => new Date(pkg.expiresAt).getTime() > Date.now()
+        );
+
+        if (stillValid) {
+          setPackages(existingPackages);
+          setPhase('packages');
+          return;
+        }
+
+        packageService.clearCachedPackages(eventId);
+        setPhase('expired');
+      } catch {
+        if (active) {
+          setPhase('ready');
+        }
+      }
+    };
+
+    void loadPackages();
+
+    return () => {
+      active = false;
+    };
   }, [eventId]);
 
   const generatePackages = useCallback(async () => {
     setPhase('generating');
     try {
       const data = await packageService.generatePackages(eventId);
-      sessionStorage.setItem(`packages_${eventId}`, JSON.stringify(data));
       setPackages(data);
       setPhase('packages');
       toast.success('Packages generated successfully!');
     } catch {
-      if (!featureFlags.useCustomerPackagesMock) {
-        setPhase('ready');
-        toast.error('Failed to generate packages. Please try again.');
-        return;
-      }
-
-      await new Promise(r => setTimeout(r, 2000));
-      const data = createMockPackages();
-      sessionStorage.setItem(`packages_${eventId}`, JSON.stringify(data));
-      setPackages(data);
-      setPhase('packages');
-      toast.success('Packages generated successfully!');
+      setPhase('ready');
+      toast.error('Failed to generate packages. Please try again.');
     }
   }, [eventId]);
 
   const handleExpire = useCallback(() => {
-    sessionStorage.removeItem(`packages_${eventId}`);
+    packageService.clearCachedPackages(eventId);
     setPhase('expired');
   }, [eventId]);
 
