@@ -444,7 +444,8 @@ class TestAdminRegister:
     URL = "/api/v1/auth/admin/register"
 
     def test_register_admin_201(self, client):
-        with patch.dict("os.environ", {"DISABLE_ADMIN_REGISTER": "false"}):
+        with patch("app.routers.v1.admin_router.settings") as mock_settings:
+            mock_settings.DISABLE_ADMIN_REGISTER = "false"
             resp = client.post(self.URL, json={
                 "email": f"admin_{_uid()}@test.com",
                 "password": "AdminPass1!",
@@ -456,7 +457,8 @@ class TestAdminRegister:
 
     def test_register_admin_duplicate_400(self, client, db_session):
         adm = _make_admin(db_session)
-        with patch.dict("os.environ", {"DISABLE_ADMIN_REGISTER": "false"}):
+        with patch("app.routers.v1.admin_router.settings") as mock_settings:
+            mock_settings.DISABLE_ADMIN_REGISTER = "false"
             resp = client.post(self.URL, json={
                 "email": adm.email,
                 "password": "AdminPass1!",
