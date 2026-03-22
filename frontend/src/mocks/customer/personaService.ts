@@ -192,4 +192,27 @@ export const mockCustomerPersonaService = {
       data: personas[index],
     };
   },
+
+  async deletePersona(personaId: string): Promise<ServiceResult<void>> {
+    await new Promise((resolve) => setTimeout(resolve, 120));
+
+    const personas = loadMockPersonas();
+    const nextPersonas = personas.filter((item) => item.persona_id !== personaId);
+
+    if (nextPersonas.length === personas.length) {
+      return {
+        ok: false,
+        status: 404,
+        error: 'Unable to delete persona.',
+      };
+    }
+
+    persistMockPersonas(nextPersonas);
+
+    return {
+      ok: true,
+      status: 204,
+      data: undefined,
+    };
+  },
 };

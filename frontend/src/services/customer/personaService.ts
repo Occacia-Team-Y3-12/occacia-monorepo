@@ -6,6 +6,18 @@ import {
   CustomerPersonaUpdatePayload,
 } from '@/types/customer/persona';
 
+type CustomerPersonaService = {
+  listPersonas(): Promise<ServiceResult<CustomerPersona[]>>;
+  getPersona(personaId: string): Promise<ServiceResult<CustomerPersona>>;
+  updatePersona(
+    personaId: string,
+    payload: CustomerPersonaUpdatePayload
+  ): Promise<ServiceResult<CustomerPersona>>;
+  confirmPersona(personaId: string): Promise<ServiceResult<CustomerPersona | null>>;
+  unconfirmPersona(personaId: string): Promise<ServiceResult<CustomerPersona | null>>;
+  deletePersona(personaId: string): Promise<ServiceResult<void>>;
+};
+
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 const toErrorMessage = (error: unknown): string => {
@@ -157,7 +169,7 @@ const extractPersona = (value: unknown): CustomerPersona | null | undefined => {
   return undefined;
 };
 
-const apiCustomerPersonaService = {
+const apiCustomerPersonaService: CustomerPersonaService = {
   async listPersonas(): Promise<ServiceResult<CustomerPersona[]>> {
     const result = await request('/api/v1/customers/personas/');
     return {
@@ -235,6 +247,6 @@ const apiCustomerPersonaService = {
   },
 };
 
-export const customerPersonaService = featureFlags.useCustomerPersonaMock
+export const customerPersonaService: CustomerPersonaService = featureFlags.useCustomerPersonaMock
   ? mockCustomerPersonaService
   : apiCustomerPersonaService;
