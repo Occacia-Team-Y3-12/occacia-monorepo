@@ -19,6 +19,8 @@ from app.common.utils import now_utc
 from app.core.config import settings
 from app.core.security import (
     ALGORITHM, SECRET_KEY,
+    create_refresh_token,
+    decode_token,
     get_password_hash, verify_password,
 )
 from app.models.admin import Admin
@@ -161,9 +163,15 @@ class AdminService:
         redis.delete(redis_key)  # one-time use
 
         token = self._create_admin_token(admin.admin_id, admin.staff_role or "staff")
+        refresh_token = create_refresh_token(
+            data={"sub": admin.admin_id, "role": "ADMIN", "staffRole": admin.staff_role or "staff"},
+            expires_delta=timedelta(days=7),
+        )
         logger.info("Admin login verified for: %s", admin.email)
         return {
             "access_token": token,
+            "accessToken": token,
+            "refreshToken": refresh_token,
             "token_type": "bearer",
             "role": admin.staff_role,
             "user": {
@@ -172,6 +180,63 @@ class AdminService:
                 "role": admin.staff_role,
             },
         }
+
+    def refresh_admin_token(self, db: Session, refresh_token: str) -> dict:
+        exc = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token.",
+        )
+        try:
+            claims = decode_token(refresh_token)
+        except jwt.PyJWTError:
+            raise exc
+        if claims.get("type") != "refresh" or claims.get("role") != "ADMIN":
+            raise exc
+        admin_id = claims.get("sub")
+        if not admin_id:
+            raise exc
+        admin = db.query(Admin).filter(Admin.admin_id == admin_id).first()
+        if not admin:
+            raise exc
+
+        new_access_token = self._create_admin_token(admin.admin_id, admin.staff_role or "staff")
+        new_refresh_token = create_refresh_token(
+            data={"sub": admin.admin_id, "role": "ADMIN", "staffRole": admin.staff_role or "staff"},
+            expires_delta=timedelta(days=7),
+        )
+        return {
+            "access_token": new_access_token,
+            "token_type": "bearer",
+            "accessToken": new_access_token,
+            "refreshToken": new_refresh_token,
+            "user": {
+                "userId": admin.admin_id,
+                "email": admin.email,
+                "role": admin.staff_role or "staff",
+            },
+        }
+
+    def logout_admin(self, db: Session, authorization: str | None) -> dict[str, str]:
+        """Invalidate admin session token by adding it to blacklist (best effort)."""
+        _ = db
+        if authorization and authorization.lower().startswith("bearer "):
+            token = authorization[7:]
+            self._blacklist_token(token, role="ADMIN")
+        return {"message": "Logged out successfully."}
+
+    def _blacklist_token(self, token: str, role: str) -> None:
+        """Store token in Redis blacklist using remaining JWT lifetime as TTL."""
+        try:
+            claims = decode_token(token)
+            exp = claims.get("exp")
+            if exp:
+                ttl = int(exp - datetime.now(UTC).timestamp())
+                if ttl > 0:
+                    redis = _get_redis()
+                    if redis:
+                        redis.setex(f"blacklist:{token}", ttl, role)
+        except Exception as exc:
+            logger.warning("Admin token blacklist failed (non-blocking): %s", exc)
 
     # ── Forgot password — Step 1: send OTP ───────────────────────────────────
 
