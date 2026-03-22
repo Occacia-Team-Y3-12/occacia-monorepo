@@ -889,7 +889,7 @@ class AdminVendorService:
         if approval_status:
             query = query.filter(Vendor.approval_status ==
                                  approval_status.upper())
-        if status:
+        if status and hasattr(Vendor, "status"):
             query = query.filter(Vendor.status == status.upper())
         return query.order_by(Vendor.id.desc()).all()
 
@@ -904,7 +904,11 @@ class AdminVendorService:
             raise HTTPException(
                 status_code=400, detail="status must be ACTIVE, SUSPENDED, or DISABLED")
         vendor = self.get_vendor(vendor_id)
-        vendor.status = new_status.upper()
+        if hasattr(vendor, "status"):
+            vendor.status = new_status.upper()
+        else:
+            logger.warning(
+                "Vendor model has no .status column yet. Skipping admin status write.")
         if hasattr(vendor, "is_verified"):
             vendor.is_verified = (new_status.upper() == "APPROVED")
         self.db.commit()

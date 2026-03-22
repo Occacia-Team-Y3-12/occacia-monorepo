@@ -15,7 +15,6 @@ class Vendor(Base):
     # EERD attributes
     display_name = Column(String, nullable=True)
     contact_phone = Column(String, nullable=True)
-    status = Column(String, default="PENDING")
     approval_status = Column(String, default="PENDING")
     approved_at = Column(DateTime(timezone=True), nullable=True)
 

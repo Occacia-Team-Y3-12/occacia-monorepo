@@ -26,16 +26,6 @@ class OrderActivityStatus(str, Enum):
     CANCELLED = "CANCELLED"
 
 
-class VendorStatus(str, Enum):
-    ACTIVE = "ACTIVE"
-    PENDING_ADMIN = "PENDING_ADMIN"
-    PENDING = "PENDING"
-    APPROVED = "APPROVED"
-    REJECTED = "REJECTED"
-    SUSPENDED = "SUSPENDED"
-    DISABLED = "DISABLED"
-
-
 class VendorApprovalStatus(str, Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"

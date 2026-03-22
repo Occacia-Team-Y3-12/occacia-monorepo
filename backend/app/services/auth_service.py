@@ -24,8 +24,7 @@ from app.core.security import (
     decode_token
 )
 from app.models.customer import Customer
-from app.models.vendor import Vendor
-from app.common.enums import VendorStatus
+from app.models.vendor import Vendor, VendorStatus
 from app.schemas.auth_schema import (
     AuthResponse,
     CustomerRegister,
