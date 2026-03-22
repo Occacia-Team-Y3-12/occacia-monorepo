@@ -1,5 +1,5 @@
-import type { VendorAuthService } from './authService.shared';
-import { persistVendorSession } from './authService.shared';
+import type { VendorAuthService } from '@/services/vendor/authService.shared';
+import { persistVendorSession } from '@/services/vendor/authService.shared';
 
 const sleep = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));

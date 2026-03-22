@@ -127,25 +127,6 @@ export const persistCustomerLoginResult = (
   return result;
 };
 
-export const createMockCustomerLoginResponse = (
-  email: string
-): LoginResponse => {
-  const fallbackEmail = email || 'customer@occacia.test';
-
-  return {
-    status: 'success',
-    message: 'Mock login success',
-    accessToken: `mock_customer_token_${Date.now()}`,
-    refreshToken: `mock_customer_refresh_${Date.now()}`,
-    user: {
-      id: 'mock-customer-1',
-      email: fallbackEmail,
-      username: fallbackEmail.split('@')[0] || 'customer',
-      fullName: 'Mock Customer',
-    },
-  };
-};
-
 export const logoutCustomerSession = () => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('customerToken');

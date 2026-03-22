@@ -4,19 +4,18 @@ import {
   MOCK_SHORTLIST,
   createMockPackages,
 } from '@/mocks/customerExperience';
+import type { CustomerPackageService } from '@/services/customer/packageService.types';
 import type {
+  ConfirmPackageOrderResponse,
   FulfillmentRequest,
   OrderTask,
   PackageOrder,
-  ConfirmPackageOrderResponse,
 } from '@/types/customer/order';
 import type {
   PackageItem,
   RecommendationPackage,
   ShortlistedOffering,
 } from '@/types/customer/package';
-
-import type { CustomerPackageService } from './packageService.types';
 
 const sleep = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -78,7 +77,12 @@ const persistPackages = (
 const createMockPackageCatalog = (): RecommendationPackage[] =>
   createMockPackages().map((pkg) => ({
     ...pkg,
-    name: pkg.name ?? `${pkg.type.charAt(0)}${pkg.type.slice(1).toLowerCase().replace('_', ' ')} Package`,
+    name:
+      pkg.name ??
+      `${pkg.type.charAt(0)}${pkg.type
+        .slice(1)
+        .toLowerCase()
+        .replace('_', ' ')} Package`,
     eventName: MOCK_EVENT.eventTitle,
     eventDate: getMockEventDate(),
     eventLocation: 'Colombo, Sri Lanka',
@@ -111,7 +115,9 @@ const buildShortlistForItem = (
     ...offering,
     offeringId: `${item.taskId}-${offering.offeringId}`,
     offeringTitle:
-      index === 0 ? `${item.offeringCategory} Premium Match` : offering.offeringTitle,
+      index === 0
+        ? `${item.offeringCategory} Premium Match`
+        : offering.offeringTitle,
     isBestMatch: false,
   })),
 ];
@@ -220,7 +226,8 @@ export const mockPackageService: CustomerPackageService = {
     }
 
     const currentPackage = packages[packageIndex];
-    const updatedItems = items.reduce<PackageItem[]>((nextItems, { taskId, offeringId }) => {
+    const updatedItems = items.reduce<PackageItem[]>(
+      (nextItems, { taskId, offeringId }) => {
         const currentItem = currentPackage.items.find(
           (item) => item.taskId === taskId
         );
@@ -247,7 +254,9 @@ export const mockPackageService: CustomerPackageService = {
         });
 
         return nextItems;
-      }, []);
+      },
+      []
+    );
 
     const updatedPackage: RecommendationPackage = {
       ...currentPackage,
