@@ -208,7 +208,7 @@ def test_customer_forgot_password_unknown_email(client):
 
 def test_customer_reset_password_invalid_token(client):
     r = client.post("/api/v1/auth/customer/password/reset",
-                    json={"token": "bad-token", "new_password": "NewPass123!"})
+                    json={"reset_token": "bad-token", "new_password": "NewPass123!"})
     assert r.status_code == 400
 
 

@@ -5,34 +5,11 @@ import { useRouter } from 'next/navigation';
 import { customerEventService } from '@/services/customer/eventServices';
 import { ROUTES } from '@/lib/routes';
 import { CreateCustomerEventPayload, CustomerPersonaOption, CustomerEventType, EventTypeOption } from '@/types/customer';
+import { EVENT_TYPE_FALLBACKS } from '@/mocks/customerExperience';
 
 type CustomerEventFormType = CustomerEventType | string;
 
 const DEFAULT_EVENT_TYPE: CustomerEventFormType = '';
-
-const EVENT_TYPE_FALLBACKS: EventTypeOption[] = [
-  {
-    id: 'individual',
-    value: 'individual',
-    label: 'Individual',
-    example: 'Visit someone',
-    titlePlaceholder: 'e.g., Visiting to see sick mom',
-  },
-  {
-    id: 'group',
-    value: 'group',
-    label: 'Group',
-    example: 'Celebration',
-    titlePlaceholder: 'e.g., Family dinner planning',
-  },
-  {
-    id: 'others',
-    value: 'others',
-    label: 'Others',
-    example: 'Appointment',
-    titlePlaceholder: 'e.g., Doctor appointment this Saturday',
-  },
-];
 
 export const PERSONA_OPTIONS: CustomerPersonaOption[] = [
   { id: 'john-cena', name: 'John Cena', role: 'Professional Athlete', imageUrl: '/images/customer/events/Jhon.svg' },
@@ -71,8 +48,12 @@ export const useCreateEvent = () => {
 
       if (result.ok && result.data?.data?.eventTypes?.length) {
         setEventTypes(result.data.data.eventTypes);
-      } else if (!result.ok) {
+      } else {
+        setEventTypes(EVENT_TYPE_FALLBACKS);
+
+        if (!result.ok) {
         setErrors((prev) => ({ ...prev, form: result.error || 'Unable to load event types right now.' }));
+        }
       }
 
       setIsLoadingEventTypes(false);

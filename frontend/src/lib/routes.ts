@@ -5,15 +5,19 @@ export const ROUTES = {
     DASHBOARD: '/customer/dashboard',
     REGISTER: '/customer/register',
     EVENTS: '/customer/events',
+    EVENTS_NEW: '/customer/events/new',
     EVENT_CHAT: (eventId: string) => `/customer/events/${eventId}/chat`,
     EVENT_DRAFT_REVIEW: (eventId: string) => `/customer/events/${eventId}/draft`,
     EVENT_RECOMMENDATIONS: (eventId: string) => `/customer/events/${eventId}/recommendations`,
     EVENT_PACKAGES: (eventId: string) => `/customer/events/${eventId}/packages`,
     EVENT_PACKAGE_DETAIL: (eventId: string, packageId: string) => `/customer/events/${eventId}/packages/${packageId}`,
     EVENT_PACKAGE_CUSTOMIZE: (eventId: string, packageId: string) => `/customer/events/${eventId}/packages/${packageId}/customize`,
+    EVENT_PACKAGE_CONFIRM: (eventId: string, packageId: string) => `/customer/events/${eventId}/packages/${packageId}/confirm`,
+    EVENT_ORDER_CONFIRMATION: (eventId: string, packageOrderId: string) => `/customer/events/${eventId}/orders/${packageOrderId}`,
     PRODUCTS: '/customer/products',
     CART: '/customer/cart',
     ORDERS: '/customer/orders',
+    PERSONA: '/customer/persona',
   },
   VENDOR: {
     LOGIN: '/vendor/auth/login',
@@ -31,9 +35,13 @@ export const ROUTES = {
     PENDING_APPROVAL: '/vendors/pending-approval',
   },
   ADMIN: {
-    DASHBOARD: '/admin',
+    HOME: '/admin',
+    LOGIN: '/admin/login',
+    DASHBOARD: '/admin/dashboard',
     APPROVALS: '/admin/approvals',
     USERS: '/admin/users',
+    CUSTOMERS: '/admin/customers',
+    PENDING_VENDORS: '/admin/vendors/pending',
     SETTINGS: '/admin/settings',
   },
 } as const;
@@ -44,4 +52,3 @@ export const ROUTES_ALIAS = {
   VENDOR_ACTIVATED: ROUTES.VENDOR.ACTIVATED,
   VENDOR_PRODUCTS: ROUTES.VENDOR.PRODUCTS,
 } as const;
-

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy.orm import relationship
 
 from app.common.utils import generate_prefixed_id, now_utc
 from app.core.database import Base
@@ -34,8 +35,11 @@ class Event(Base):
     external_calendar_event_id = Column(String, nullable=True)
     calendar_last_sync_at = Column(DateTime(timezone=True), nullable=True)
     calendar_last_sync_status = Column(String, nullable=True)
-    status = Column(String, nullable=False, default="DRAFT")
+    status = Column(String, nullable=False, default="DRAFT", index=True)
     confirmed_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=now_utc, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False)
+
+    # Vendor task board relations
+    tasks = relationship("VendorTask", back_populates="event")

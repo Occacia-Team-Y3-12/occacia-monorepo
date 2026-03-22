@@ -1,0 +1,19 @@
+<svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="800" fill="#1C1917"/>
+  <rect x="88" y="78" width="1024" height="644" rx="44" fill="#F5F5F4"/>
+  <rect x="88" y="78" width="1024" height="644" rx="44" fill="url(#paint0_linear)" fill-opacity="0.8"/>
+  <path d="M208 166H988" stroke="#0F172A" stroke-opacity="0.18" stroke-width="2"/>
+  <path d="M208 236H988" stroke="#0F172A" stroke-opacity="0.18" stroke-width="2"/>
+  <path d="M208 306H988" stroke="#0F172A" stroke-opacity="0.18" stroke-width="2"/>
+  <path d="M208 376H988" stroke="#0F172A" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="150" y="250" fill="#0F172A" font-family="Arial, sans-serif" font-size="108" font-weight="700" letter-spacing="-4">FIELD</text>
+  <text x="150" y="360" fill="#EA580C" font-family="Georgia, serif" font-size="114" letter-spacing="-4">NOTES</text>
+  <text x="154" y="448" fill="#0F172A" font-family="Arial, sans-serif" font-size="54" font-weight="700" letter-spacing="16">LIVE</text>
+  <text x="154" y="624" fill="#1E293B" font-family="Arial, sans-serif" font-size="26" letter-spacing="8">WORKSHOP FOR FOUNDERS AND CREATIVE OPERATORS</text>
+  <defs>
+    <linearGradient id="paint0_linear" x1="104" y1="114" x2="1102" y2="690" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF7ED"/>
+      <stop offset="1" stop-color="#E2E8F0"/>
+    </linearGradient>
+  </defs>
+</svg>

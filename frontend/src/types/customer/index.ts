@@ -1,5 +1,13 @@
 // src/types/customer/index.ts
 export * from './auth';
+export * from './task';
+
+export type ServiceResult<T> = {
+  ok: boolean;
+  status: number;
+  data?: T;
+  error?: string;
+};
 
 export interface Customer {
   id: string;
