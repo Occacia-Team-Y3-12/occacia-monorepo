@@ -18,6 +18,8 @@ export const ROUTES = {
     CART: '/customer/cart',
     ORDERS: '/customer/orders',
     PERSONA: '/customer/persona',
+    PERSONA_NEW: '/customer/persona/new',
+    PERSONA_DETAIL: (personaId: string) => `/customer/persona/${personaId}`,
   },
   VENDOR: {
     LOGIN: '/vendor/auth/login',

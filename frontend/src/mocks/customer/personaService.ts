@@ -1,6 +1,7 @@
 import type { ServiceResult } from '@/types/customer';
 import type {
   CustomerPersona,
+  CustomerPersonaCreatePayload,
   CustomerPersonaUpdatePayload,
 } from '@/types/customer/persona';
 
@@ -84,6 +85,40 @@ export const mockCustomerPersonaService = {
       ok: true,
       status: 200,
       data: loadMockPersonas(),
+    };
+  },
+
+  async createPersona(payload: CustomerPersonaCreatePayload): Promise<ServiceResult<CustomerPersona>> {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    const now = new Date().toISOString();
+    const personas = loadMockPersonas();
+    const nextPersona: CustomerPersona = {
+      id: personas.length ? Math.max(...personas.map((item) => item.id)) + 1 : 1,
+      persona_id: `persona-${Date.now()}`,
+      customer_id: personas[0]?.customer_id ?? 'mock-customer-1',
+      name: payload.name.trim(),
+      relationship: payload.relationship ?? null,
+      birthday: payload.birthday ?? null,
+      personality: payload.personality ?? null,
+      preferences_json: payload.preferences_json ?? null,
+      food_preferences: payload.food_preferences ?? [],
+      color_preferences: payload.color_preferences ?? [],
+      music_preferences: payload.music_preferences ?? [],
+      personality_tags: payload.personality_tags ?? [],
+      is_confirmed: false,
+      confirmed_at: null,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const nextPersonas = [nextPersona, ...personas];
+    persistMockPersonas(nextPersonas);
+
+    return {
+      ok: true,
+      status: 201,
+      data: nextPersona,
     };
   },
 

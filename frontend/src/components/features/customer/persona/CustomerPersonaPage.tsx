@@ -216,7 +216,11 @@ const buildInsightGroups = (raw: unknown): InsightGroup[] => {
     .slice(0, 6);
 };
 
-function CustomerPersonaContent() {
+type CustomerPersonaPageProps = {
+  personaId?: string;
+};
+
+function CustomerPersonaContent({ personaId }: CustomerPersonaPageProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<CustomerPersonaDraft | null>(null);
@@ -247,6 +251,10 @@ function CustomerPersonaContent() {
   });
 
   const selectedPersonaId = useMemo(() => {
+    if (personaId) {
+      return personaId;
+    }
+
     const personas = personasQuery.data ?? [];
     if (!personas.length) {
       return null;
@@ -254,7 +262,7 @@ function CustomerPersonaContent() {
 
     const firstUnconfirmed = personas.find((persona: CustomerPersona) => !persona.is_confirmed);
     return (firstUnconfirmed ?? personas[0]).persona_id;
-  }, [personasQuery.data]);
+  }, [personaId, personasQuery.data]);
 
   const personaQuery = useQuery({
     queryKey: ['customer-persona', selectedPersonaId],
@@ -647,12 +655,12 @@ function CustomerPersonaContent() {
   );
 }
 
-export default function CustomerPersonaPage() {
+export default function CustomerPersonaPage({ personaId }: CustomerPersonaPageProps) {
   const [queryClient] = useState(() => new QueryClient());
 
   return (
     <QueryClientProvider client={queryClient}>
-      <CustomerPersonaContent />
+      <CustomerPersonaContent personaId={personaId} />
     </QueryClientProvider>
   );
 }
