@@ -96,6 +96,11 @@ def seed_data() -> bool:
                 if table in Base.metadata.tables
             ]
             if tables_to_create:
+                if not hasattr(db.bind, "_run_ddl_visitor"):
+                    logger.warning(
+                        "Skipping seed because DB bind does not support DDL create_all in this context."
+                    )
+                    return False
                 Base.metadata.create_all(bind=db.bind, tables=tables_to_create)
                 inspector = inspect(db.bind)
                 still_missing = [
@@ -595,11 +600,13 @@ def seed_data() -> bool:
         logger.info("Seed script found all records already present. No new rows added.")
         return False
     except Exception:
-        db.rollback()
+        if hasattr(db, "rollback"):
+            db.rollback()
         logger.exception("Seed failed due to an unexpected error.")
         raise
     finally:
-        db.close()
+        if hasattr(db, "close"):
+            db.close()
 
 
 def main() -> int:
