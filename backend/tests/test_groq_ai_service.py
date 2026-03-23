@@ -141,6 +141,26 @@ async def test_plan_event_chat_raises_on_http_500():
             )
 
 
+@pytest.mark.anyio
+async def test_plan_event_chat_http_401_is_not_retried():
+    request = httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions")
+    response = httpx.Response(401, request=request, text="unauthorized")
+    exc = httpx.HTTPStatusError("401", request=request, response=response)
+    post_mock = AsyncMock(side_effect=exc)
+
+    with patch("httpx.AsyncClient.post", new=post_mock):
+        with pytest.raises(httpx.HTTPStatusError):
+            await groq_ai_service.plan_event_chat(
+                content="Plan",
+                history=[],
+                personas=[],
+                event_context={},
+                needs_persona=True,
+            )
+
+    assert post_mock.await_count == 1
+
+
 def test_system_prompt_contains_persona_collection_when_needs_persona_true():
     prompt = _build_system_prompt(event_context={}, personas=[], needs_persona=True)
     assert "persona" in prompt.lower()

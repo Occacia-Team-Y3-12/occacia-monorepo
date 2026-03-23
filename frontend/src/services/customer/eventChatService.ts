@@ -1,5 +1,6 @@
 import { featureFlags } from '@/config/featureFlags';
 import { mockCustomerEventChatService } from '@/mocks/customer/eventChatService';
+import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 import {
   CalendarConnectRequest,
   CalendarConnectResponse,
@@ -62,9 +63,23 @@ const parseBody = <T>(raw: string, contentType: string): (T & { message?: string
   }
 };
 
+const withCustomerAuthHeaders = (headers?: HeadersInit) => {
+  const merged = new Headers(headers);
+  const token = getStoredCustomerToken();
+
+  if (token && !merged.has('Authorization')) {
+    merged.set('Authorization', `Bearer ${token}`);
+  }
+
+  return merged;
+};
+
 const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<ServiceResult<T>> => {
   try {
-    const response = await fetch(input, init);
+    const response = await fetch(input, {
+      ...init,
+      headers: withCustomerAuthHeaders(init?.headers),
+    });
     const raw = await response.text();
     const contentType = response.headers.get('content-type') || '';
     const data = parseBody<T>(raw, contentType);
@@ -128,10 +143,12 @@ const apiCustomerEventChatService: CustomerEventChatService = {
   },
 
   postChat(eventId: string, payload: EventChatRequest): Promise<ServiceResult<EventChatResponse>> {
+    const content = payload.content?.trim() || payload.message?.trim() || '';
+
     return request<EventChatResponse>(`/api/v1/customers/events/${eventId}/chat`, {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ content }),
     });
   },
 
@@ -192,10 +209,18 @@ const apiCustomerEventChatService: CustomerEventChatService = {
   },
 
   connectCalendar(payload: CalendarConnectRequest): Promise<ServiceResult<CalendarConnectResponse>> {
+    const redirectUri =
+      payload.redirectUri
+      || (typeof window !== 'undefined' ? window.location.href : '');
+
     return request<CalendarConnectResponse>('/api/v1/customers/calendar/connect', {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        provider: payload.provider,
+        redirectUri,
+        scopes: payload.scopes ?? [],
+      }),
     });
   },
 

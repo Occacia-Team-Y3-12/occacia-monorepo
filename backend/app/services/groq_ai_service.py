@@ -12,7 +12,7 @@ import re
 from typing import Any, List, Optional
 
 import httpx
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
 
@@ -21,6 +21,15 @@ logger = logging.getLogger(__name__)
 _GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 _GROQ_MODEL = "llama-3.3-70b-versatile"
 _MAX_HISTORY = 10
+
+
+def _is_retryable_http_status_error(exc: BaseException) -> bool:
+    if not isinstance(exc, httpx.HTTPStatusError):
+        return False
+
+    status_code = exc.response.status_code
+    # Retry only on transient upstream failures/rate limits.
+    return status_code == 429 or status_code >= 500
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +237,7 @@ class GroqAIService:
     @retry(
         stop=stop_after_attempt(2),
         wait=wait_exponential(multiplier=1, min=2, max=5),
-        retry=retry_if_exception_type(httpx.HTTPStatusError),
+        retry=retry_if_exception(_is_retryable_http_status_error),
     )
     async def plan_event_chat(
         self,

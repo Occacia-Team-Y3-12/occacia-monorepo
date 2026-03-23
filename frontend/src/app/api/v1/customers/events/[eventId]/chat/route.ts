@@ -31,7 +31,7 @@ export async function POST(
 
   try {
     const body = (await request.json()) as EventChatRequest;
-    const message = body.message?.trim();
+    const message = body.content?.trim() || body.message?.trim();
 
     if (!message) {
       return NextResponse.json(

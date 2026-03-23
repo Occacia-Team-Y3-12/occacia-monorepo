@@ -31,6 +31,7 @@ export type CustomerLoginPayload = LoginResponse & Record<string, unknown>;
 
 export const customerAuthApi = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },

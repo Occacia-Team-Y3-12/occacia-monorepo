@@ -78,7 +78,7 @@ export const mockCustomerEventChatService = {
     eventId: string,
     payload: EventChatRequest
   ): Promise<ServiceResult<EventChatResponse>> {
-    const message = payload.message?.trim();
+    const message = payload.content?.trim() || payload.message?.trim();
     if (!message) {
       return failure(400, 'Message is required.', {
         status: 'error',
