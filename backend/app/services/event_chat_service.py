@@ -21,6 +21,7 @@ from app.models.task import Task
 from app.schemas.event_planning_schema import ChatSendResponse, SuggestedTaskDraftResponse
 from app.services.event_planning_service import event_planning_service
 from app.services.groq_ai_service import groq_ai_service
+from app.services.offering_service import offering_service
 from app.services.persona_service import persona_service
 
 logger = logging.getLogger(__name__)
@@ -154,6 +155,7 @@ class EventChatService:
         # 10c. Persist suggested tasks (skip duplicates by name)
         suggested_tasks_out: list[SuggestedTaskDraftResponse] = []
         existing_task_names = {t.name.lower() for t in tasks}
+        newly_created_task_ids: list[str] = []
         raw_suggested = ai_output.get("suggestedTasks") or []
         for t in raw_suggested:
             task_name = (t.get("name") or "").strip()
@@ -169,7 +171,7 @@ class EventChatService:
             )
             if task_name.lower() not in existing_task_names:
                 try:
-                    event_planning_service.create_task(
+                    task_obj = event_planning_service.create_task(
                         db,
                         customer_id=customer_id,
                         event_id=event_id,
@@ -180,9 +182,30 @@ class EventChatService:
                             "currency":    t.get("currency", "LKR"),
                         },
                     )
+                    newly_created_task_ids.append(task_obj.task_id)
                     existing_task_names.add(task_name.lower())
                 except Exception as exc:
                     logger.warning("Failed to persist task '%s': %s", task_name, exc)
+
+        # 10d. Precompute shortlist for newly created tasks (chat-time capped at 3)
+        for task_id in newly_created_task_ids:
+            try:
+                task_obj = db.query(Task).filter(Task.task_id == task_id).first()
+                if not task_obj:
+                    continue
+                offerings_with_rank = offering_service.find_offerings_for_task(
+                    db=db,
+                    task=task_obj,
+                    limit=3,
+                )
+                if offerings_with_rank:
+                    offering_service.save_task_offering_shortlist(
+                        db=db,
+                        task_id=task_id,
+                        offerings_with_rank=offerings_with_rank,
+                    )
+            except Exception as exc:
+                logger.warning("Failed to shortlist offerings for task %s: %s", task_id, exc)
 
         # ── 11. Build and return response ─────────────────────────────
         return ChatSendResponse(
