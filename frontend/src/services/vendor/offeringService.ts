@@ -1,8 +1,6 @@
 import axios from 'axios';
-import { featureFlags } from '@/config/featureFlags';
-import { mockOfferingService } from '@/mocks/vendor/offeringService';
-import { API_BASE_URL } from '@/services/api';
 import { Offering, CreateOfferingData, UpdateOfferingData } from '@/types/vendor/offering';
+import { API_BASE_URL } from '@/services/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -17,7 +15,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-const apiOfferingService = {
+export const offeringService = {
   getAll: async (): Promise<Offering[]> => {
     const response = await api.get('/vendors/offerings');
     return response.data;
@@ -38,7 +36,3 @@ const apiOfferingService = {
     return response.data;
   },
 };
-
-export const offeringService = featureFlags.useVendorOfferingsMock
-  ? mockOfferingService
-  : apiOfferingService;

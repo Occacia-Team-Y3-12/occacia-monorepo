@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { featureFlags } from '@/config/featureFlags';
 import { mockVendorTaskApi } from '@/mocks/vendor/vendorTaskApi';
 import { TaskListResponse, TaskListItem } from '@/types/vendorTasks';
+import { API_BASE_URL } from '@/services/api';
 
 type VendorTaskStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'DONE' | string;
 type FulfillmentDecision = 'ACCEPT' | 'REJECT';
@@ -63,14 +64,6 @@ interface UpdateVendorTaskPayload {
 interface GetTasksFilters {
   search?: string;
   priority?: 'high' | 'medium' | 'low';
-}
-
-function getApiBaseUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (!configured) {
-    return '/api/v1';
-  }
-  return configured.endsWith('/api/v1') ? configured : `${configured}/api/v1`;
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -175,7 +168,7 @@ function mapAxiosError(error: unknown, fallback: string): Error {
 }
 
 const vendorApi = axios.create({
-  baseURL: getApiBaseUrl(),
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 

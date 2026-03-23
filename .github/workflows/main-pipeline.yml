@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Prevents overlapping deployments from corrupting your server
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -155,28 +156,21 @@ jobs:
           LANGFLOW_URL: ${{ secrets.LANGFLOW_URL }}
           LANGFLOW_ORG_ID: ${{ secrets.LANGFLOW_ORG_ID }}
           LANGFLOW_TOKEN: ${{ secrets.LANGFLOW_TOKEN }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_NAME: ${{ secrets.DB_NAME }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ALGORITHM: ${{ secrets.ALGORITHM }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           DISABLE_ADMIN_REGISTER: ${{ secrets.DISABLE_ADMIN_REGISTER }}
-          # ── SMTP ─────────────────────────────────────────────────
-          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          SMTP_USE_TLS: ${{ secrets.SMTP_USE_TLS }}
-          SKIP_EMAIL_VERIFICATION: ${{ secrets.SKIP_EMAIL_VERIFICATION }}
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: LANGFLOW_URL,LANGFLOW_ORG_ID,LANGFLOW_TOKEN,GROQ_API_KEY,DB_USER,DB_PASSWORD,DB_NAME,DATABASE_URL,SECRET_KEY,ALGORITHM,REDIS_PASSWORD,DISABLE_ADMIN_REGISTER,FROM_EMAIL,SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_PASSWORD,SMTP_USE_TLS,SKIP_EMAIL_VERIFICATION
+          envs: LANGFLOW_URL,LANGFLOW_ORG_ID,LANGFLOW_TOKEN,DB_USER,DB_PASSWORD,DB_NAME,DATABASE_URL,SECRET_KEY,ALGORITHM,SENDGRID_API_KEY,FROM_EMAIL,REDIS_PASSWORD,DISABLE_ADMIN_REGISTER
           script: |
             set -e
             cd ~/occacia-app
@@ -186,29 +180,23 @@ jobs:
             LANGFLOW_URL=${LANGFLOW_URL}
             LANGFLOW_ORG_ID=${LANGFLOW_ORG_ID}
             LANGFLOW_TOKEN=${LANGFLOW_TOKEN}
-            GROQ_API_KEY=${GROQ_API_KEY}
             DB_USER=${DB_USER}
             DB_PASSWORD=${DB_PASSWORD}
             DB_NAME=${DB_NAME}
             DATABASE_URL=${DATABASE_URL}
             SECRET_KEY=${SECRET_KEY}
             ALGORITHM=${ALGORITHM:-HS256}
+            SENDGRID_API_KEY=${SENDGRID_API_KEY}
+            FROM_EMAIL=${FROM_EMAIL}
             REDIS_PASSWORD=${REDIS_PASSWORD}
             REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
             DISABLE_ADMIN_REGISTER=${DISABLE_ADMIN_REGISTER}
             DOCKER_SOCKET=/var/run/docker.sock
-            FROM_EMAIL=${FROM_EMAIL}
-            SMTP_HOST=${SMTP_HOST}
-            SMTP_PORT=${SMTP_PORT:-25}
-            SMTP_USER=${SMTP_USER}
-            SMTP_PASSWORD=${SMTP_PASSWORD}
-            SMTP_USE_TLS=${SMTP_USE_TLS:-false}
-            SKIP_EMAIL_VERIFICATION=${SKIP_EMAIL_VERIFICATION:-false}
-            RUN_DB_SEED_ON_STARTUP=1
             EOF
 
-            # Stop and remove all named containers first
+            # Recreate containers while preserving named volumes.
             sudo docker compose down --remove-orphans || true
+            sudo docker rm -f occacia-radar || true
             sudo docker rm -f \
               occacia-db \
               occacia-redis \
@@ -217,16 +205,7 @@ jobs:
               occacia-nginx \
               occacia-backup \
               occacia-radar || true
-
-            # Safe image cleanup — dangling only
-            sudo docker builder prune -a -f
-            sudo docker image prune -f --filter "dangling=true"
-
-            # Restart Docker daemon to flush stale iptables rules
-            sudo systemctl restart docker
-            sleep 5
-
-            sudo docker compose build --no-cache backend frontend
+            sudo docker compose build --no-cache backend
             sudo docker compose up -d db redis backend
 
             echo "Waiting for backend health..."
@@ -268,5 +247,18 @@ jobs:
               exit 1
             fi
 
+            if ! curl --fail --max-time 10 http://localhost/api/v1/health >/dev/null 2>&1; then
+              echo "Public API health check failed through nginx. Recent logs:"
+              sudo docker compose logs --tail=200 nginx frontend backend
+              exit 1
+            fi
+
+            if ! curl --fail --max-time 10 http://localhost/api/v1/event-types >/dev/null 2>&1; then
+              echo "Frontend/backend API integration check failed through nginx. Recent logs:"
+              sudo docker compose logs --tail=200 nginx frontend backend
+              exit 1
+            fi
+
+            # Cleanup images
             sudo docker image prune -f
             echo "Deployed at $(date)" >> ~/occacia-app/deploy_history.log

@@ -29,8 +29,17 @@ if (fs.existsSync(fallbackEnvPath)) {
 }
 
 const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+const useLocalWorkerWorkarounds = process.env.NEXT_LOCAL_WINDOWS_WORKAROUNDS === '1';
 
 const nextConfig: NextConfig = {
+  ...(useLocalWorkerWorkarounds
+    ? {
+        experimental: {
+          workerThreads: true,
+          webpackBuildWorker: false,
+        },
+      }
+    : {}),
   output: 'standalone',   // ← add this
   turbopack: {
     root: path.resolve(__dirname),

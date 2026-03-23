@@ -1,32 +1,77 @@
-import axios from 'axios';
-
-import { featureFlags } from '@/config/featureFlags';
-import { mockCustomerOrderService } from '@/mocks/customer/orderService';
 import { API_BASE_URL } from '@/services/api';
 import type { PackageOrder } from '@/types/customer/order';
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('customerToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+const readOrdersFromSession = (): PackageOrder[] => {
+  if (typeof window === 'undefined') {
+    return [];
   }
-  return config;
-});
 
-const apiCustomerOrderService = {
+  const orders: PackageOrder[] = [];
+
+  for (const key of Object.keys(sessionStorage)) {
+    if (!key.startsWith('order_')) {
+      continue;
+    }
+
+    const raw = sessionStorage.getItem(key);
+    if (!raw) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as { packageOrder?: PackageOrder };
+      if (parsed.packageOrder) {
+        orders.push(parsed.packageOrder);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return orders.sort((left, right) =>
+    right.createdAt.localeCompare(left.createdAt)
+  );
+};
+
+const fetchOrdersFromApi = async (): Promise<PackageOrder[] | null> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/customers/package-orders`, {
+      headers:
+        typeof window !== 'undefined'
+          ? {
+              Authorization: `Bearer ${localStorage.getItem('customerToken') || ''}`,
+            }
+          : undefined,
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const body = (await response.json()) as
+      | PackageOrder[]
+      | { items?: PackageOrder[] };
+    if (Array.isArray(body)) {
+      return body;
+    }
+    if (Array.isArray(body.items)) {
+      return body.items;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+export const customerOrderService = {
   async listOrders(): Promise<PackageOrder[]> {
-    const response = await api.get<{ items: PackageOrder[] }>(
-      '/customers/package-orders'
-    );
+    const apiOrders = await fetchOrdersFromApi();
+    if (apiOrders && apiOrders.length > 0) {
+      return apiOrders;
+    }
 
-    return response.data.items ?? [];
+    return readOrdersFromSession();
   },
 };
 
-export const customerOrderService = featureFlags.useCustomerOrdersMock
-  ? mockCustomerOrderService
-  : apiCustomerOrderService;

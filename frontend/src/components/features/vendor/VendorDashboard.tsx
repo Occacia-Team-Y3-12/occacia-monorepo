@@ -2,16 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ROUTES } from '@/lib/routes';
 import Modal from '@/components/ui/Modal';
 
 type SidebarItem = {
 	label: string;
-  href: string;
   icon: string;
 	badge?: number;
+	active?: boolean;
 };
 
 type StatCard = {
@@ -33,12 +33,11 @@ type OrderRow = {
 };
 
 const sidebarItems: SidebarItem[] = [
-  { label: 'Dashboard', href: ROUTES.VENDOR.DASHBOARD, icon: '/icons/vendor/dashboard/dashboard.svg' },
-  { label: 'Activities', href: ROUTES.VENDOR.ACTIVITIES, icon: '/icons/vendor/dashboard/calendar.svg' },
-  { label: 'Offerings', href: ROUTES.VENDOR.OFFERINGS, icon: '/icons/vendor/dashboard/clipboard.svg' },
-  { label: 'Orders', href: ROUTES.VENDOR.ORDERS, icon: '/icons/vendor/dashboard/shopping-cart.svg', badge: 12 },
-  { label: 'Products', href: ROUTES.VENDOR.PRODUCTS, icon: '/icons/vendor/dashboard/users.svg' },
-  { label: 'Tasks', href: ROUTES.VENDOR.TASKS, icon: '/icons/vendor/dashboard/calendar.svg' },
+  { label: 'Dashboard', icon: '/icons/vendor/dashboard/dashboard.svg', active: true },
+  { label: 'Orders', icon: '/icons/vendor/dashboard/shopping-cart.svg', badge: 12 },
+  { label: 'Packages', icon: '/icons/vendor/dashboard/clipboard.svg' },
+  { label: 'Analytics', icon: '/icons/vendor/dashboard/calendar.svg' },
+  { label: 'Recipients', icon: '/icons/vendor/dashboard/users.svg' },
 ];
 
 const statCards: StatCard[] = [
@@ -98,7 +97,6 @@ const recipientTypes = [
 
 export default function VendorDashboard() {
   const router = useRouter();
-  const pathname = usePathname();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
@@ -126,14 +124,6 @@ export default function VendorDashboard() {
     router.push(ROUTES.VENDOR.LOGIN);
   };
 
-  const isSidebarItemActive = (href: string) => {
-    if (href === ROUTES.VENDOR.DASHBOARD) {
-      return pathname === href;
-    }
-
-    return pathname === href || pathname.startsWith(`${href}/`);
-  };
-
   return (
     <div className="min-h-screen bg-[#f4f6fb] text-slate-900">
       <div className="mx-auto flex w-full max-w-[1600px]">
@@ -142,9 +132,9 @@ export default function VendorDashboard() {
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           } ${isDesktopSidebarCollapsed ? 'lg:hidden' : 'lg:flex lg:relative'}`}
         >
-          <div className="mb-2 flex items-center gap-0 py-1">
+          <div className="mb-2 flex items-center gap-2 py-1">
           <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="ml-[-8px] h-[59px] w-[59px] shrink-0" priority />
-          <span className="text-[26px] font-bold tracking-normal text-[#0D47A1]">Occacia</span>
+          <span className="text-[22px] font-extrabold tracking-tight text-[#1562CC]">OCCACIA</span>
           <button
             type="button"
             onClick={() => setIsDesktopSidebarCollapsed(true)}
@@ -161,15 +151,13 @@ export default function VendorDashboard() {
 
           <nav className="mt-6 space-y-1">
             {sidebarItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
+              <button
+                key={item.label}
                 onClick={() => setIsSidebarOpen(false)}
-                className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-base transition-colors xl:text-[18px] ${
-                  isSidebarItemActive(item.href)
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-base transition-colors xl:text-[18px]
+                  ${item.active ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}
+                `}
+                type="button"
               >
                 <span className="flex items-center gap-3 font-medium">
                   <Image src={item.icon} alt="" width={20} height={20} className="h-5 w-5 opacity-90" />
@@ -178,7 +166,7 @@ export default function VendorDashboard() {
                 {item.badge ? (
                   <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">{item.badge}</span>
                 ) : null}
-              </Link>
+              </button>
             ))}
           </nav>
 
@@ -198,7 +186,7 @@ export default function VendorDashboard() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:gap-5 lg:w-auto">
             {isDesktopSidebarCollapsed && (
-              <div className="-ml-2 group relative hidden shrink-0 items-center gap-1 lg:flex">
+              <div className="group relative hidden lg:block">
                 <button
                   type="button"
                   onClick={() => setIsDesktopSidebarCollapsed(false)}
@@ -214,32 +202,19 @@ export default function VendorDashboard() {
                     </svg>
                   </span>
                 </button>
-                <span className="whitespace-nowrap text-[26px] font-bold tracking-normal text-[#0D47A1]">Occacia</span>
               </div>
             )}
 
-            {isSidebarOpen ? (
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(false)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#E2E5EC] bg-white text-[#5B6478] lg:hidden"
-                aria-label="Close sidebar"
-              >
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6 6 18" />
-                </svg>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(true)}
-                className="-ml-2 flex shrink-0 items-center gap-1 self-start lg:hidden"
-                aria-label="Open sidebar"
-              >
-                <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="h-[59px] w-[59px]" />
-                <span className="whitespace-nowrap text-[26px] font-bold tracking-normal text-[#0D47A1]">Occacia</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen((prev) => !prev)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#E2E5EC] bg-white text-[#5B6478] lg:hidden"
+              aria-label="Toggle sidebar"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+            </button>
         <div className="relative w-full sm:w-[320px] md:w-[360px]">
                   <input
                     type="search"

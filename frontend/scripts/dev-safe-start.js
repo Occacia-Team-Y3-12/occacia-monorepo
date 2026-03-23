@@ -1,10 +1,16 @@
 const fs = require('fs');
+const http = require('http');
 const path = require('path');
-const { spawn } = require('child_process');
 const { execSync } = require('child_process');
+const next = require('next');
 
 const projectRoot = path.resolve(__dirname, '..');
 const lockPath = path.join(projectRoot, '.next', 'dev', 'lock');
+const useTurbopack = process.argv.includes('--turbopack');
+const host = process.env.HOST || '127.0.0.1';
+const port = Number(process.env.PORT || 3000);
+
+process.env.NEXT_LOCAL_WINDOWS_WORKAROUNDS = '1';
 
 function log(msg) {
   process.stdout.write(`[dev-safe] ${msg}\n`);
@@ -85,26 +91,34 @@ function ensurePort3000IsUsable() {
   log('Close that process manually if you want this app on http://localhost:3000');
 }
 
-function startNextDev() {
-  const isWindows = process.platform === 'win32';
-  const command = isWindows ? 'npm run dev:raw' : 'npm';
-  const args = isWindows ? [] : ['run', 'dev:raw'];
-
-  const child = spawn(command, args, {
-    cwd: projectRoot,
-    stdio: 'inherit',
-    shell: isWindows,
+async function startNextDev() {
+  const app = next({
+    dev: true,
+    dir: projectRoot,
+    hostname: host,
+    port,
+    turbopack: useTurbopack,
   });
 
-  child.on('exit', (code, signal) => {
-    if (signal) {
-      process.kill(process.pid, signal);
-      return;
-    }
-    process.exit(code ?? 0);
+  const handle = app.getRequestHandler();
+
+  await app.prepare();
+
+  const server = http.createServer((req, res) => handle(req, res));
+
+  server.on('error', (error) => {
+    console.error(error);
+    process.exit(1);
+  });
+
+  server.listen(port, host, () => {
+    log(`Next.js dev server ready at http://${host}:${port}${useTurbopack ? ' (Turbopack)' : ''}`);
   });
 }
 
 removeStaleLock();
 ensurePort3000IsUsable();
-startNextDev();
+startNextDev().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

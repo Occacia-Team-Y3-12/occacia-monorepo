@@ -261,7 +261,10 @@ class EventChatService:
         try:
             tz = ZoneInfo(timezone_str)
         except (ZoneInfoNotFoundError, Exception):
-            tz = ZoneInfo("Asia/Colombo")
+            try:
+                tz = ZoneInfo("UTC")
+            except (ZoneInfoNotFoundError, Exception):
+                tz = timezone.utc
 
         try:
             naive_date = datetime.strptime(date_str, "%Y-%m-%d")
