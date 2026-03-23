@@ -25,7 +25,7 @@ class VendorOrganizationRegisterRequest(BaseModel):
 
 class VendorRegisterRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8)
     display_name: Optional[str] = Field(default=None, alias="displayName")
     contact_phone: Optional[str] = Field(default=None, alias="contactPhone")
     organization_code: Optional[str] = Field(default=None, alias="organizationCode")

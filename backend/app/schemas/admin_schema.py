@@ -12,7 +12,7 @@ from app.schemas.package_schema import (
 
 class AdminRegister(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8)
     staff_role: Optional[str] = "staff"
 
 
@@ -22,6 +22,16 @@ class AdminResponse(BaseModel):
     email: str
     staff_role: Optional[str]
     model_config = ConfigDict(from_attributes=True)
+
+
+class AdminProfileResponse(BaseModel):
+    admin_id: str = Field(alias="adminId")
+    email: str
+    staff_role: Optional[str] = Field(default=None, alias="staffRole")
+    status: Optional[str] = None
+    created_at: Optional[datetime] = Field(default=None, alias="createdAt")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class VendorAdminView(BaseModel):

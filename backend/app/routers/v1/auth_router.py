@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi import HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -49,9 +49,11 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
-class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(alias="currentPassword", min_length=8)
+    new_password: str = Field(alias="newPassword", min_length=8)
+
+    model_config = {"populate_by_name": True}
 
 
 class AdminLoginRequest(BaseModel):
@@ -70,7 +72,13 @@ async def _parse_login_payload(request: Request) -> LoginRequest | SimpleNamespa
     content_type = request.headers.get("content-type", "")
     if "application/json" in content_type:
         body = await request.json()
-        return LoginRequest.model_validate(body)
+        try:
+            return LoginRequest.model_validate(body)
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=exc.errors(),
+            ) from exc
     form     = await request.form()
     username = form.get("username") or form.get("email")
     password = form.get("password")
@@ -93,6 +101,24 @@ def register_customer(payload: CustomerRegister, db: Session = Depends(get_db)):
     Sends a verification email with a link — user clicks link to activate.
     """
     return auth_service.register_customer(db, payload)
+
+
+@router.delete(
+    "/customer/delete",
+    response_model=AuthMessageResponse,
+    tags=["Authentication"],
+)
+def delete_customer_account(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    """Delete authenticated customer account."""
+    return auth_service.delete_customer_account(
+        db=db,
+        customer=current_customer,
+        authorization=request.headers.get("Authorization"),
+    )
 
 
 @router.post("/customer/login", tags=["Authentication"])
@@ -205,13 +231,18 @@ def customer_reset_password(
 
 @router.post("/customer/password/change", response_model=AuthMessageResponse)
 def customer_change_password(
-    payload: ChangePasswordRequest,
+    payload: PasswordChangeRequest,
+    request: Request,
     db: Session = Depends(get_db),
     customer: Customer = Depends(get_current_customer),
 ):
     """Authenticated customer password change."""
-    return auth_service.change_customer_password_authenticated(
-        db, customer, payload.current_password, payload.new_password
+    return auth_service.change_customer_password(
+        db=db,
+        customer=customer,
+        current_password=payload.current_password,
+        new_password=payload.new_password,
+        authorization=request.headers.get("Authorization"),
     )
 
 
@@ -226,7 +257,7 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
     Sends a verification email with a link — user clicks link to activate.
     """
     if vendor_service.get_vendor_by_email(db, email=vendor_data.email):
-        raise HTTPException(status_code=400, detail="Email already taken!")
+        raise HTTPException(status_code=400, detail="Email already registered.")
 
     resolved_business_name = vendor_data.business_name or vendor_data.display_name
     resolved_location_base = vendor_data.location_base
@@ -300,6 +331,24 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
     vendor = vendor_service.create_vendor(db, enriched_vendor_data)
     auth_service.register_vendor_verification(db, vendor)
     return {"message": "Registration successful. Please verify your email."}
+
+
+@router.delete(
+    "/vendor/delete",
+    response_model=AuthMessageResponse,
+    tags=["Authentication"],
+)
+def delete_vendor_account(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_vendor: Vendor = Depends(get_current_vendor),
+):
+    """Delete authenticated vendor account."""
+    return auth_service.delete_vendor_account(
+        db=db,
+        vendor=current_vendor,
+        authorization=request.headers.get("Authorization"),
+    )
 
 
 @router.post("/vendor/login", tags=["Authentication"])
@@ -400,13 +449,18 @@ def vendor_reset_password(
 
 @router.post("/vendor/password/change", response_model=AuthMessageResponse)
 def vendor_change_password(
-    payload: ChangePasswordRequest,
+    payload: PasswordChangeRequest,
+    request: Request,
     db: Session = Depends(get_db),
     vendor: Vendor = Depends(get_current_vendor),
 ):
     """Authenticated vendor password change."""
-    return auth_service.change_vendor_password_authenticated(
-        db, vendor, payload.current_password, payload.new_password
+    return auth_service.change_vendor_password(
+        db=db,
+        vendor=vendor,
+        current_password=payload.current_password,
+        new_password=payload.new_password,
+        authorization=request.headers.get("Authorization"),
     )
 
 
@@ -506,11 +560,32 @@ def admin_logout(
     return admin_service.logout_admin(db, authorization=request.headers.get("Authorization"))
 
 
-@router.post(
-    "/admin/token/refresh",
+@router.delete(
+    "/admin/delete",
+    response_model=AuthMessageResponse,
     tags=["Authentication"],
 )
-def refresh_admin_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
+def delete_admin_account(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    """Delete authenticated admin account."""
+    from app.services.admin_service import admin_service
+    return admin_service.delete_admin_account(
+        db=db,
+        admin=current_admin,
+        authorization=request.headers.get("Authorization"),
+    )
+
+
+@router.post(
+    "/admin/token/refresh",
+    response_model=AuthResponse,
+    response_model_by_alias=True,
+    tags=["Authentication"],
+)
+def admin_refresh_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
     """Refresh admin access token using an admin refresh token."""
     from app.services.admin_service import admin_service
     return admin_service.refresh_admin_token(db, payload.refresh_token)

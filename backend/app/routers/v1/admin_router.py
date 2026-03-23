@@ -23,6 +23,7 @@ from app.schemas.admin_schema import (
     CustomerStatusUpdateRequest, AdminTaskSupportActionRequest, InternalNoteCreateRequest,
     InternalNoteResponse, PaginatedFulfillmentRequestsResponse, PaginatedInternalNotesResponse,
     PaginatedPackageOrdersResponse, PaginatedTasksResponse, AdminDashboardResponse,
+    AdminProfileResponse,
 )
 from app.schemas.event_planning_schema import TaskResponse
 from app.schemas.package_schema import (
@@ -154,13 +155,30 @@ def register_admin(payload: AdminRegister, db: Session = Depends(get_db)):
     Provision a new admin account (internal use only).
     Disabled in production via DISABLE_ADMIN_REGISTER env var.
     """
-    if getattr(settings, "DISABLE_ADMIN_REGISTER", "false").lower() == "true":
+    disable_flag = getattr(settings, "DISABLE_ADMIN_REGISTER", "false")
+    if isinstance(disable_flag, bool):
+        disabled = disable_flag
+    else:
+        disabled = str(disable_flag).lower() == "true"
+    if disabled:
         raise HTTPException(status_code=403, detail="Admin registration is disabled.")
     return admin_service.register_admin(
         db,
         email=payload.email,
         password=payload.password,
         staff_role=payload.staff_role,
+    )
+
+
+@router.get("/me", response_model=AdminProfileResponse)
+def get_admin_me(current_admin: Admin = Depends(get_current_admin)):
+    """Returns the authenticated admin profile."""
+    return AdminProfileResponse(
+        adminId=str(current_admin.admin_id),
+        email=current_admin.email,
+        staffRole=getattr(current_admin, "staff_role", None),
+        status=getattr(current_admin, "status", "ACTIVE"),
+        createdAt=getattr(current_admin, "created_at", None),
     )
 
 
