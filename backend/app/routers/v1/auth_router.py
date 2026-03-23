@@ -152,7 +152,7 @@ def resend_customer_verification_email(
     return auth_service.resend_customer_verification_email(db, payload)
 
 
-# ── Customer forgot password — 3-step OTP flow ───────────────────────────────
+# ── Customer forgot password — reset link flow ───────────────────────────────
 
 @router.post("/customer/password/forgot", response_model=AuthMessageResponse)
 def customer_forgot_password(
@@ -161,7 +161,7 @@ def customer_forgot_password(
 ):
     """
     Step 1 — Forgot password.
-    Sends a 6-digit OTP to the customer's email. OTP expires in 5 minutes.
+    Sends a time-limited password reset link to the customer's email.
     """
     return auth_service.request_customer_password_reset_otp(db, str(payload.email))
 
@@ -171,7 +171,7 @@ def customer_resend_password_otp(
     payload: ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ):
-    """Resend customer password reset OTP."""
+    """Resend customer password reset link."""
     return auth_service.resend_customer_password_reset_otp(db, str(payload.email))
 
 
@@ -197,8 +197,8 @@ def customer_reset_password(
     db: Session = Depends(get_db),
 ):
     """
-    Step 3 — Reset password.
-    Submit the reset token from Step 2 along with the new password.
+    Step 2 — Reset password.
+    Submit the reset token from the email link along with the new password.
     """
     return auth_service.confirm_customer_password_reset(db, payload.reset_token, payload.new_password)
 

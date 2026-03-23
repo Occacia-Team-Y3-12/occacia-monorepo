@@ -28,6 +28,19 @@ export interface LoginFormData {
   password: string;
 }
 
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
+export interface ResetPasswordPayload {
+  token: string;
+  password: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
+}
+
 export interface LoginResponse {
   status?: string;
   message?: string;

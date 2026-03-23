@@ -20,7 +20,7 @@ from app.services.notification_service import (
     NotificationService,
     CUSTOMER_VERIFICATION_NOTIFICATION,
     VENDOR_VERIFICATION_NOTIFICATION,
-    CUSTOMER_PASSWORD_RESET_OTP,
+    CUSTOMER_PASSWORD_RESET_LINK,
     VENDOR_PASSWORD_RESET_OTP,
     ADMIN_PASSWORD_RESET_OTP,
 )
@@ -114,41 +114,45 @@ def test_vendor_verification_subject():
     assert "vendor" in subject.lower() or "Occacia" in subject
 
 
-# ── Customer password reset OTP ───────────────────────────────────────────────
+# ── Customer password reset link ──────────────────────────────────────────────
 
-def test_customer_password_reset_otp_contains_code():
-    """Customer password reset OTP email must contain the OTP code."""
-    otp = "123456"
-    _, body, html = _render(CUSTOMER_PASSWORD_RESET_OTP, {
+def test_customer_password_reset_link_contains_frontend_url():
+    """Customer password reset email must contain the frontend reset link."""
+    token = "reset-token-123"
+    link = f"https://app.occacia.com/customer/auth/reset-password?token={token}"
+    _, body, html = _render(CUSTOMER_PASSWORD_RESET_LINK, {
         "userId": "CUS-001",
         "userName": "Test User",
         "userEmail": "user@test.com",
-        "otpCode": otp,
+        "resetToken": token,
+        "resetLink": link,
     })
-    assert otp in body
-    assert otp in html
+    assert link in body
+    assert link in html
 
 
-def test_customer_password_reset_otp_no_reset_link_in_body():
-    """Customer OTP email must NOT contain a direct reset link (OTP flow only)."""
-    _, body, _ = _render(CUSTOMER_PASSWORD_RESET_OTP, {
+def test_customer_password_reset_link_no_backend_api_path():
+    """Customer password reset email must point to frontend, not backend API."""
+    _, body, _ = _render(CUSTOMER_PASSWORD_RESET_LINK, {
         "userId": "CUS-001",
         "userName": "Test User",
         "userEmail": "user@test.com",
-        "otpCode": "654321",
+        "resetToken": "reset-token-456",
+        "resetLink": "https://app.occacia.com/customer/auth/reset-password?token=reset-token-456",
     })
     assert "/api/v1/auth" not in body
 
 
-def test_customer_password_reset_otp_subject():
-    """Customer password reset OTP subject must mention reset or code."""
-    subject, _, _ = _render(CUSTOMER_PASSWORD_RESET_OTP, {
+def test_customer_password_reset_link_subject():
+    """Customer password reset email subject must mention reset."""
+    subject, _, _ = _render(CUSTOMER_PASSWORD_RESET_LINK, {
         "userId": "CUS-001",
         "userName": "Test User",
         "userEmail": "user@test.com",
-        "otpCode": "000000",
+        "resetToken": "reset-token-789",
+        "resetLink": "https://app.occacia.com/customer/auth/reset-password?token=reset-token-789",
     })
-    assert any(word in subject.lower() for word in ["reset", "password", "code", "occacia"])
+    assert any(word in subject.lower() for word in ["reset", "password", "occacia"])
 
 
 # ── Vendor password reset OTP ─────────────────────────────────────────────────

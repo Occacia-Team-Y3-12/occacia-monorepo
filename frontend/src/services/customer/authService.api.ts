@@ -27,6 +27,21 @@ export const apiCustomerAuthService: CustomerAuthService = {
     });
   },
 
+  forgotPassword: async (email) => {
+    const response = await customerAuthApi.post('/auth/customer/password/forgot', {
+      email,
+    });
+    return response.data;
+  },
+
+  resetPassword: async ({ token, password }) => {
+    const response = await customerAuthApi.post('/auth/customer/password/reset', {
+      reset_token: token,
+      new_password: password,
+    });
+    return response.data;
+  },
+
   login: async (data) => {
     const response = await customerAuthApi.post('/auth/customer/login', data);
     return persistCustomerLoginResult(response.data as CustomerLoginPayload);

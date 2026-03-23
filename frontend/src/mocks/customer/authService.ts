@@ -61,6 +61,30 @@ export const mockCustomerAuthService: CustomerAuthService = {
     await sleep(300);
   },
 
+  forgotPassword: async () => {
+    await sleep(300);
+
+    return {
+      message: 'If this email is registered, a password reset link has been sent.',
+    };
+  },
+
+  resetPassword: async ({ token, password }) => {
+    await sleep(500);
+
+    if (!token || !isValidMockToken(token)) {
+      throw new Error('Invalid or expired reset link.');
+    }
+
+    if (!password.trim()) {
+      throw new Error('Password is required.');
+    }
+
+    return {
+      message: 'Password updated successfully.',
+    };
+  },
+
   login: async (data) => {
     await sleep(350);
 

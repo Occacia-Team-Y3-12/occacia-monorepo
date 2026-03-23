@@ -228,33 +228,34 @@ class AuthService:
         )
         return {"message": "Verification email resent successfully."}
 
-    # ── Customer forgot password — OTP flow ───────────────────────────────────
+    # ── Customer forgot password — reset link flow ────────────────────────────
 
     def request_customer_password_reset_otp(
         self, db: Session, email: str,
     ) -> dict[str, str]:
-        """Step 1 — send OTP to customer email."""
+        """Issue a one-time password reset link for the customer."""
         customer  = customer_service.get_customer_by_email(db, email=email)
         if not customer:
-            return {"message": "If this email is registered, a reset code has been sent."}
+            return {"message": "If this email is registered, a password reset link has been sent."}
 
-        otp_code  = _generate_otp()
-        redis     = _get_redis()
-        redis_key = f"pwd_otp:customer:{email}"
-        if redis:
-            redis.setex(redis_key, OTP_TTL_SECONDS, otp_code)
-        else:
-            logger.warning("Redis unavailable — customer OTP for %s: %s", email, otp_code)
-
-        notification_service.queue_customer_password_reset_otp(
-            db, customer=customer, otp_code=otp_code,
+        reset_token, expires_at = self._create_reset_token(
+            email, role="CUSTOMER", token_type="pwd_reset_link",
         )
-        return {"message": "If this email is registered, a reset code has been sent."}
+        customer.password_reset_token = reset_token
+        customer.password_reset_token_expires_at = expires_at
+        db.add(customer)
+        db.commit()
+        db.refresh(customer)
+
+        notification_service.queue_customer_password_reset_link(
+            db, customer=customer, reset_token=reset_token,
+        )
+        return {"message": "If this email is registered, a password reset link has been sent."}
 
     def resend_customer_password_reset_otp(
         self, db: Session, email: str,
     ) -> dict[str, str]:
-        """Resend password reset OTP to customer email."""
+        """Resend the customer password reset link."""
         return self.request_customer_password_reset_otp(db, email)
 
     def verify_customer_password_reset_otp(
@@ -272,19 +273,36 @@ class AuthService:
             raise HTTPException(status_code=400, detail="Invalid OTP code.")
         redis.delete(redis_key)  # consume — one use only
 
-        reset_token = self._create_reset_token(email, role="CUSTOMER")
+        reset_token, _ = self._create_reset_token(email, role="CUSTOMER")
         return {"resetToken": reset_token, "message": "OTP verified. You may now reset your password."}
 
     def confirm_customer_password_reset(
         self, db: Session, reset_token: str, new_password: str,
     ) -> dict[str, str]:
-        """Step 3 — accept reset token + new password."""
-        claims   = self._decode_reset_token(reset_token, expected_role="CUSTOMER")
+        """Accept a one-time reset token and update the customer password."""
+        claims   = self._decode_reset_token(
+            reset_token,
+            expected_role="CUSTOMER",
+            allowed_types=("pwd_reset_verified", "pwd_reset_link"),
+        )
         email    = claims.get("sub")
         customer = customer_service.get_customer_by_email(db, email=email)
         if not customer:
             raise HTTPException(status_code=404, detail="User not found.")
+        if customer.password_reset_token != reset_token:
+            raise HTTPException(status_code=400, detail="Invalid reset token.")
+        if (
+            customer.password_reset_token_expires_at is not None and
+            customer.password_reset_token_expires_at < datetime.now(UTC)
+        ):
+            customer.password_reset_token = None
+            customer.password_reset_token_expires_at = None
+            db.add(customer)
+            db.commit()
+            raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new password reset link.")
         customer.password_hash = get_password_hash(new_password)
+        customer.password_reset_token = None
+        customer.password_reset_token_expires_at = None
         db.add(customer)
         db.commit()
         logger.info("Customer password reset: %s", email)
@@ -432,7 +450,7 @@ class AuthService:
             raise HTTPException(status_code=400, detail="Invalid OTP code.")
         redis.delete(redis_key)
 
-        reset_token = self._create_reset_token(email, role="VENDOR")
+        reset_token, _ = self._create_reset_token(email, role="VENDOR")
         return {"resetToken": reset_token, "message": "OTP verified. You may now reset your password."}
 
     def confirm_vendor_password_reset(
@@ -505,24 +523,32 @@ class AuthService:
 
     # ── Token helpers ─────────────────────────────────────────────────────────
 
-    def _create_reset_token(self, email: str, role: str) -> str:
-        """Short-lived JWT issued after OTP verified. Authorises the final password reset."""
+    def _create_reset_token(
+        self, email: str, role: str, token_type: str = "pwd_reset_verified",
+    ) -> tuple[str, datetime]:
+        """Short-lived JWT authorising the final password reset."""
         expires_at = datetime.now(UTC) + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
-        return jwt.encode(
-            {"sub": email, "type": "pwd_reset_verified", "role": role, "exp": expires_at},
+        token = jwt.encode(
+            {"sub": email, "type": token_type, "role": role, "exp": expires_at},
             SECRET_KEY, algorithm=ALGORITHM,
         )
+        return token, expires_at
 
-    def _decode_reset_token(self, token: str, expected_role: str) -> dict:
+    def _decode_reset_token(
+        self,
+        token: str,
+        expected_role: str,
+        allowed_types: tuple[str, ...] = ("pwd_reset_verified",),
+    ) -> dict:
         try:
             claims = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         except ExpiredSignatureError as exc:
             raise HTTPException(
-                status_code=400, detail="Reset token has expired. Please request a new OTP.",
+                status_code=400, detail="Reset token has expired. Please request a new password reset link.",
             ) from exc
         except PyJWTError as exc:
             raise HTTPException(status_code=400, detail="Invalid reset token.") from exc
-        if claims.get("type") != "pwd_reset_verified":
+        if claims.get("type") not in allowed_types:
             raise HTTPException(status_code=400, detail="Invalid reset token.")
         if claims.get("role") != expected_role:
             raise HTTPException(status_code=400, detail="Invalid reset token.")

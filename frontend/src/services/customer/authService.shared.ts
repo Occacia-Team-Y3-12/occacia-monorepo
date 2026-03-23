@@ -2,10 +2,13 @@ import axios from 'axios';
 
 import { API_BASE_URL } from '@/services/api';
 import type {
+  ForgotPasswordResponse,
   LoginFormData,
   LoginResponse,
   RegisterFormData,
   RegisterResponse,
+  ResetPasswordPayload,
+  ResetPasswordResponse,
   VerifyEmailResponse,
 } from '@/types/customer/auth';
 
@@ -13,6 +16,8 @@ export type CustomerAuthService = {
   register: (data: RegisterFormData) => Promise<RegisterResponse>;
   verifyEmail: (token: string) => Promise<VerifyEmailResponse>;
   resendVerification: (email: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<ForgotPasswordResponse>;
+  resetPassword: (payload: ResetPasswordPayload) => Promise<ResetPasswordResponse>;
   login: (data: LoginFormData) => Promise<LoginResponse>;
   refreshToken: (refreshToken?: string) => Promise<LoginResponse>;
   logout: () => Promise<void>;
