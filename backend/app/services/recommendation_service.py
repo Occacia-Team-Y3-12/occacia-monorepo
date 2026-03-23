@@ -200,7 +200,13 @@ class RecommendationService:
             .all()
         )
         if not packages:
-            raise HTTPException(status_code=404, detail="Recommendation packages not found")
+            return RecommendationPackageListResponse(
+                eventId=event_id,
+                generatedAt=now_utc(),
+                expiresAt=None,
+                isExpired=False,
+                packages=[],
+            )
         return self._build_package_list_response(db, event_id=event_id, packages=packages)
 
     def get_package_by_id(
