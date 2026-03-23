@@ -112,6 +112,15 @@ _TASK_TEMPLATES = {
 
 
 class EventPlanningService:
+    @staticmethod
+    def _normalize_calendar_provider(provider: object) -> str | None:
+        if provider is None:
+            return None
+        if not isinstance(provider, str):
+            return None
+        normalized = provider.strip().upper()
+        return normalized or None
+
     def get_event_for_customer(self, db: Session, *, customer_id: str, event_id: str) -> Event:
         event = (
             db.query(Event)
@@ -508,7 +517,7 @@ class EventPlanningService:
                 event.calendar_last_sync_status = None
                 event.calendar_last_sync_at = None
         else:
-            provider = payload.get("provider") or customer.calendar_provider
+            provider = self._normalize_calendar_provider(payload.get("provider")) or customer.calendar_provider
             if provider not in _CALENDAR_PROVIDERS:
                 raise HTTPException(status_code=400, detail="Calendar provider is not connected")
             if customer.calendar_provider != provider:
@@ -583,6 +592,7 @@ class EventPlanningService:
         provider: str,
         redirect_uri: str,
     ) -> dict[str, str]:
+        provider = self._normalize_calendar_provider(provider)
         if provider not in _CALENDAR_PROVIDERS:
             raise HTTPException(status_code=400, detail="Unsupported calendar provider")
         customer = self._get_customer(db, customer_id)
@@ -609,6 +619,7 @@ class EventPlanningService:
         state: str | None,
         redirect_uri: str | None = None,
     ) -> Customer:
+        provider = self._normalize_calendar_provider(provider)
         if provider not in _CALENDAR_PROVIDERS:
             raise HTTPException(status_code=400, detail="Unsupported calendar provider")
         if not code.strip():
