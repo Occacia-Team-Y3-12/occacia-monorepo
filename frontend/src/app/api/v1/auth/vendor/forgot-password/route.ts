@@ -10,5 +10,5 @@ export async function POST(request: NextRequest) {
     return mockVendorForgotPassword(payload);
   }
 
-  return proxyApiRequest(request, '/auth/vendor/forgot-password');
+  return proxyApiRequest(request, '/auth/vendor/password/forgot');
 }

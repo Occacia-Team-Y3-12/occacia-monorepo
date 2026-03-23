@@ -348,7 +348,7 @@ def resend_vendor_verification_email(
     return auth_service.resend_vendor_verification_email(db, payload)
 
 
-# ── Vendor forgot password — 3-step OTP flow ─────────────────────────────────
+# ── Vendor forgot password — reset link flow ─────────────────────────────────
 
 @router.post("/vendor/password/forgot", response_model=AuthMessageResponse)
 def vendor_forgot_password(
@@ -357,7 +357,7 @@ def vendor_forgot_password(
 ):
     """
     Step 1 — Forgot password.
-    Sends a 6-digit OTP to the vendor's email. OTP expires in 5 minutes.
+    Sends a time-limited password reset link to the vendor's email.
     """
     return auth_service.request_vendor_password_reset_otp(db, str(payload.email))
 
@@ -367,7 +367,7 @@ def vendor_resend_password_otp(
     payload: ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ):
-    """Resend vendor password reset OTP."""
+    """Resend vendor password reset link."""
     return auth_service.resend_vendor_password_reset_otp(db, str(payload.email))
 
 
@@ -392,8 +392,8 @@ def vendor_reset_password(
     db: Session = Depends(get_db),
 ):
     """
-    Step 3 — Reset password.
-    Submit the reset token from Step 2 and the new password.
+    Step 2 — Reset password.
+    Submit the reset token from the email link and the new password.
     """
     return auth_service.confirm_vendor_password_reset(db, payload.reset_token, payload.new_password)
 

@@ -27,6 +27,8 @@ class Vendor(Base):
     phone = Column(String, nullable=True)
     is_verified = Column(Boolean, default=False)
     password_hash = Column(String, nullable=True)
+    password_reset_token = Column(String, nullable=True)
+    password_reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     offerings = relationship("Offering", back_populates="vendor", cascade="all, delete-orphan")

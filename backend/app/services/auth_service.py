@@ -406,33 +406,34 @@ class AuthService:
         self.register_vendor_verification(db, vendor)
         return {"message": "Verification email resent successfully."}
 
-    # ── Vendor forgot password — OTP flow ─────────────────────────────────────
+    # ── Vendor forgot password — reset link flow ──────────────────────────────
 
     def request_vendor_password_reset_otp(
         self, db: Session, email: str,
     ) -> dict[str, str]:
-        """Step 1 — send OTP to vendor email."""
+        """Issue a one-time password reset link for the vendor."""
         vendor    = vendor_service.get_vendor_by_email(db, email=email)
         if not vendor:
-            return {"message": "If this email is registered, a reset code has been sent."}
+            return {"message": "If this email is registered, a password reset link has been sent."}
 
-        otp_code  = _generate_otp()
-        redis     = _get_redis()
-        redis_key = f"pwd_otp:vendor:{email}"
-        if redis:
-            redis.setex(redis_key, OTP_TTL_SECONDS, otp_code)
-        else:
-            logger.warning("Redis unavailable — vendor OTP for %s: %s", email, otp_code)
-
-        notification_service.queue_vendor_password_reset_otp(
-            db, vendor=vendor, otp_code=otp_code,
+        reset_token, expires_at = self._create_reset_token(
+            email, role="VENDOR", token_type="pwd_reset_link",
         )
-        return {"message": "If this email is registered, a reset code has been sent."}
+        vendor.password_reset_token = reset_token
+        vendor.password_reset_token_expires_at = expires_at
+        db.add(vendor)
+        db.commit()
+        db.refresh(vendor)
+
+        notification_service.queue_vendor_password_reset_link(
+            db, vendor=vendor, reset_token=reset_token,
+        )
+        return {"message": "If this email is registered, a password reset link has been sent."}
 
     def resend_vendor_password_reset_otp(
         self, db: Session, email: str,
     ) -> dict[str, str]:
-        """Resend password reset OTP to vendor email."""
+        """Resend the vendor password reset link."""
         return self.request_vendor_password_reset_otp(db, email)
 
     def verify_vendor_password_reset_otp(
@@ -456,13 +457,30 @@ class AuthService:
     def confirm_vendor_password_reset(
         self, db: Session, reset_token: str, new_password: str,
     ) -> dict[str, str]:
-        """Step 3 — accept reset token + new password."""
-        claims = self._decode_reset_token(reset_token, expected_role="VENDOR")
+        """Accept a one-time reset token and update the vendor password."""
+        claims = self._decode_reset_token(
+            reset_token,
+            expected_role="VENDOR",
+            allowed_types=("pwd_reset_verified", "pwd_reset_link"),
+        )
         email  = claims.get("sub")
         vendor = vendor_service.get_vendor_by_email(db, email=email)
         if not vendor:
             raise HTTPException(status_code=404, detail="Vendor not found.")
+        if vendor.password_reset_token != reset_token:
+            raise HTTPException(status_code=400, detail="Invalid reset token.")
+        if (
+            vendor.password_reset_token_expires_at is not None and
+            vendor.password_reset_token_expires_at < datetime.now(UTC)
+        ):
+            vendor.password_reset_token = None
+            vendor.password_reset_token_expires_at = None
+            db.add(vendor)
+            db.commit()
+            raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new password reset link.")
         vendor.password_hash = get_password_hash(new_password)
+        vendor.password_reset_token = None
+        vendor.password_reset_token_expires_at = None
         db.add(vendor)
         db.commit()
         logger.info("Vendor password reset: %s", email)

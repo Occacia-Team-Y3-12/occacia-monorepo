@@ -60,7 +60,7 @@ export type VendorAuthService = {
     payload: VendorFormData & { organizationType: 'join' | 'create' }
   ) => Promise<RegisterResult>;
   resendVerification: (email: string) => Promise<{ ok: boolean; message?: string }>;
-  forgotPassword: (email: string) => Promise<{ ok: boolean }>;
+  forgotPassword: (email: string) => Promise<{ ok: boolean; message?: string }>;
   resetPassword: (payload: {
     token: string;
     password: string;

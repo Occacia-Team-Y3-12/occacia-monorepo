@@ -29,7 +29,7 @@ TASK_CONFIRMED_NOTIFICATION             = "TASK_CONFIRMED"
 CUSTOMER_VERIFICATION_NOTIFICATION     = "CUSTOMER_VERIFICATION"
 VENDOR_VERIFICATION_NOTIFICATION       = "VENDOR_VERIFICATION"
 CUSTOMER_PASSWORD_RESET_LINK           = "CUSTOMER_PASSWORD_RESET_LINK"
-VENDOR_PASSWORD_RESET_OTP              = "VENDOR_PASSWORD_RESET_OTP"
+VENDOR_PASSWORD_RESET_LINK             = "VENDOR_PASSWORD_RESET_LINK"
 ADMIN_LOGIN_OTP_NOTIFICATION           = "ADMIN_LOGIN_OTP"
 ADMIN_PASSWORD_RESET_OTP               = "ADMIN_PASSWORD_RESET_OTP"
 
@@ -167,14 +167,14 @@ _TEMPLATES: dict[str, NotificationTemplate] = {
         ),
     ),
 
-    VENDOR_PASSWORD_RESET_OTP: NotificationTemplate(
-        subject="Your Occacia vendor account password reset code",
+    VENDOR_PASSWORD_RESET_LINK: NotificationTemplate(
+        subject="Reset your Occacia vendor password",
         text_body=(
             "Hi {userName},\n\n"
             "We received a request to reset the password for your Occacia vendor account.\n\n"
-            "Your password reset code is:\n\n"
-            "{otpCode}\n\n"
-            "Enter this code on the password reset page to continue.\n\n"
+            "Use the secure password reset link below to continue:\n\n"
+            "{resetLink}\n\n"
+            "This link expires in 10 minutes and can only be used once.\n\n"
             "If you did not request a password reset, you can safely ignore this email."
         ),
         html_body=(
@@ -182,11 +182,15 @@ _TEMPLATES: dict[str, NotificationTemplate] = {
             "<div style='background:#6C3FC5;padding:24px;text-align:center;'>"
             "<h1 style='color:#fff;margin:0;font-size:24px;'>Occacia Vendors</h1></div>"
             "<div style='padding:32px;'>"
-            "<h2 style='color:#6C3FC5;'>Vendor Password Reset Code</h2>"
+            "<h2 style='color:#6C3FC5;'>Reset Your Vendor Password</h2>"
             "<p>Hi {userName},</p>"
             "<p>We received a request to reset the password for your Occacia vendor account. "
-            "Enter the code below on the password reset page:</p>"
-            "{otpBlock}"
+            "Use the secure link below to set a new password:</p>"
+            "<div style='text-align:center;margin:32px 0;'>"
+            "<a href='{resetLink}' style='background:#6C3FC5;color:#fff;"
+            "padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:bold;"
+            "font-size:16px;'>Reset Vendor Password</a></div>"
+            "<p style='color:#888;font-size:13px;'>This link expires in 10 minutes and can only be used once.</p>"
             "<p style='color:#888;font-size:13px;'>"
             "If you did not request this, your password will not be changed.</p>"
             "</div></body></html>"
@@ -444,18 +448,22 @@ class NotificationService:
             },
         )
 
-    def queue_vendor_password_reset_otp(
-        self, db: Session, *, vendor: Vendor, otp_code: str,
+    def queue_vendor_password_reset_link(
+        self, db: Session, *, vendor: Vendor, reset_token: str,
     ) -> Notification | None:
         return self.enqueue_notification(
             db,
-            notification_type=VENDOR_PASSWORD_RESET_OTP,
+            notification_type=VENDOR_PASSWORD_RESET_LINK,
             recipient_id=vendor.vendor_id,
             context_data={
                 "userId": vendor.vendor_id,
                 "userName": vendor.display_name or vendor.business_name or vendor.email,
                 "userEmail": vendor.email,
-                "otpCode": otp_code,
+                "resetToken": reset_token,
+                "resetLink": (
+                    f"https://app.occacia.com/vendor/auth/reset-password"
+                    f"?token={reset_token}"
+                ),
             },
         )
 

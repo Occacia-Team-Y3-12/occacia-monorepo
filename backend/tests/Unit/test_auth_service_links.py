@@ -21,7 +21,7 @@ from app.services.notification_service import (
     CUSTOMER_VERIFICATION_NOTIFICATION,
     VENDOR_VERIFICATION_NOTIFICATION,
     CUSTOMER_PASSWORD_RESET_LINK,
-    VENDOR_PASSWORD_RESET_OTP,
+    VENDOR_PASSWORD_RESET_LINK,
     ADMIN_PASSWORD_RESET_OTP,
 )
 
@@ -155,28 +155,31 @@ def test_customer_password_reset_link_subject():
     assert any(word in subject.lower() for word in ["reset", "password", "occacia"])
 
 
-# ── Vendor password reset OTP ─────────────────────────────────────────────────
+# ── Vendor password reset link ────────────────────────────────────────────────
 
-def test_vendor_password_reset_otp_contains_code():
-    """Vendor password reset OTP email must contain the OTP code."""
-    otp = "789012"
-    _, body, html = _render(VENDOR_PASSWORD_RESET_OTP, {
+def test_vendor_password_reset_link_contains_frontend_url():
+    """Vendor password reset email must contain the frontend reset link."""
+    token = "vendor-reset-token-123"
+    link = f"https://app.occacia.com/vendor/auth/reset-password?token={token}"
+    _, body, html = _render(VENDOR_PASSWORD_RESET_LINK, {
         "userId": "VEN-001",
         "userName": "Test Vendor",
         "userEmail": "vendor@test.com",
-        "otpCode": otp,
+        "resetToken": token,
+        "resetLink": link,
     })
-    assert otp in body
-    assert otp in html
+    assert link in body
+    assert link in html
 
 
-def test_vendor_password_reset_otp_subject_mentions_vendor():
-    """Vendor password reset OTP subject must mention vendor."""
-    subject, _, _ = _render(VENDOR_PASSWORD_RESET_OTP, {
+def test_vendor_password_reset_link_subject_mentions_vendor():
+    """Vendor password reset email subject must mention vendor."""
+    subject, _, _ = _render(VENDOR_PASSWORD_RESET_LINK, {
         "userId": "VEN-001",
         "userName": "Test Vendor",
         "userEmail": "vendor@test.com",
-        "otpCode": "111111",
+        "resetToken": "vendor-reset-token-456",
+        "resetLink": "https://app.occacia.com/vendor/auth/reset-password?token=vendor-reset-token-456",
     })
     assert "vendor" in subject.lower() or "Occacia" in subject
 

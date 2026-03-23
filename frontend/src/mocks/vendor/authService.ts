@@ -62,8 +62,13 @@ export const mockVendorAuthService: VendorAuthService = {
   },
 
   async forgotPassword(email) {
-    await sleep(1200);
-    return { ok: email.trim().length > 0 };
+    await sleep(350);
+    return {
+      ok: email.trim().length > 0,
+      message: email.trim().length > 0
+        ? 'If this email is registered, a password reset link has been sent.'
+        : 'Email is required.',
+    };
   },
 
   async resetPassword(payload) {

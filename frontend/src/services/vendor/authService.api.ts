@@ -220,20 +220,33 @@ export const apiVendorAuthService: VendorAuthService = {
   },
 
   async forgotPassword(email) {
-    const response = await fetch(`${VENDOR_AUTH_API_BASE}/forgot-password`, {
+    const response = await fetch(`${VENDOR_AUTH_API_BASE}/password/forgot`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
 
-    return { ok: response.ok };
+    let data: { message?: string; detail?: string } = {};
+    try {
+      data = (await response.json()) as { message?: string; detail?: string };
+    } catch {
+      data = {};
+    }
+
+    return {
+      ok: response.ok,
+      message: data.message || data.detail,
+    };
   },
 
   async resetPassword(payload) {
-    const response = await fetch(`${VENDOR_AUTH_API_BASE}/reset-password`, {
+    const response = await fetch(`${VENDOR_AUTH_API_BASE}/password/reset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        reset_token: payload.token,
+        new_password: payload.password,
+      }),
     });
 
     let data: { message?: string } = {};

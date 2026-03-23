@@ -14,5 +14,5 @@ export async function POST(request: NextRequest) {
     return mockVendorResetPassword(payload);
   }
 
-  return proxyApiRequest(request, '/auth/vendor/reset-password');
+  return proxyApiRequest(request, '/auth/vendor/password/reset');
 }
