@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 import { ROUTES } from '@/lib/routes';
@@ -16,7 +16,7 @@ const resolveRedirectUri = () => {
   return '';
 };
 
-export default function OAuthCallbackPage() {
+function OAuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [message, setMessage] = useState('Completing Google Calendar connection...');
@@ -86,5 +86,21 @@ export default function OAuthCallbackPage() {
         <p className="mt-2 text-sm text-[#666666]">{message}</p>
       </div>
     </main>
+  );
+}
+
+export default function OAuthCallbackPage() {
+  return (
+    <Suspense fallback={
+      <main className="flex min-h-screen items-center justify-center bg-[#F4F8FA] p-6">
+        <div className="w-full max-w-md rounded-2xl border border-[#EAEAEA] bg-white p-6 text-center">
+          <h1 className="text-lg font-semibold text-[#0D47A1]">Calendar Authorization</h1>
+          <p className="mt-2 text-sm text-[#666666]">Preparing callback...</p>
+        </div>
+      </main>
+    }
+    >
+      <OAuthCallbackContent />
+    </Suspense>
   );
 }
