@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ROUTES } from '@/lib/routes';
@@ -22,6 +23,8 @@ type OrderRow = {
   budget: string;
   status: 'New Order' | 'Preparing' | 'Ready' | 'Delivered';
 };
+
+type OrderFilter = 'all' | 'pending' | 'completed';
 
 const statCards: StatCard[] = [
   { title: 'New Orders Today', value: '24', note: '+12%', noteTone: 'green', iconBg: 'bg-blue-100', icon: '/icons/vendor/dashboard/stat-bag.svg' },
@@ -78,7 +81,42 @@ const recipientTypes = [
   { label: 'Elderly Visits', value: 15, color: 'bg-emerald-500' },
 ];
 
+const orderFilterOptions: Array<{
+  value: OrderFilter;
+  label: string;
+  icon: string;
+  iconAlt: string;
+}> = [
+  { value: 'all', label: 'All Orders', icon: '/icons/vendor/dashboard/filter-all-orders.svg', iconAlt: 'All orders' },
+  { value: 'pending', label: 'Pending', icon: '/icons/vendor/dashboard/filter-pending.svg', iconAlt: 'Pending' },
+  { value: 'completed', label: 'Completed', icon: '/icons/vendor/dashboard/filter-completed.svg', iconAlt: 'Completed' },
+];
+
+function getOrderFilter(status: OrderRow['status']): Exclude<OrderFilter, 'all'> {
+  if (status === 'Ready' || status === 'Delivered') {
+    return 'completed';
+  }
+
+  return 'pending';
+}
+
+function buildOrdersHref(filter: OrderFilter): string {
+  if (filter === 'all') {
+    return ROUTES.VENDOR.ORDERS;
+  }
+
+  return `${ROUTES.VENDOR.ORDERS}?status=${filter}`;
+}
+
 export default function VendorDashboard() {
+  const [orderFilter, setOrderFilter] = useState<OrderFilter>('all');
+  const [isRecipientReportOpen, setIsRecipientReportOpen] = useState(false);
+
+  const filteredOrders =
+    orderFilter === 'all'
+      ? orders
+      : orders.filter((order) => getOrderFilter(order.status) === orderFilter);
+
   return (
     <VendorPortalShell>
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -110,18 +148,23 @@ export default function VendorDashboard() {
               <p className="text-sm text-slate-500">Manage and fulfill customer orders</p>
             </div>
             <div className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-slate-100 p-1 text-sm sm:w-auto">
-              <button type="button" className="rounded-lg bg-white px-3 py-2 font-medium text-blue-700 shadow-sm inline-flex items-center gap-2 sm:px-4">
-                <Image src="/icons/vendor/dashboard/filter-all-orders.svg" alt="All orders" width={16} height={16} className="h-4 w-4" />
-                All Orders
-              </button>
-              <button type="button" className="rounded-lg px-3 py-2 text-slate-600 inline-flex items-center gap-2 sm:px-4">
-                <Image src="/icons/vendor/dashboard/filter-pending.svg" alt="Pending" width={16} height={16} className="h-4 w-4" />
-                Pending
-              </button>
-              <button type="button" className="rounded-lg px-3 py-2 text-slate-600 inline-flex items-center gap-2 sm:px-4">
-                <Image src="/icons/vendor/dashboard/filter-completed.svg" alt="Completed" width={16} height={16} className="h-4 w-4" />
-                Completed
-              </button>
+              {orderFilterOptions.map((option) => {
+                const isActive = orderFilter === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setOrderFilter(option.value)}
+                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 sm:px-4 ${
+                      isActive ? 'bg-white font-medium text-blue-700 shadow-sm' : 'text-slate-600'
+                    }`}
+                  >
+                    <Image src={option.icon} alt={option.iconAlt} width={16} height={16} className="h-4 w-4" />
+                    {option.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -138,31 +181,43 @@ export default function VendorDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((order) => (
-                  <tr key={order.id} className="rounded-xl bg-slate-50">
-                    <td className="rounded-l-xl px-2 py-3 text-xs font-semibold text-blue-700 sm:text-sm">{order.id}</td>
-                    <td className="px-2 py-3 text-sm font-semibold text-slate-800 sm:text-base">{order.occasion}</td>
-                    <td className="px-2 py-3">
-                      <div className="text-sm font-semibold text-slate-800 sm:text-base">{order.recipient}</div>
-                      <div className="text-xs text-slate-500 sm:text-sm">{order.recipientMeta}</div>
-                    </td>
-                    <td className="px-2 py-3 text-sm font-semibold text-slate-800 sm:text-base">{order.budget}</td>
-                    <td className="px-2 py-3">
-                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusPillClass[order.status]}`}>{order.status}</span>
-                    </td>
-                    <td className="rounded-r-xl px-2 py-3 text-blue-600">
-                      <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm">
-                        <Image src="/icons/vendor/dashboard/table-action-view.svg" alt="View" width={18} height={18} className="h-[18px] w-[18px]" />
-                      </button>
+                {filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                      No {orderFilter === 'all' ? 'orders' : orderFilter} orders to show right now.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredOrders.map((order) => (
+                    <tr key={order.id} className="rounded-xl bg-slate-50">
+                      <td className="rounded-l-xl px-2 py-3 text-xs font-semibold text-blue-700 sm:text-sm">{order.id}</td>
+                      <td className="px-2 py-3 text-sm font-semibold text-slate-800 sm:text-base">{order.occasion}</td>
+                      <td className="px-2 py-3">
+                        <div className="text-sm font-semibold text-slate-800 sm:text-base">{order.recipient}</div>
+                        <div className="text-xs text-slate-500 sm:text-sm">{order.recipientMeta}</div>
+                      </td>
+                      <td className="px-2 py-3 text-sm font-semibold text-slate-800 sm:text-base">{order.budget}</td>
+                      <td className="px-2 py-3">
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusPillClass[order.status]}`}>{order.status}</span>
+                      </td>
+                      <td className="rounded-r-xl px-2 py-3 text-blue-600">
+                        <Link
+                          href={buildOrdersHref(getOrderFilter(order.status))}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm transition hover:bg-slate-100"
+                          aria-label={`View ${order.id}`}
+                        >
+                          <Image src="/icons/vendor/dashboard/table-action-view.svg" alt="View" width={18} height={18} className="h-[18px] w-[18px]" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
 
           <div className="mt-2 text-center">
-            <Link href={ROUTES.VENDOR.ORDERS} className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-800">
+            <Link href={buildOrdersHref(orderFilter)} className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-800">
               View All Orders
               <Image src="/icons/vendor/dashboard/link-view-orders.svg" alt="" aria-hidden="true" width={16} height={16} className="h-4 w-4" />
             </Link>
@@ -173,27 +228,31 @@ export default function VendorDashboard() {
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:p-5">
             <h3 className="mb-4 text-base font-semibold text-slate-900">Quick Actions</h3>
             <div className="space-y-3 text-sm">
-              <button className="w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white shadow-md hover:bg-blue-700 inline-flex items-center justify-center gap-2" type="button">
+              <Link href={`${ROUTES.VENDOR.OFFERINGS}?new=1`} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white shadow-md hover:bg-blue-700">
                 <Image src="/icons/vendor/dashboard/quick-package.svg" alt="" aria-hidden="true" width={18} height={18} className="h-[18px] w-[18px]" />
                 Create New Package
-              </button>
+              </Link>
               <Link href={ROUTES.VENDOR.OFFERINGS} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-2">
                 <Image src="/icons/vendor/dashboard/quick-inventory.svg" alt="" aria-hidden="true" width={18} height={18} className="h-[18px] w-[18px]" />
                 Manage Offerings
               </Link>
-              <button className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-2" type="button">
+              <Link href={ROUTES.VENDOR.ACTIVITIES} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50">
                 <Image src="/icons/vendor/dashboard/quick-delivery.svg" alt="" aria-hidden="true" width={18} height={18} className="h-[18px] w-[18px]" />
                 Schedule Delivery
-              </button>
+              </Link>
             </div>
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-base font-semibold text-slate-900">Top Recipient Types</h3>
-              <button type="button" className="text-sm font-semibold text-blue-700 hover:text-blue-800 inline-flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setIsRecipientReportOpen((previous) => !previous)}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:text-blue-800"
+              >
                 <Image src="/icons/vendor/dashboard/link-report.svg" alt="" aria-hidden="true" width={16} height={16} className="h-4 w-4" />
-                View Report
+                {isRecipientReportOpen ? 'Hide Report' : 'View Report'}
               </button>
             </div>
 
@@ -210,6 +269,12 @@ export default function VendorDashboard() {
                 </div>
               ))}
             </div>
+
+            {isRecipientReportOpen ? (
+              <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-slate-700">
+                Birthday celebrations remain your strongest segment, while date-night packages are the clearest growth area for upcoming campaigns and featured offerings.
+              </div>
+            ) : null}
           </section>
         </div>
       </section>

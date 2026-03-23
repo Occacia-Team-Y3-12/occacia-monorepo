@@ -1,25 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, PackageOpen, LayoutDashboard, Package, ShoppingBag, LogOut } from 'lucide-react';
+import { Plus, PackageOpen } from 'lucide-react';
 import OfferingCard from '@/components/vendor/offerings/OfferingCard';
 import OfferingForm from '@/components/vendor/offerings/OfferingForm';
+import VendorPortalShell from '@/components/features/vendor/VendorPortalShell';
 import { Offering, CreateOfferingData } from '@/types/vendor/offering';
 import { offeringService } from '@/services/vendor/offeringService';
 import { ROUTES } from '@/lib/routes';
 
-const navItems = [
-  { href: ROUTES.VENDOR.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/vendor/offerings', label: 'Manage Offerings', icon: Package },
-  { href: ROUTES.VENDOR.ORDERS, label: 'Orders', icon: ShoppingBag },
-];
-
 export default function OfferingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [offerings, setOfferings] = useState<Offering[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -29,6 +23,13 @@ export default function OfferingsPage() {
   useEffect(() => {
     fetchOfferings();
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setEditingOffering(null);
+      setShowForm(true);
+    }
+  }, [searchParams]);
 
   const fetchOfferings = async () => {
     setIsLoading(true);
@@ -92,38 +93,8 @@ export default function OfferingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f6fb] flex">
-      {/* Sidebar */}
-      <aside className="w-[250px] shrink-0 border-r border-slate-200 bg-white flex flex-col px-4 py-2 min-h-screen">
-        <div className="mb-6 flex items-center gap-2 py-1">
-          <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="ml-[-8px] h-[59px] w-[59px] shrink-0" priority />
-          <span className="text-[22px] font-extrabold tracking-tight text-[#1562CC]">OCCACIA</span>
-        </div>
-
-        <nav className="space-y-1 flex-1">
-          {navItems.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href}
-              className={`flex items-center gap-3 px-3 py-3 rounded-xl text-base font-medium transition ${
-                href === '/vendor/offerings'
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}>
-              <Icon size={20} />
-              {label}
-            </Link>
-          ))}
-        </nav>
-
-        <button onClick={() => router.push(ROUTES.VENDOR.LOGIN)}
-          className="flex items-center gap-3 px-3 py-3 rounded-xl text-base font-medium text-slate-600 hover:bg-slate-100 transition mt-auto">
-          <LogOut size={20} />
-          Logout
-        </button>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 p-6 overflow-x-hidden">
-        <div className="max-w-5xl mx-auto">
+    <VendorPortalShell>
+      <div className="mx-auto max-w-5xl">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Manage Offerings</h1>
@@ -189,8 +160,7 @@ export default function OfferingsPage() {
               </div>
             </>
           )}
-        </div>
-      </main>
-    </div>
+      </div>
+    </VendorPortalShell>
   );
 }

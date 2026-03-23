@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import VendorPortalShell from '@/components/features/vendor/VendorPortalShell';
 import { vendorTaskApi } from '@/services/vendorTaskApi';
 import { TaskCard } from '@/components/vendor/TaskCard';
 import { TaskStatusTabs } from '@/components/vendor/TaskStatusTabs';
@@ -60,21 +61,24 @@ function VendorActivitiesContent() {
   
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <AlertCircle className="w-12 h-12 text-red-500" />
-        <h3 className="text-lg font-semibold">Failed to load activities</h3>
-        <button 
-          onClick={() => refetch()}
-          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
-        >
-          Try Again
-        </button>
-      </div>
+      <VendorPortalShell>
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 rounded-2xl border border-slate-200 bg-white">
+          <AlertCircle className="w-12 h-12 text-red-500" />
+          <h3 className="text-lg font-semibold">Failed to load activities</h3>
+          <button 
+            onClick={() => refetch()}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+          >
+            Try Again
+          </button>
+        </div>
+      </VendorPortalShell>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <VendorPortalShell>
+    <div className="container mx-auto px-0 py-2 max-w-7xl">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Assigned Activities</h1>
@@ -116,5 +120,6 @@ function VendorActivitiesContent() {
         )}
       </div>
     </div>
+    </VendorPortalShell>
   );
 }
