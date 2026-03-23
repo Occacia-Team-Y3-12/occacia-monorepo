@@ -32,14 +32,7 @@ export const shouldUseCustomerPlanningMockApi = () => {
 };
 
 export const shouldUseVendorAuthMock = () => {
-  const enableFrontendMocks = envFlag(
-    process.env.NEXT_PUBLIC_ENABLE_FRONTEND_MOCKS
-  );
-
-  return envFlag(
-    process.env.NEXT_PUBLIC_USE_VENDOR_AUTH_MOCK,
-    enableFrontendMocks
-  );
+  return envFlag(process.env.NEXT_PUBLIC_USE_VENDOR_AUTH_MOCK);
 };
 
 export async function proxyApiRequest(

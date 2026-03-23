@@ -41,16 +41,13 @@ export const featureFlags = {
     enableFrontendMocks
   ),
   useVendorAuthMock: envFlag(
-    process.env.NEXT_PUBLIC_USE_VENDOR_AUTH_MOCK,
-    enableFrontendMocks
+    process.env.NEXT_PUBLIC_USE_VENDOR_AUTH_MOCK
   ),
   useVendorOfferingsMock: envFlag(
-    process.env.NEXT_PUBLIC_USE_VENDOR_OFFERINGS_MOCK,
-    enableFrontendMocks
+    process.env.NEXT_PUBLIC_USE_VENDOR_OFFERINGS_MOCK
   ),
   useVendorTasksMock: envFlag(
-    process.env.NEXT_PUBLIC_USE_VENDOR_TASKS_MOCK,
-    enableFrontendMocks
+    process.env.NEXT_PUBLIC_USE_VENDOR_TASKS_MOCK
   ),
   useCustomerPackagesMock: envFlag(
     process.env.NEXT_PUBLIC_USE_CUSTOMER_PACKAGES_MOCK,

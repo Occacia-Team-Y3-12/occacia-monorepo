@@ -32,13 +32,8 @@ const envFlag = (value: string | undefined, defaultValue = false) => {
   return value.trim().toLowerCase() === 'true';
 };
 
-const enableFrontendMocks = envFlag(
-  process.env.NEXT_PUBLIC_ENABLE_FRONTEND_MOCKS
-);
-
 const useVendorAuthMock = envFlag(
-  process.env.NEXT_PUBLIC_USE_VENDOR_AUTH_MOCK,
-  enableFrontendMocks
+  process.env.NEXT_PUBLIC_USE_VENDOR_AUTH_MOCK
 );
 
 const isMockEmailValid = (value: string) => value.trim().length > 0;

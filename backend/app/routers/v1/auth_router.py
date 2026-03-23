@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi import HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -69,7 +69,13 @@ async def _parse_login_payload(request: Request) -> LoginRequest | SimpleNamespa
     content_type = request.headers.get("content-type", "")
     if "application/json" in content_type:
         body = await request.json()
-        return LoginRequest.model_validate(body)
+        try:
+            return LoginRequest.model_validate(body)
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=exc.errors(),
+            ) from exc
     form     = await request.form()
     username = form.get("username") or form.get("email")
     password = form.get("password")

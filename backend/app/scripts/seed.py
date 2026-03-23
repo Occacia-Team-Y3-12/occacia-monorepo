@@ -6,6 +6,7 @@ from datetime import timedelta
 from sqlalchemy import inspect
 
 from app.common.utils import now_utc
+from app.core.security import get_password_hash
 from app.core.database import SessionLocal
 from app.models.admin import Admin
 from app.models.customer import Customer
@@ -29,6 +30,9 @@ from app.models.user import User
 from app.models.vendor import Vendor
 
 logger = logging.getLogger(__name__)
+
+SEED_AUTH_PASSWORD = "Password123!"
+SEED_AUTH_HASH = get_password_hash(SEED_AUTH_PASSWORD)
 
 
 SEED_MODELS = (
@@ -89,9 +93,9 @@ def seed_data() -> bool:
         admin, created = _get_or_create(
             db,
             Admin,
-            {"email": "seed.admin@occacia.local"},
+            {"email": "seed.admin@occacia.com"},
             {
-                "password_hash": "seed_admin_hash",
+                "password_hash": SEED_AUTH_HASH,
                 "staff_role": "super_admin",
             },
         )
@@ -100,9 +104,9 @@ def seed_data() -> bool:
         _user_admin, created = _get_or_create(
             db,
             User,
-            {"email": "seed.user.admin@occacia.local"},
+            {"email": "seed.user.admin@occacia.com"},
             {
-                "password_hash": "seed_user_admin_hash",
+                "password_hash": SEED_AUTH_HASH,
                 "role": "ADMIN",
                 "status": "ACTIVE",
                 "last_login_at": now,
@@ -113,9 +117,9 @@ def seed_data() -> bool:
         user_customer, created = _get_or_create(
             db,
             User,
-            {"email": "seed.user.customer@occacia.local"},
+            {"email": "seed.user.customer@occacia.com"},
             {
-                "password_hash": "seed_user_customer_hash",
+                "password_hash": SEED_AUTH_HASH,
                 "role": "CUSTOMER",
                 "status": "ACTIVE",
                 "last_login_at": now,
@@ -126,9 +130,9 @@ def seed_data() -> bool:
         _user_vendor, created = _get_or_create(
             db,
             User,
-            {"email": "seed.user.vendor@occacia.local"},
+            {"email": "seed.user.vendor@occacia.com"},
             {
-                "password_hash": "seed_user_vendor_hash",
+                "password_hash": SEED_AUTH_HASH,
                 "role": "VENDOR",
                 "status": "ACTIVE",
                 "last_login_at": now,
@@ -139,10 +143,10 @@ def seed_data() -> bool:
         customer, created = _get_or_create(
             db,
             Customer,
-            {"email": "seed.customer@occacia.local"},
+            {"email": "seed.customer@occacia.com"},
             {
                 "full_name": "Seed Customer",
-                "password_hash": "seed_customer_hash",
+                "password_hash": SEED_AUTH_HASH,
                 "phone": "+94771111000",
                 "locale": "en-LK",
                 "address": "Colombo, Sri Lanka",
@@ -155,7 +159,7 @@ def seed_data() -> bool:
         vendor, created = _get_or_create(
             db,
             Vendor,
-            {"email": "seed.vendor@occacia.local"},
+            {"email": "seed.vendor@occacia.com"},
             {
                 "business_name": "Seed Event Studio",
                 "display_name": "Seed Event Studio",
@@ -165,7 +169,7 @@ def seed_data() -> bool:
                 "approval_status": "APPROVED",
                 "approved_at": now,
                 "is_verified": True,
-                "password_hash": "seed_vendor_hash",
+                "password_hash": SEED_AUTH_HASH,
             },
         )
         created_rows += int(created)
@@ -178,10 +182,10 @@ def seed_data() -> bool:
                 "name": "Seed Organization",
                 "legal_name": "Seed Organization (Pvt) Ltd",
                 "tax_id": "TAX-SEED-001",
-                "email": "seed.org@occacia.local",
+                "email": "seed.org@occacia.com",
                 "phone": "+94112223355",
                 "address": "No 100, Flower Road, Colombo",
-                "website": "https://seed.occacia.local",
+                "website": "https://seed.occacia.com",
                 "description": "Seeded organization for pipeline and QA smoke data.",
                 "status": "approved",
                 "reviewed_by": admin.id,
