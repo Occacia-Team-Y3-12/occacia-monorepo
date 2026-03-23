@@ -6,7 +6,7 @@ from datetime import timedelta
 from sqlalchemy import inspect, text
 
 from app.common.utils import now_utc
-from app.core.database import SessionLocal
+from app.core.database import Base, SessionLocal
 from app.models.admin import Admin
 from app.models.customer import Customer
 from app.models.event import Event
@@ -73,39 +73,126 @@ def seed_data() -> bool:
 
     try:
         inspector = inspect(db.bind)
+
+        def _is_integer_column(table_name: str, column_name: str) -> bool:
+            if not inspector.has_table(table_name):
+                return False
+            for column in inspector.get_columns(table_name):
+                if column.get("name") != column_name:
+                    continue
+                return "INT" in str(column.get("type", "")).upper()
+            return False
         required_tables = [model.__tablename__ for model in SEED_MODELS]
         missing_tables = [table for table in required_tables if not inspector.has_table(table)]
         if missing_tables:
             logger.warning(
-                "Skipping seed because required tables are missing: %s. "
-                "Run `poetry run alembic upgrade heads` first.",
+                "Required tables are missing: %s. "
+                "Attempting fail-safe table creation before seeding.",
                 ", ".join(sorted(missing_tables)),
             )
-            return False
-
-        # [FAIL-SAFE] Ensure offerings table has quality_tier and created_at columns
-        # This protects against cases where migrations were skipped or auto-heal didn't update existing tables.
-        if inspector.has_table("offerings"):
-            columns = [c["name"] for c in inspector.get_columns("offerings")]
-            if "quality_tier" not in columns or "created_at" not in columns:
-                logger.info("Adding missing columns to offerings table via fail-safe...")
-                # Using raw SQL to be dialect-agnostic but targeting Postgres primarily since it's the target env.
-                # 'IF NOT EXISTS' is supported by Postgres 9.6+
-                with db.bind.begin() as conn:
-                    if "quality_tier" not in columns:
-                        conn.execute(
-                            text(
-                                "ALTER TABLE offerings ADD COLUMN IF NOT EXISTS quality_tier VARCHAR NOT NULL DEFAULT 'MEDIUM'"
-                            )
-                        )
-                    if "created_at" not in columns:
-                        conn.execute(
-                            text(
-                                "ALTER TABLE offerings ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"
-                            )
-                        )
-                # Refresh inspector to reflect changes
+            tables_to_create = [
+                Base.metadata.tables[table]
+                for table in missing_tables
+                if table in Base.metadata.tables
+            ]
+            if tables_to_create:
+                Base.metadata.create_all(bind=db.bind, tables=tables_to_create)
                 inspector = inspect(db.bind)
+                still_missing = [
+                    table for table in required_tables if not inspector.has_table(table)
+                ]
+                if still_missing:
+                    logger.warning(
+                        "Skipping seed because required tables are still missing after fail-safe creation: %s",
+                        ", ".join(sorted(still_missing)),
+                    )
+                    return False
+            else:
+                logger.warning(
+                    "Skipping seed because required tables are missing and not present in SQLAlchemy metadata: %s",
+                    ", ".join(sorted(missing_tables)),
+                )
+                return False
+
+        # [FAIL-SAFE] Ensure critical columns exist on existing databases.
+        # This protects startup when a persisted DB volume is behind current models.
+        table_column_failsafes: dict[str, list[tuple[str, str]]] = {
+            "offerings": [
+                (
+                    "quality_tier",
+                    "ALTER TABLE offerings ADD COLUMN IF NOT EXISTS quality_tier VARCHAR NOT NULL DEFAULT 'MEDIUM'",
+                ),
+                (
+                    "created_at",
+                    "ALTER TABLE offerings ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+                ),
+            ],
+            "customers": [
+                (
+                    "password_reset_token",
+                    "ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR",
+                ),
+                (
+                    "password_reset_token_expires_at",
+                    "ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_reset_token_expires_at TIMESTAMP WITH TIME ZONE",
+                ),
+            ],
+            "vendors": [
+                (
+                    "display_name",
+                    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS display_name VARCHAR",
+                ),
+                (
+                    "contact_phone",
+                    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS contact_phone VARCHAR",
+                ),
+                (
+                    "organization_id",
+                    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS organization_id INTEGER",
+                ),
+                (
+                    "approval_status",
+                    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS approval_status VARCHAR DEFAULT 'PENDING'",
+                ),
+                (
+                    "approved_at",
+                    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP WITH TIME ZONE",
+                ),
+                (
+                    "password_reset_token",
+                    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR",
+                ),
+                (
+                    "password_reset_token_expires_at",
+                    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS password_reset_token_expires_at TIMESTAMP WITH TIME ZONE",
+                ),
+            ],
+        }
+
+        for table_name, column_specs in table_column_failsafes.items():
+            if not inspector.has_table(table_name):
+                continue
+
+            columns = {c["name"] for c in inspector.get_columns(table_name)}
+            missing_specs = [
+                (column_name, ddl)
+                for column_name, ddl in column_specs
+                if column_name not in columns
+            ]
+            if not missing_specs:
+                continue
+
+            logger.info(
+                "Adding missing columns to %s table via fail-safe: %s",
+                table_name,
+                ", ".join(column_name for column_name, _ in missing_specs),
+            )
+            with db.bind.begin() as conn:
+                for _, ddl in missing_specs:
+                    conn.execute(text(ddl))
+
+        # Refresh inspector to reflect any fail-safe schema updates.
+        inspector = inspect(db.bind)
 
         now = now_utc()
         created_rows = 0
@@ -186,6 +273,22 @@ def seed_data() -> bool:
             },
         )
         created_rows += int(created)
+
+        package_vendor_ref = (
+            str(vendor_studio.id)
+            if _is_integer_column("packages", "vendor_id")
+            else vendor_studio.vendor_id
+        )
+        task_vendor_ref = (
+            str(vendor_studio.id)
+            if _is_integer_column("tasks", "assigned_vendor_id")
+            else vendor_studio.vendor_id
+        )
+        task_request_vendor_ref = (
+            str(vendor_studio.id)
+            if _is_integer_column("task_requests", "vendor_id")
+            else vendor_studio.vendor_id
+        )
 
         vendor_decor, created = _get_or_create(
             db,
@@ -365,7 +468,7 @@ def seed_data() -> bool:
         package, created = _get_or_create(
             db,
             Package,
-            {"vendor_id": vendor_studio.vendor_id, "name": "Seed Signature Package"},
+            {"vendor_id": package_vendor_ref, "name": "Seed Signature Package"},
             {
                 "description": "Core package with catering, decor, and hosting support.",
                 "price": 25000.0,
@@ -392,7 +495,7 @@ def seed_data() -> bool:
                 "needs_vendor": "true",
                 "status": "ASSIGNED",
                 "selected_offering_id": offering_catering.offering_id,
-                "assigned_vendor_id": vendor_studio.vendor_id,
+                "assigned_vendor_id": task_vendor_ref,
                 "confirmed_at": now,
                 "status_updated_at": now,
                 "due_at": now + timedelta(days=5),
@@ -470,7 +573,7 @@ def seed_data() -> bool:
             {
                 "package_order_id": execution_request.execution_request_id,
                 "task_id": task.task_id,
-                "vendor_id": vendor_studio.vendor_id,
+                "vendor_id": task_request_vendor_ref,
                 "offering_id": offering_catering.offering_id,
             },
             {

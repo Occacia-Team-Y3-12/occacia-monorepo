@@ -16,18 +16,30 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+def _table_exists(table_name: str) -> bool:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    return inspector.has_table(table_name)
+
+
 def _index_exists(table_name: str, index_name: str) -> bool:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
+    if not _table_exists(table_name):
+        return False
     return any(index["name"] == index_name for index in inspector.get_indexes(table_name))
 
 
 def _create_index_if_missing(index_name: str, table_name: str, columns: list[str]) -> None:
+    if not _table_exists(table_name):
+        return
     if not _index_exists(table_name, index_name):
         op.create_index(index_name, table_name, columns, unique=False)
 
 
 def _drop_index_if_exists(index_name: str, table_name: str) -> None:
+    if not _table_exists(table_name):
+        return
     if _index_exists(table_name, index_name):
         op.drop_index(index_name, table_name=table_name)
 
