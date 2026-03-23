@@ -2,8 +2,11 @@ export const ROUTES = {
   HOME: '/',
   CUSTOMER: {
     LOGIN: '/customer/auth/login',
+    FORGOT_PASSWORD: '/customer/auth/forgot-password',
+    RESET_PASSWORD: '/customer/auth/reset-password',
     DASHBOARD: '/customer/dashboard',
-    REGISTER: '/customer/register',
+    REGISTER: '/customer/auth/register',
+    VERIFY_EMAIL: '/customer/auth/verify-email',
     EVENTS: '/customer/events',
     EVENTS_NEW: '/customer/events/new',
     EVENT_CHAT: (eventId: string) => `/customer/events/${eventId}/chat`,

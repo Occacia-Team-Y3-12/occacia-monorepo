@@ -21,11 +21,11 @@ export interface Customer {
 }
 
 export interface CustomerRegistrationData {
-  username: string;
   fullName: string;
   email: string;
-  mobileNumber: string;
+  phone: string;
   password: string;
+  locale?: string;
 }
 
 export interface VerifyEmailResponse {

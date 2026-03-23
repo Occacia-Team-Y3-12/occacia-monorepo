@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from app.common.utils import now_utc
 from app.core.database import SessionLocal
@@ -93,9 +93,17 @@ def seed_data() -> bool:
                 # 'IF NOT EXISTS' is supported by Postgres 9.6+
                 with db.bind.begin() as conn:
                     if "quality_tier" not in columns:
-                        conn.execute("ALTER TABLE offerings ADD COLUMN IF NOT EXISTS quality_tier VARCHAR NOT NULL DEFAULT 'MEDIUM'")
+                        conn.execute(
+                            text(
+                                "ALTER TABLE offerings ADD COLUMN IF NOT EXISTS quality_tier VARCHAR NOT NULL DEFAULT 'MEDIUM'"
+                            )
+                        )
                     if "created_at" not in columns:
-                        conn.execute("ALTER TABLE offerings ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()")
+                        conn.execute(
+                            text(
+                                "ALTER TABLE offerings ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"
+                            )
+                        )
                 # Refresh inspector to reflect changes
                 inspector = inspect(db.bind)
 

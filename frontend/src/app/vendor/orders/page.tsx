@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import VendorPortalShell from '@/components/features/vendor/VendorPortalShell';
 
 interface VendorOrder {
   id: string;
@@ -10,11 +12,26 @@ interface VendorOrder {
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
 }
 
+type OrderStatusFilter = 'all' | VendorOrder['status'];
+
+function getOrderStatusFilter(value: string | null): OrderStatusFilter {
+  if (value === 'pending' || value === 'processing' || value === 'completed' || value === 'cancelled') {
+    return value;
+  }
+
+  return 'all';
+}
+
 export default function VendorOrdersPage() {
-  const [statusFilter, setStatusFilter] = useState('all');
+  const searchParams = useSearchParams();
+  const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>(() => getOrderStatusFilter(searchParams.get('status')));
   const orders: VendorOrder[] = [];
 
-  const statuses = [
+  useEffect(() => {
+    setStatusFilter(getOrderStatusFilter(searchParams.get('status')));
+  }, [searchParams]);
+
+  const statuses: Array<{ value: OrderStatusFilter; label: string; count: number }> = [
     { value: 'all', label: 'All Orders', count: 0 },
     { value: 'pending', label: 'Pending', count: 0 },
     { value: 'processing', label: 'Processing', count: 0 },
@@ -23,17 +40,15 @@ export default function VendorOrdersPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 py-4 md:py-6 px-4 sm:px-8">
-        <div className="max-w-7xl mx-auto">
+    <VendorPortalShell>
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-white border border-gray-200 rounded-2xl py-4 md:py-6 px-4 sm:px-8 shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">Orders</h1>
           <p className="text-gray-600 mt-1 md:mt-2 text-sm md:text-base">Manage and track your orders</p>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 md:py-12">
+      <div className="max-w-7xl mx-auto px-0 py-8 md:py-12">
         {/* Status Tabs */}
         <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-5 md:mb-8">
           {statuses.map((status) => (
@@ -80,6 +95,6 @@ export default function VendorOrdersPage() {
           )}
         </div>
       </div>
-    </div>
+    </VendorPortalShell>
   );
 }

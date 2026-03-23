@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.common.utils import generate_prefixed_id
@@ -16,6 +16,7 @@ class Vendor(Base):
     # EERD attributes
     display_name = Column(String, nullable=True)
     contact_phone = Column(String, nullable=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     approval_status = Column(String, default="PENDING", index=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -26,8 +27,10 @@ class Vendor(Base):
     phone = Column(String, nullable=True)
     is_verified = Column(Boolean, default=False)
     password_hash = Column(String, nullable=True)
+    password_reset_token = Column(String, nullable=True)
+    password_reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     offerings = relationship("Offering", back_populates="vendor", cascade="all, delete-orphan")
     vendor_tasks = relationship("VendorTask", back_populates="vendor", cascade="all, delete-orphan")
-
+    organization = relationship("Organization")

@@ -28,7 +28,9 @@ import pytest
 from app.core.database import SessionLocal
 from app.core.security import create_access_token, create_refresh_token
 from app.models.customer import Customer
+from app.models.organization import Organization
 from app.models.vendor import Vendor
+from app.services.auth_service import auth_service
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -110,6 +112,20 @@ def _register_vendor(client, email: str, password: str = "Pass123!"):
         "email": email,
         "password": password,
     })
+
+
+def _activate_vendor(email: str) -> Vendor:
+    db = SessionLocal()
+    try:
+        v = db.query(Vendor).filter(Vendor.email == email).first()
+        assert v is not None, f"Vendor {email} not found"
+        v.is_verified = True
+        v.approval_status = "APPROVED"
+        db.commit()
+        db.refresh(v)
+        return v
+    finally:
+        db.close()
 
 
 def _login_customer(client, email: str, password: str = "Pass12345!"):
@@ -447,7 +463,7 @@ class TestCustomerLogout:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. CUSTOMER PASSWORD RESET (OTP flow)
+# 6. CUSTOMER PASSWORD RESET (link flow)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestCustomerPasswordReset:
@@ -455,91 +471,107 @@ class TestCustomerPasswordReset:
     def test_forgot_known_email(self, client):
         email = _customer_email()
         _register_customer(client, email)
-        fake_redis = _make_fake_redis()
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis):
-            r = client.post("/api/v1/auth/customer/password/forgot",
-                            json={"email": email})
+        r = client.post("/api/v1/auth/customer/password/forgot",
+                        json={"email": email})
         assert r.status_code == 200
+        db = SessionLocal()
+        try:
+            customer = db.query(Customer).filter(Customer.email == email).first()
+            assert customer is not None
+            assert customer.password_reset_token is not None
+            assert customer.password_reset_token_expires_at is not None
+        finally:
+            db.close()
 
     def test_forgot_unknown_email_still_200(self, client):
         r = client.post("/api/v1/auth/customer/password/forgot",
                         json={"email": "nobody@test.com"})
         assert r.status_code == 200
 
-    def test_resend_otp_replaces_previous_customer_otp(self, client):
+    def test_forgot_replaces_previous_customer_reset_token(self, client):
         email = _customer_email()
         _register_customer(client, email)
-        fake_redis = _make_fake_redis()
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis), \
-             patch("app.services.auth_service._generate_otp", side_effect=["111111", "222222"]):
-            first = client.post("/api/v1/auth/customer/password/forgot",
-                                json={"email": email})
-            resend = client.post("/api/v1/auth/customer/password/forgot/resend-otp",
-                                 json={"email": email})
-            old_otp = client.post("/api/v1/auth/customer/password/verify-otp",
-                                  json={"email": email, "otp": "111111"})
-            new_otp = client.post("/api/v1/auth/customer/password/verify-otp",
-                                  json={"email": email, "otp": "222222"})
+        first = client.post("/api/v1/auth/customer/password/forgot",
+                            json={"email": email})
+        db = SessionLocal()
+        try:
+            customer = db.query(Customer).filter(Customer.email == email).first()
+            assert customer is not None
+            first_token = customer.password_reset_token
+        finally:
+            db.close()
+        resend = client.post("/api/v1/auth/customer/password/forgot/resend-otp",
+                             json={"email": email})
+        db = SessionLocal()
+        try:
+            customer = db.query(Customer).filter(Customer.email == email).first()
+            assert customer is not None
+            second_token = customer.password_reset_token
+        finally:
+            db.close()
         assert first.status_code == 200
         assert resend.status_code == 200
-        assert old_otp.status_code == 400
-        assert new_otp.status_code == 200
+        assert first_token is not None
+        assert second_token is not None
+        assert first_token != second_token
 
     def test_reset_invalid_token(self, client):
         r = client.post("/api/v1/auth/customer/password/reset",
                         json={"reset_token": "bad", "new_password": "NewPass123!"})
         assert r.status_code == 400
 
-    def test_verify_otp_wrong_code(self, client):
+    def test_reset_reused_token_rejected(self, client, monkeypatch):
         email = _customer_email()
+        monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         _register_customer(client, email)
-        fake_redis = _make_fake_redis()
-        _seed_otp(fake_redis, "customer", email, "123456")
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis):
-            r = client.post("/api/v1/auth/customer/password/verify-otp",
-                            json={"email": email, "otp": "000000"})
-        assert r.status_code == 400
+        _activate_customer(email)
 
-    def test_verify_otp_consumed_after_use(self, client):
-        email = _customer_email()
-        _register_customer(client, email)
-        fake_redis = _make_fake_redis()
-        _seed_otp(fake_redis, "customer", email, "777666")
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis):
-            client.post("/api/v1/auth/customer/password/verify-otp",
-                        json={"email": email, "otp": "777666"})
-            r2 = client.post("/api/v1/auth/customer/password/verify-otp",
-                             json={"email": email, "otp": "777666"})
+        client.post("/api/v1/auth/customer/password/forgot",
+                    json={"email": email})
+        db = SessionLocal()
+        try:
+            customer = db.query(Customer).filter(Customer.email == email).first()
+            assert customer is not None
+            reset_token = customer.password_reset_token
+        finally:
+            db.close()
+
+        r1 = client.post("/api/v1/auth/customer/password/reset",
+                         json={"reset_token": reset_token, "new_password": "NewPass999!"})
+        r2 = client.post("/api/v1/auth/customer/password/reset",
+                         json={"reset_token": reset_token, "new_password": "NewPass888!"})
+        assert r1.status_code == 200
         assert r2.status_code == 400
 
-    def test_verify_otp_expired_key(self, client):
-        email = _customer_email()
-        _register_customer(client, email)
-        fake_redis = _make_fake_redis()  # empty — no OTP seeded
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis):
-            r = client.post("/api/v1/auth/customer/password/verify-otp",
-                            json={"email": email, "otp": "123456"})
-        assert r.status_code in (400, 503)
-
-    def test_full_otp_reset_flow(self, client, monkeypatch):
+    def test_full_reset_link_flow(self, client, monkeypatch):
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _customer_email()
         _register_customer(client, email)
         _activate_customer(email)
 
-        fake_redis = _make_fake_redis()
-        _seed_otp(fake_redis, "customer", email, "654321")
+        client.post("/api/v1/auth/customer/password/forgot",
+                    json={"email": email})
+        db = SessionLocal()
+        try:
+            customer = db.query(Customer).filter(Customer.email == email).first()
+            assert customer is not None
+            reset_token = customer.password_reset_token
+        finally:
+            db.close()
 
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis):
-            r2 = client.post("/api/v1/auth/customer/password/verify-otp",
-                             json={"email": email, "otp": "654321"})
-            assert r2.status_code == 200
-            reset_token = r2.json()["resetToken"]
+        r3 = client.post("/api/v1/auth/customer/password/reset",
+                         json={"reset_token": reset_token,
+                               "new_password": "NewPass999!"})
+        assert r3.status_code == 200
 
-            r3 = client.post("/api/v1/auth/customer/password/reset",
-                             json={"reset_token": reset_token,
-                                   "new_password": "NewPass999!"})
-            assert r3.status_code == 200
+        db = SessionLocal()
+        try:
+            customer = db.query(Customer).filter(Customer.email == email).first()
+            assert customer is not None
+            assert customer.password_reset_token is None
+            assert customer.password_reset_token_expires_at is None
+        finally:
+            db.close()
 
         assert _login_customer(client, email, "NewPass999!").status_code == 200
 
@@ -584,6 +616,84 @@ class TestVendorRegistration:
         finally:
             db.close()
 
+    def test_register_with_display_name_contract(self, client):
+        r = client.post("/api/v1/auth/vendor/register", json={
+            "email": _vendor_email(),
+            "password": "Pass123!",
+            "displayName": "Vendor Display",
+        })
+        assert r.status_code == 201
+
+    def test_register_join_existing_organization(self, client):
+        db = SessionLocal()
+        try:
+            org = Organization(
+                name=f"Org {_uid()}",
+                registration_number=f"ORG-{_uid()}",
+                email=f"org-{_uid()}@test.com",
+                status="approved",
+            )
+            db.add(org)
+            db.commit()
+            db.refresh(org)
+            org_code = org.registration_number
+            org_id = org.id
+            org_name = org.name
+        finally:
+            db.close()
+
+        email = _vendor_email()
+        r = client.post("/api/v1/auth/vendor/register", json={
+            "email": email,
+            "password": "Pass123!",
+            "displayName": "Vendor Display",
+            "organizationCode": org_code,
+        })
+        assert r.status_code == 201
+
+        db = SessionLocal()
+        try:
+            v = db.query(Vendor).filter(Vendor.email == email).first()
+            assert v is not None
+            assert v.organization_id == org_id
+            assert v.business_name == org_name
+        finally:
+            db.close()
+
+    def test_register_create_organization(self, client):
+        email = _vendor_email()
+        registration_number = f"REG-{_uid()}"
+        organization_name = f"Org {_uid()}"
+        r = client.post("/api/v1/auth/vendor/register", json={
+            "email": email,
+            "password": "Pass123!",
+            "displayName": "Vendor Display",
+            "organization": {
+                "name": organization_name,
+                "registrationNumber": registration_number,
+                "email": f"org-{_uid()}@test.com",
+                "phone": "+94770000000",
+                "address": "Colombo",
+                "kymDetails": {
+                    "businessRegNumber": registration_number,
+                },
+            },
+        })
+        assert r.status_code == 201
+
+        db = SessionLocal()
+        try:
+            v = db.query(Vendor).filter(Vendor.email == email).first()
+            org = db.query(Organization).filter(
+                Organization.registration_number == registration_number
+            ).first()
+            assert v is not None
+            assert org is not None
+            assert v.organization_id == org.id
+            assert v.business_name == organization_name
+        finally:
+            db.close()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 8. VENDOR EMAIL VERIFICATION
@@ -622,6 +732,27 @@ class TestVendorEmailVerification:
                         json={"email": email})
         assert r.status_code == 400
 
+    def test_verify_sets_pending_admin_message(self, client):
+        email = _vendor_email()
+        _register_vendor(client, email)
+        token, _ = auth_service._create_verification_token(
+            email,
+            token_type="verify_vendor_email",
+            hours=24,
+        )
+
+        r = client.get("/api/v1/auth/vendor/verify-email", params={"token": token})
+        assert r.status_code == 200
+        assert "pending admin approval" in r.json()["message"].lower()
+
+        db = SessionLocal()
+        try:
+            vendor = db.query(Vendor).filter(Vendor.email == email).first()
+            assert vendor.is_verified is True
+            assert vendor.approval_status == "PENDING"
+        finally:
+            db.close()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 9. VENDOR LOGIN
@@ -633,6 +764,7 @@ class TestVendorLogin:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
         r = _login_vendor(client, email)
         assert r.status_code == 200
         data = r.json()
@@ -650,28 +782,24 @@ class TestVendorLogin:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
         data = _login_vendor(client, email).json()
         assert "accessToken" in data or "access_token" in data
         assert "refreshToken" in data or "refresh_token" in data
 
-    def test_pending_vendor_can_login(self, client, monkeypatch):
+    def test_pending_vendor_blocked_from_login(self, client, monkeypatch):
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
-        assert _login_vendor(client, email).status_code == 200
+        r = _login_vendor(client, email)
+        assert r.status_code == 403
+        assert "pending admin approval" in r.json()["detail"].lower()
 
     def test_approved_vendor_accesses_protected_routes(self, client, monkeypatch):
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
-        db = SessionLocal()
-        try:
-            v = db.query(Vendor).filter(Vendor.email == email).first()
-            v.approval_status = "APPROVED"
-            v.is_verified = True
-            db.commit()
-        finally:
-            db.close()
+        _activate_vendor(email)
         data = _login_vendor(client, email).json()
         token = data.get("accessToken") or data.get("access_token")
         r = client.get("/api/v1/vendors/me",
@@ -682,11 +810,7 @@ class TestVendorLogin:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
-        data = _login_vendor(client, email).json()
-        token = data.get("accessToken") or data.get("access_token")
-        r = client.get("/api/v1/vendors/fulfillment-requests",
-                       headers={"Authorization": f"Bearer {token}"})
-        assert r.status_code == 403
+        assert _login_vendor(client, email).status_code == 403
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -699,6 +823,7 @@ class TestVendorLogout:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
         data = _login_vendor(client, email).json()
         return data.get("accessToken") or data.get("access_token")
 
@@ -727,6 +852,7 @@ class TestVendorLogout:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
 
         with patch("app.services.auth_service._get_redis", return_value=fake_redis), \
              patch("app.core.security.is_token_blacklisted",
@@ -749,6 +875,7 @@ class TestVendorLogout:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
 
         # Log in once to get token_a (the one we will log out).
         # Mint token_b directly with a unique jti so it is a genuinely different
@@ -790,7 +917,7 @@ class TestVendorLogout:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 11. VENDOR PASSWORD RESET (OTP flow)
+# 11. VENDOR PASSWORD RESET (link flow)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestVendorPasswordReset:
@@ -798,90 +925,103 @@ class TestVendorPasswordReset:
     def test_forgot_known_email(self, client):
         email = _vendor_email()
         _register_vendor(client, email)
-        fake_redis = _make_fake_redis()
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis):
-            r = client.post("/api/v1/auth/vendor/password/forgot",
-                            json={"email": email})
+        r = client.post("/api/v1/auth/vendor/password/forgot",
+                        json={"email": email})
         assert r.status_code == 200
+        db = SessionLocal()
+        try:
+            vendor = db.query(Vendor).filter(Vendor.email == email).first()
+            assert vendor is not None
+            assert vendor.password_reset_token is not None
+            assert vendor.password_reset_token_expires_at is not None
+        finally:
+            db.close()
 
     def test_forgot_unknown_email_still_200(self, client):
         r = client.post("/api/v1/auth/vendor/password/forgot",
                         json={"email": "nobody@vendor.com"})
         assert r.status_code == 200
 
-    def test_resend_otp_replaces_previous_vendor_otp(self, client):
+    def test_forgot_replaces_previous_vendor_reset_token(self, client):
         email = _vendor_email()
         _register_vendor(client, email)
-        fake_redis = _make_fake_redis()
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis), \
-             patch("app.services.auth_service._generate_otp", side_effect=["333333", "444444"]):
-            first = client.post("/api/v1/auth/vendor/password/forgot",
-                                json={"email": email})
-            resend = client.post("/api/v1/auth/vendor/password/forgot/resend-otp",
-                                 json={"email": email})
-            old_otp = client.post("/api/v1/auth/vendor/password/verify-otp",
-                                  json={"email": email, "otp": "333333"})
-            new_otp = client.post("/api/v1/auth/vendor/password/verify-otp",
-                                  json={"email": email, "otp": "444444"})
+        first = client.post("/api/v1/auth/vendor/password/forgot",
+                            json={"email": email})
+        db = SessionLocal()
+        try:
+            vendor = db.query(Vendor).filter(Vendor.email == email).first()
+            assert vendor is not None
+            first_token = vendor.password_reset_token
+        finally:
+            db.close()
+        resend = client.post("/api/v1/auth/vendor/password/forgot/resend-otp",
+                             json={"email": email})
+        db = SessionLocal()
+        try:
+            vendor = db.query(Vendor).filter(Vendor.email == email).first()
+            assert vendor is not None
+            second_token = vendor.password_reset_token
+        finally:
+            db.close()
         assert first.status_code == 200
         assert resend.status_code == 200
-        assert old_otp.status_code == 400
-        assert new_otp.status_code == 200
+        assert first_token is not None
+        assert second_token is not None
+        assert first_token != second_token
 
     def test_reset_invalid_token(self, client):
         r = client.post("/api/v1/auth/vendor/password/reset",
                         json={"reset_token": "bad", "new_password": "NewPass123!"})
         assert r.status_code == 400
 
-    def test_verify_otp_wrong_code(self, client):
+    def test_reset_reused_token_rejected(self, client):
         email = _vendor_email()
         _register_vendor(client, email)
-        fake_redis = _make_fake_redis()
-        _seed_otp(fake_redis, "vendor", email, "888777")
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis):
-            r = client.post("/api/v1/auth/vendor/password/verify-otp",
-                            json={"email": email, "otp": "000000"})
-        assert r.status_code == 400
-
-    def test_verify_otp_consumed_after_use(self, client):
-        email = _vendor_email()
-        _register_vendor(client, email)
-        fake_redis = _make_fake_redis()
-        _seed_otp(fake_redis, "vendor", email, "222111")
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis):
-            client.post("/api/v1/auth/vendor/password/verify-otp",
-                        json={"email": email, "otp": "222111"})
-            r2 = client.post("/api/v1/auth/vendor/password/verify-otp",
-                             json={"email": email, "otp": "222111"})
+        client.post("/api/v1/auth/vendor/password/forgot",
+                    json={"email": email})
+        db = SessionLocal()
+        try:
+            vendor = db.query(Vendor).filter(Vendor.email == email).first()
+            assert vendor is not None
+            reset_token = vendor.password_reset_token
+        finally:
+            db.close()
+        r1 = client.post("/api/v1/auth/vendor/password/reset",
+                         json={"reset_token": reset_token, "new_password": "NewVend999!"})
+        r2 = client.post("/api/v1/auth/vendor/password/reset",
+                         json={"reset_token": reset_token, "new_password": "NewVend888!"})
+        assert r1.status_code == 200
         assert r2.status_code == 400
 
-    def test_verify_otp_expired_key(self, client):
-        email = _vendor_email()
-        _register_vendor(client, email)
-        fake_redis = _make_fake_redis()
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis):
-            r = client.post("/api/v1/auth/vendor/password/verify-otp",
-                            json={"email": email, "otp": "000000"})
-        assert r.status_code in (400, 503)
-
-    def test_full_otp_reset_flow(self, client, monkeypatch):
+    def test_full_reset_link_flow(self, client, monkeypatch):
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
-        fake_redis = _make_fake_redis()
-        _seed_otp(fake_redis, "vendor", email, "112233")
+        client.post("/api/v1/auth/vendor/password/forgot",
+                    json={"email": email})
+        db = SessionLocal()
+        try:
+            vendor = db.query(Vendor).filter(Vendor.email == email).first()
+            assert vendor is not None
+            reset_token = vendor.password_reset_token
+        finally:
+            db.close()
 
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis):
-            r2 = client.post("/api/v1/auth/vendor/password/verify-otp",
-                             json={"email": email, "otp": "112233"})
-            assert r2.status_code == 200
-            reset_token = r2.json()["resetToken"]
+        r3 = client.post("/api/v1/auth/vendor/password/reset",
+                         json={"reset_token": reset_token,
+                               "new_password": "NewVend999!"})
+        assert r3.status_code == 200
 
-            r3 = client.post("/api/v1/auth/vendor/password/reset",
-                             json={"reset_token": reset_token,
-                                   "new_password": "NewVend999!"})
-            assert r3.status_code == 200
+        db = SessionLocal()
+        try:
+            vendor = db.query(Vendor).filter(Vendor.email == email).first()
+            assert vendor is not None
+            assert vendor.password_reset_token is None
+            assert vendor.password_reset_token_expires_at is None
+        finally:
+            db.close()
 
+        _activate_vendor(email)
         assert _login_vendor(client, email, "NewVend999!").status_code == 200
 
 
@@ -895,6 +1035,7 @@ class TestVendorTokenRefresh:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
         return _login_vendor(client, email).json()
 
     def test_refresh_success(self, client, monkeypatch):
@@ -927,6 +1068,25 @@ class TestVendorTokenRefresh:
         customer_refresh = _login_customer(client, email).json()["refreshToken"]
         r = client.post("/api/v1/auth/vendor/token/refresh",
                         json={"refreshToken": customer_refresh})
+        assert r.status_code == 401
+
+    def test_refresh_pending_vendor_rejected(self, client, monkeypatch):
+        monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
+        email = _vendor_email()
+        _register_vendor(client, email)
+        db = SessionLocal()
+        try:
+            v = db.query(Vendor).filter(Vendor.email == email).first()
+            assert v is not None
+            v.is_verified = True
+            db.commit()
+        finally:
+            db.close()
+        refresh = create_refresh_token(
+            data={"sub": email, "role": "VENDOR"}, expires_delta=timedelta(days=7),
+        )
+        r = client.post("/api/v1/auth/vendor/token/refresh",
+                        json={"refreshToken": refresh})
         assert r.status_code == 401
 
 
@@ -970,6 +1130,7 @@ class TestTokenBlacklist:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
 
         with patch("app.services.auth_service._get_redis", return_value=fake_redis), \
              patch("app.core.security.is_token_blacklisted",
@@ -991,20 +1152,28 @@ class TestTokenBlacklist:
 class TestResetTokenRoleIsolation:
 
     def _customer_reset_token(self, client, email: str) -> str | None:
-        fake_redis = _make_fake_redis()
-        _seed_otp(fake_redis, "customer", email, "444555")
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis):
-            resp = client.post("/api/v1/auth/customer/password/verify-otp",
-                               json={"email": email, "otp": "444555"})
-        return resp.json().get("resetToken") if resp.status_code == 200 else None
+        resp = client.post("/api/v1/auth/customer/password/forgot",
+                           json={"email": email})
+        if resp.status_code != 200:
+            return None
+        db = SessionLocal()
+        try:
+            customer = db.query(Customer).filter(Customer.email == email).first()
+            return customer.password_reset_token if customer else None
+        finally:
+            db.close()
 
     def _vendor_reset_token(self, client, email: str) -> str | None:
-        fake_redis = _make_fake_redis()
-        _seed_otp(fake_redis, "vendor", email, "666777")
-        with patch("app.services.auth_service._get_redis", return_value=fake_redis):
-            resp = client.post("/api/v1/auth/vendor/password/verify-otp",
-                               json={"email": email, "otp": "666777"})
-        return resp.json().get("resetToken") if resp.status_code == 200 else None
+        resp = client.post("/api/v1/auth/vendor/password/forgot",
+                           json={"email": email})
+        if resp.status_code != 200:
+            return None
+        db = SessionLocal()
+        try:
+            vendor = db.query(Vendor).filter(Vendor.email == email).first()
+            return vendor.password_reset_token if vendor else None
+        finally:
+            db.close()
 
     def test_customer_token_rejected_on_vendor_reset(self, client):
         email = _customer_email()
@@ -1291,6 +1460,7 @@ class TestVendorPasswordChange:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
         token = _login_vendor(client, email, "Pass123!").json()["accessToken"]
         r = client.post(
             "/api/v1/auth/vendor/password/change",
@@ -1305,6 +1475,7 @@ class TestVendorPasswordChange:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
         token = _login_vendor(client, email, "Pass123!").json()["accessToken"]
         r = client.post(
             "/api/v1/auth/vendor/password/change",

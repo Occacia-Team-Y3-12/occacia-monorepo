@@ -11,7 +11,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-# --- Runtime Stage ---d
+# --- Runtime Stage ---
 FROM node:22-slim AS runner
 WORKDIR /app
 

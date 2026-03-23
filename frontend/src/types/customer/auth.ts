@@ -1,19 +1,19 @@
 // src/types/customer/auth.ts
 export interface RegisterFormData {
-  username: string;
   fullName: string;
   email: string;
-  mobileNumber: string;
+  phone: string;
   password: string;
+  locale?: string;
 }
 
 export interface RegisterResponse {
-  status: string;
+  status?: string;
   message?: string;
 }
 
 export interface VerifyEmailResponse {
-  status: string;
+  status?: string;
   message: string;
 }
 
@@ -28,8 +28,21 @@ export interface LoginFormData {
   password: string;
 }
 
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
+export interface ResetPasswordPayload {
+  token: string;
+  password: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
+}
+
 export interface LoginResponse {
-  status: string;
+  status?: string;
   message?: string;
   token?: string;
   accessToken?: string;
@@ -37,9 +50,12 @@ export interface LoginResponse {
   refreshToken?: string;
   refresh_token?: string;
   user?: {
-    id: string;
+    id?: string;
+    userId?: string;
     email: string;
-    username: string;
-    fullName: string;
+    username?: string;
+    fullName?: string;
+    role?: string;
+    status?: string;
   };
 }

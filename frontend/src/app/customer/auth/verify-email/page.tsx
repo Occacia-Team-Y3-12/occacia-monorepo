@@ -4,36 +4,87 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
+import { Mail, RefreshCw } from 'lucide-react';
 import { ROUTES } from '@/lib/routes';
 import { customerAuthService } from '@/services/customer/authServices';
+
+type VerificationStatus = 'pending' | 'loading' | 'success' | 'error';
+
+const getCustomerAuthErrorMessage = (error: unknown, fallback: string) => {
+  const response = (error as {
+    response?: {
+      data?: {
+        message?: string;
+        detail?: string;
+      };
+    };
+  })?.response;
+
+  return response?.data?.message || response?.data?.detail || fallback;
+};
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const token = searchParams.get('token');
+  const email = searchParams.get('email');
+  const [status, setStatus] = useState<VerificationStatus>(() => {
+    if (token) return 'loading';
+    if (email) return 'pending';
+    return 'error';
+  });
+  const [message, setMessage] = useState<string | null>(null);
+  const [isResending, setIsResending] = useState(false);
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    let redirectTimer: NodeJS.Timeout;
-    
+    let redirectTimer: ReturnType<typeof setTimeout> | undefined;
+
     if (!token) {
-      setStatus('error');
+      setStatus(email ? 'pending' : 'error');
+      setMessage(
+        email
+          ? 'We sent a verification link to your email address. Open it to activate your account.'
+          : 'The verification link is invalid or missing.'
+      );
       return;
     }
 
-    customerAuthService.verifyEmail(token).then(() => {
+    setStatus('loading');
+    setMessage('Verifying your email...');
+
+    customerAuthService.verifyEmail(token).then((response) => {
         setStatus('success');
+        setMessage(response.message || 'Email verified successfully.');
         redirectTimer = setTimeout(() => {
-          router.push(ROUTES.CUSTOMER.LOGIN);
+          router.replace(ROUTES.CUSTOMER.LOGIN);
         }, 2000);
-      }).catch(() => {
+      }).catch((error: unknown) => {
         setStatus('error');
+        setMessage(getCustomerAuthErrorMessage(error, 'The verification link is invalid or expired.'));
       });
 
     return () => {
       if (redirectTimer) clearTimeout(redirectTimer);
     };
-  }, [searchParams, router]);
+  }, [email, router, token]);
+
+  const handleResend = async () => {
+    if (!email) {
+      return;
+    }
+
+    setIsResending(true);
+    try {
+      await customerAuthService.resendVerification(email);
+      setMessage('Verification email resent successfully. Please check your inbox.');
+    } catch (error: unknown) {
+      setStatus('error');
+      setMessage(getCustomerAuthErrorMessage(error, 'Unable to resend the verification email right now.'));
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
@@ -45,10 +96,42 @@ function VerifyEmailContent() {
         </div>
         
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#2c3e50] mb-3 md:mb-4">Email Verification</h1>
+
+        {status === 'pending' && (
+          <div>
+            <div className="w-12 h-12 md:w-16 md:h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6">
+              <Mail className="w-6 h-6 md:w-8 md:h-8 text-[#1565c0]" />
+            </div>
+            <p className="text-[#2c3e50] mb-2 text-sm md:text-base font-semibold">Check your email</p>
+            {email ? (
+              <p className="text-[#2c3e50] font-semibold mb-3 md:mb-4 text-sm md:text-base">{email}</p>
+            ) : null}
+            <p className="text-[#5a6c7d] text-sm md:text-base mb-6">
+              {message}
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => void handleResend()}
+                disabled={isResending}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#1565c0] px-6 py-3 text-base font-medium text-white transition-colors duration-200 hover:bg-[#0d47a1] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                <RefreshCw className={`h-4 w-4 ${isResending ? 'animate-spin' : ''}`} />
+                {isResending ? 'Resending...' : 'Resend Verification Email'}
+              </button>
+              <Link
+                href={ROUTES.CUSTOMER.LOGIN}
+                className="inline-block rounded-lg border border-[#D7DEEA] px-6 py-3 text-base font-medium text-[#2c3e50] transition-colors duration-200 hover:bg-[#F4F8FA]"
+              >
+                Go to Login
+              </Link>
+            </div>
+          </div>
+        )}
         
         {status === 'loading' && (
           <div>
-            <p className="text-[#5a6c7d] mb-4 md:mb-6 text-sm md:text-base">Verifying your email...</p>
+            <p className="text-[#5a6c7d] mb-4 md:mb-6 text-sm md:text-base">{message || 'Verifying your email...'}</p>
             <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-[#1e88e5] mx-auto"></div>
           </div>
         )}
@@ -60,7 +143,7 @@ function VerifyEmailContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-green-600 mb-3 md:mb-4 text-sm md:text-base font-semibold">Email verified successfully!</p>
+            <p className="text-green-600 mb-3 md:mb-4 text-sm md:text-base font-semibold">{message || 'Email verified successfully!'}</p>
             <p className="text-[#5a6c7d] text-sm md:text-base">Redirecting to login...</p>
           </div>
         )}
@@ -73,10 +156,10 @@ function VerifyEmailContent() {
               </svg>
             </div>
             <p className="text-red-600 mb-3 md:mb-4 text-sm md:text-base font-semibold">Verification failed</p>
-            <p className="text-[#5a6c7d] text-sm md:text-base mb-6">The verification link is invalid or expired. Please try registering again.</p>
-            <a href={ROUTES.CUSTOMER.REGISTER} className="inline-block bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium px-6 md:px-8 py-3 md:py-4 text-base md:text-lg rounded-lg transition-colors duration-200">
+            <p className="text-[#5a6c7d] text-sm md:text-base mb-6">{message || 'The verification link is invalid or expired. Please try registering again.'}</p>
+            <Link href={ROUTES.CUSTOMER.REGISTER} className="inline-block bg-[#1565c0] hover:bg-[#0d47a1] text-white font-medium px-6 md:px-8 py-3 md:py-4 text-base md:text-lg rounded-lg transition-colors duration-200">
               Back to Registration
-            </a>
+            </Link>
           </div>
         )}
       </div>

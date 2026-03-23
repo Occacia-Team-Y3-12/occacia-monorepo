@@ -44,6 +44,7 @@ from app.models.event_persona import EventPersona
 from app.models.inquiry import Inquiry
 from app.models.notification import Notification
 from app.models.offering import Offering
+from app.models.organization import Organization
 from app.models.package import Package
 from app.models.package_execution_request import PackageExecutionRequest
 from app.models.package_item import PackageItem
@@ -90,6 +91,7 @@ def clean_tables():
             Offering,
             Package,
             Vendor,
+            Organization,
             Customer,
             Admin,
             User,

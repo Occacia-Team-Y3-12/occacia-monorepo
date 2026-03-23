@@ -14,6 +14,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_admin, get_current_customer, get_current_vendor
 from app.models.admin import Admin
 from app.models.customer import Customer
+from app.models.organization import Organization
 from app.models.vendor import Vendor
 from app.schemas.auth_schema import (
     AuthMessageResponse,
@@ -151,7 +152,7 @@ def resend_customer_verification_email(
     return auth_service.resend_customer_verification_email(db, payload)
 
 
-# ── Customer forgot password — 3-step OTP flow ───────────────────────────────
+# ── Customer forgot password — reset link flow ───────────────────────────────
 
 @router.post("/customer/password/forgot", response_model=AuthMessageResponse)
 def customer_forgot_password(
@@ -160,7 +161,7 @@ def customer_forgot_password(
 ):
     """
     Step 1 — Forgot password.
-    Sends a 6-digit OTP to the customer's email. OTP expires in 5 minutes.
+    Sends a time-limited password reset link to the customer's email.
     """
     return auth_service.request_customer_password_reset_otp(db, str(payload.email))
 
@@ -170,7 +171,7 @@ def customer_resend_password_otp(
     payload: ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ):
-    """Resend customer password reset OTP."""
+    """Resend customer password reset link."""
     return auth_service.resend_customer_password_reset_otp(db, str(payload.email))
 
 
@@ -196,8 +197,8 @@ def customer_reset_password(
     db: Session = Depends(get_db),
 ):
     """
-    Step 3 — Reset password.
-    Submit the reset token from Step 2 along with the new password.
+    Step 2 — Reset password.
+    Submit the reset token from the email link along with the new password.
     """
     return auth_service.confirm_customer_password_reset(db, payload.reset_token, payload.new_password)
 
@@ -218,7 +219,7 @@ def customer_change_password(
 # VENDOR routes
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@router.post("/vendor/register", response_model=VendorResponse, status_code=201)
+@router.post("/vendor/register", response_model=RegisterResponse, status_code=201)
 def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(get_db)):
     """
     Register a new vendor account.
@@ -226,11 +227,79 @@ def register_vendor(vendor_data: VendorRegisterRequest, db: Session = Depends(ge
     """
     if vendor_service.get_vendor_by_email(db, email=vendor_data.email):
         raise HTTPException(status_code=400, detail="Email already taken!")
-    if vendor_service.get_vendor_by_display_name(db, name=vendor_data.business_name):
+
+    resolved_business_name = vendor_data.business_name or vendor_data.display_name
+    resolved_location_base = vendor_data.location_base
+    resolved_phone = vendor_data.phone or vendor_data.contact_phone
+    resolved_contact_phone = vendor_data.contact_phone or vendor_data.phone
+    organization_id = None
+
+    if vendor_data.organization_code:
+        organization = db.query(Organization).filter(
+            Organization.registration_number == vendor_data.organization_code
+        ).first()
+        if not organization:
+            raise HTTPException(status_code=400, detail="Invalid organization code.")
+        organization_id = organization.id
+        resolved_business_name = organization.name
+        resolved_location_base = resolved_location_base or organization.address
+        resolved_phone = resolved_phone or organization.phone
+        resolved_contact_phone = resolved_contact_phone or organization.phone
+    elif vendor_data.organization:
+        existing_by_reg = None
+        existing_by_email = None
+        if vendor_data.organization.registration_number:
+            existing_by_reg = db.query(Organization).filter(
+                Organization.registration_number == vendor_data.organization.registration_number
+            ).first()
+        if vendor_data.organization.email:
+            existing_by_email = db.query(Organization).filter(
+                Organization.email == vendor_data.organization.email
+            ).first()
+        if existing_by_reg:
+            raise HTTPException(status_code=400, detail="Organization registration number already in use.")
+        if existing_by_email:
+            raise HTTPException(status_code=400, detail="Organization email already in use.")
+
+        organization = Organization(
+            name=vendor_data.organization.name,
+            legal_name=vendor_data.organization.name,
+            registration_number=vendor_data.organization.registration_number,
+            email=str(vendor_data.organization.email) if vendor_data.organization.email else None,
+            phone=vendor_data.organization.phone,
+            address=vendor_data.organization.address,
+            description=(
+                None
+                if not vendor_data.organization.kym_details
+                else str(vendor_data.organization.kym_details)
+            ),
+            status="pending",
+        )
+        db.add(organization)
+        db.commit()
+        db.refresh(organization)
+
+        organization_id = organization.id
+        resolved_business_name = organization.name
+        resolved_location_base = resolved_location_base or organization.address
+        resolved_phone = resolved_phone or organization.phone
+        resolved_contact_phone = resolved_contact_phone or organization.phone
+    elif resolved_business_name and vendor_service.get_vendor_by_display_name(db, name=resolved_business_name):
         raise HTTPException(status_code=400, detail="Business name already in use!")
-    vendor = vendor_service.create_vendor(db, vendor_data)
+
+    enriched_vendor_data = vendor_data.model_copy(
+        update={
+            "business_name": resolved_business_name,
+            "location_base": resolved_location_base,
+            "phone": resolved_phone,
+            "contact_phone": resolved_contact_phone,
+            "organization_id": organization_id,
+        }
+    )
+
+    vendor = vendor_service.create_vendor(db, enriched_vendor_data)
     auth_service.register_vendor_verification(db, vendor)
-    return vendor
+    return {"message": "Registration successful. Please verify your email."}
 
 
 @router.post("/vendor/login", tags=["Authentication"])
@@ -279,7 +348,7 @@ def resend_vendor_verification_email(
     return auth_service.resend_vendor_verification_email(db, payload)
 
 
-# ── Vendor forgot password — 3-step OTP flow ─────────────────────────────────
+# ── Vendor forgot password — reset link flow ─────────────────────────────────
 
 @router.post("/vendor/password/forgot", response_model=AuthMessageResponse)
 def vendor_forgot_password(
@@ -288,7 +357,7 @@ def vendor_forgot_password(
 ):
     """
     Step 1 — Forgot password.
-    Sends a 6-digit OTP to the vendor's email. OTP expires in 5 minutes.
+    Sends a time-limited password reset link to the vendor's email.
     """
     return auth_service.request_vendor_password_reset_otp(db, str(payload.email))
 
@@ -298,7 +367,7 @@ def vendor_resend_password_otp(
     payload: ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ):
-    """Resend vendor password reset OTP."""
+    """Resend vendor password reset link."""
     return auth_service.resend_vendor_password_reset_otp(db, str(payload.email))
 
 
@@ -323,8 +392,8 @@ def vendor_reset_password(
     db: Session = Depends(get_db),
 ):
     """
-    Step 3 — Reset password.
-    Submit the reset token from Step 2 and the new password.
+    Step 2 — Reset password.
+    Submit the reset token from the email link and the new password.
     """
     return auth_service.confirm_vendor_password_reset(db, payload.reset_token, payload.new_password)
 
@@ -371,6 +440,8 @@ def refresh_vendor_token(payload: RefreshTokenRequest, db: Session = Depends(get
     vendor = vendor_service.get_vendor_by_email(db, email=email)
     if not vendor:
         raise exc
+    if getattr(vendor, "approval_status", None) != "APPROVED":
+        raise exc
     access_token  = create_access_token(
         data={"sub": vendor.email, "role": "VENDOR"}, expires_delta=timedelta(minutes=60),
     )
@@ -386,7 +457,7 @@ def refresh_vendor_token(payload: RefreshTokenRequest, db: Session = Depends(get
             "userId": getattr(vendor, "vendor_id", str(getattr(vendor, "id", ""))),
             "email":  vendor.email,
             "role":   "VENDOR",
-            "status": getattr(vendor, "status", "ACTIVE"),
+            "status": getattr(vendor, "approval_status", getattr(vendor, "status", "ACTIVE")),
         },
     }
 

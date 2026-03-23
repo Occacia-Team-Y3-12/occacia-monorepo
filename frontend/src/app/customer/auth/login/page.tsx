@@ -6,7 +6,45 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 
 import LoginForm from '@/components/customer/auth/LoginForm';
+import { ROUTES } from '@/lib/routes';
 import { customerAuthService } from '@/services/customer/authServices';
+
+type LoginError = {
+  message?: string;
+  response?: {
+    data?: {
+      detail?: string;
+      message?: string;
+      errors?: Record<string, string[]>;
+    };
+  };
+};
+
+const extractLoginErrorMessage = (error: unknown) => {
+  const responseData = (error as LoginError)?.response?.data;
+
+  if (responseData?.detail) {
+    return responseData.detail;
+  }
+
+  if (responseData?.message) {
+    return responseData.message;
+  }
+
+  const firstFieldErrors = responseData?.errors
+    ? Object.values(responseData.errors).find((messages) => messages?.length)
+    : undefined;
+
+  if (firstFieldErrors?.length) {
+    return firstFieldErrors[0];
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return 'Invalid email or password. Please try again.';
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,11 +58,9 @@ export default function LoginPage() {
         throw new Error('Authentication token was not returned from login response.');
       }
       toast.success('Login successful!');
-      sessionStorage.setItem('customerAuthVerified', '1');
-      router.replace('/customer/dashboard');
+      router.replace(ROUTES.CUSTOMER.DASHBOARD);
     } catch (error: unknown) {
-      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(msg || 'Invalid email or password. Please try again.');
+      toast.error(extractLoginErrorMessage(error));
     } finally {
       setIsLoading(false);
     }

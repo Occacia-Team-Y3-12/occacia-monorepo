@@ -140,14 +140,9 @@ export const useVendorRegister = () => {
       });
 
       if (result.ok) {
-        const verificationToken = result.data?.data?.token;
-        if (verificationToken) {
-          router.push(
-            `${ROUTES.VENDOR.VERIFY_EMAIL}?token=${verificationToken}`
-          );
-          return;
-        }
-        router.push(`${ROUTES.VENDOR.LOGIN}?registered=1`);
+        router.push(
+          `${ROUTES.VENDOR.VERIFY_EMAIL}?email=${encodeURIComponent(formData.email)}`
+        );
       } else {
         setSubmitError(result.message || result.data?.detail || 'Registration failed. Please try again.');
       }

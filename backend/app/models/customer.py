@@ -26,6 +26,8 @@ class Customer(Base):
     status = Column(String, default="PENDING", nullable=False)
     verification_token = Column(String, nullable=True)
     verification_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    password_reset_token = Column(String, nullable=True)
+    password_reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     calendar_provider = Column(String, nullable=True)
     calendar_default_id = Column(String, nullable=True)
     calendar_connected_at = Column(DateTime(timezone=True), nullable=True)

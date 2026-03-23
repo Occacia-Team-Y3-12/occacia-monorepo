@@ -4,6 +4,7 @@ import type {
 } from '@/services/customer/authService.shared';
 import {
   customerAuthSessionMethods,
+  logoutCustomerSession,
   persistCustomerLoginResult,
 } from '@/services/customer/authService.shared';
 import type { LoginResponse } from '@/types/customer/auth';
@@ -39,7 +40,7 @@ export const mockCustomerAuthService: CustomerAuthService = {
 
     return {
       status: 'success',
-      message: 'Registration successful! Please check your email.',
+      message: 'Registration successful. Please verify your email.',
     };
   },
 
@@ -52,12 +53,36 @@ export const mockCustomerAuthService: CustomerAuthService = {
 
     return {
       status: 'success',
-      message: 'Email verified successfully!',
+      message: 'Email verified successfully.',
     };
   },
 
   resendVerification: async () => {
     await sleep(300);
+  },
+
+  forgotPassword: async () => {
+    await sleep(300);
+
+    return {
+      message: 'If this email is registered, a password reset link has been sent.',
+    };
+  },
+
+  resetPassword: async ({ token, password }) => {
+    await sleep(500);
+
+    if (!token || !isValidMockToken(token)) {
+      throw new Error('Invalid or expired reset link.');
+    }
+
+    if (!password.trim()) {
+      throw new Error('Password is required.');
+    }
+
+    return {
+      message: 'Password updated successfully.',
+    };
   },
 
   login: async (data) => {
@@ -66,6 +91,19 @@ export const mockCustomerAuthService: CustomerAuthService = {
     return persistCustomerLoginResult(
       createMockCustomerLoginResponse(data.email) as CustomerLoginPayload
     );
+  },
+
+  refreshToken: async () => {
+    await sleep(250);
+
+    return persistCustomerLoginResult(
+      createMockCustomerLoginResponse('customer@occacia.test') as CustomerLoginPayload
+    );
+  },
+
+  logout: async () => {
+    await sleep(150);
+    logoutCustomerSession();
   },
 
   ...customerAuthSessionMethods,
