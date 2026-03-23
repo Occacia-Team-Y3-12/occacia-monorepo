@@ -8,6 +8,8 @@ type LoginFormData = {
   password: string;
 };
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 interface LoginFormProps {
   onSubmit: (data: LoginFormData) => Promise<void>;
   isLoading: boolean;
@@ -37,6 +39,8 @@ export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
 
     if (!formData.email.trim()) {
       nextErrors.email = 'Email is required';
+    } else if (!EMAIL_PATTERN.test(formData.email.trim())) {
+      nextErrors.email = 'Enter a valid email address';
     }
 
     if (!formData.password) {

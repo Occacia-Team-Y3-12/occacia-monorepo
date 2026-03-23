@@ -2,6 +2,7 @@ import type { CustomerAuthService, CustomerLoginPayload } from './authService.sh
 import {
   customerAuthApi,
   customerAuthSessionMethods,
+  getStoredCustomerRefreshToken,
   persistCustomerLoginResult,
 } from './authService.shared';
 
@@ -26,6 +27,20 @@ export const apiCustomerAuthService: CustomerAuthService = {
 
   login: async (data) => {
     const response = await customerAuthApi.post('/auth/customer/login', data);
+    return persistCustomerLoginResult(response.data as CustomerLoginPayload);
+  },
+
+  refreshToken: async (refreshToken) => {
+    const resolvedRefreshToken = refreshToken || getStoredCustomerRefreshToken();
+
+    if (!resolvedRefreshToken) {
+      throw new Error('No customer refresh token is available.');
+    }
+
+    const response = await customerAuthApi.post('/auth/customer/token/refresh', {
+      refreshToken: resolvedRefreshToken,
+    });
+
     return persistCustomerLoginResult(response.data as CustomerLoginPayload);
   },
 

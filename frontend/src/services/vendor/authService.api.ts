@@ -5,6 +5,8 @@ import type {
 } from './authService.shared';
 import {
   getVendorAccessToken,
+  getVendorRefreshToken,
+  getStoredVendorRefreshToken,
   persistVendorSession,
 } from './authService.shared';
 
@@ -26,17 +28,63 @@ export const apiVendorAuthService: VendorAuthService = {
     }
 
     const accessToken = getVendorAccessToken(data);
+    const refreshToken = getVendorRefreshToken(data);
 
     if (!response.ok || !accessToken) {
       return {
         ok: false,
         message:
+          data.detail ||
+          data.data?.detail ||
+          data.data?.message ||
           (data as { message?: string }).message ||
           'Invalid credentials. Please try again.',
       };
     }
 
-    persistVendorSession(accessToken);
+    persistVendorSession(accessToken, refreshToken);
+    return { ok: true };
+  },
+
+  async refreshToken(refreshToken) {
+    const resolvedRefreshToken = refreshToken || getStoredVendorRefreshToken();
+
+    if (!resolvedRefreshToken) {
+      return {
+        ok: false,
+        message: 'No vendor refresh token is available.',
+      };
+    }
+
+    const response = await fetch(`${VENDOR_AUTH_API_BASE}/token/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: resolvedRefreshToken }),
+    });
+
+    let data: VendorLoginResponse = {};
+    try {
+      data = (await response.json()) as VendorLoginResponse;
+    } catch {
+      data = {};
+    }
+
+    const accessToken = getVendorAccessToken(data);
+    const nextRefreshToken = getVendorRefreshToken(data) || resolvedRefreshToken;
+
+    if (!response.ok || !accessToken) {
+      return {
+        ok: false,
+        message:
+          data.detail ||
+          data.data?.detail ||
+          data.data?.message ||
+          data.message ||
+          'Unable to refresh vendor session.',
+      };
+    }
+
+    persistVendorSession(accessToken, nextRefreshToken);
     return { ok: true };
   },
 
@@ -44,11 +92,41 @@ export const apiVendorAuthService: VendorAuthService = {
     const backendPayload = {
       email: payload.email,
       password: payload.password,
-      business_name: payload.businessName,
-      display_name: payload.fullName,
-      contact_phone: payload.businessPhone,
-      phone: payload.businessPhone,
-      location_base: payload.businessAddress,
+      displayName: payload.fullName,
+      contactPhone:
+        payload.organizationType === 'create'
+          ? payload.businessPhone
+          : undefined,
+      organizationCode:
+        payload.organizationType === 'join'
+          ? payload.organizationCode
+          : undefined,
+      organization:
+        payload.organizationType === 'create'
+          ? {
+              name: payload.businessName,
+              registrationNumber: payload.businessRegNumber,
+              email: payload.businessEmail,
+              phone: payload.businessPhone,
+              address: payload.businessAddress,
+              kymDetails: {
+                username: payload.username,
+                accountAddress: payload.address,
+                nicNumber: payload.nicNumber,
+                gender: payload.gender,
+              },
+            }
+          : undefined,
+      businessName:
+        payload.organizationType === 'create' ? payload.businessName : undefined,
+      locationBase:
+        payload.organizationType === 'create'
+          ? payload.businessAddress
+          : undefined,
+      phone:
+        payload.organizationType === 'create'
+          ? payload.businessPhone
+          : undefined,
     };
 
     const response = await fetch(`${VENDOR_AUTH_API_BASE}/register`, {
@@ -75,7 +153,30 @@ export const apiVendorAuthService: VendorAuthService = {
     return {
       ok: true,
       data,
-      message: 'Registration successful. Please login.',
+      message: data.message || 'Registration successful. Please verify your email.',
+    };
+  },
+
+  async resendVerification(email) {
+    const response = await fetch(
+      `${VENDOR_AUTH_API_BASE}/email-verification/resend`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }
+    );
+
+    let data: { message?: string } = {};
+    try {
+      data = (await response.json()) as { message?: string };
+    } catch {
+      data = {};
+    }
+
+    return {
+      ok: response.ok,
+      message: data.message,
     };
   },
 
@@ -111,13 +212,20 @@ export const apiVendorAuthService: VendorAuthService = {
 
   async verifyEmail(token) {
     if (!token) {
-      return { ok: false };
+      return { ok: false, message: 'Verification token is required.' };
     }
 
     const response = await fetch(
       `${VENDOR_AUTH_API_BASE}/verify-email?token=${encodeURIComponent(token)}`
     );
 
-    return { ok: response.ok };
+    let data: { message?: string } = {};
+    try {
+      data = (await response.json()) as { message?: string };
+    } catch {
+      data = {};
+    }
+
+    return { ok: response.ok, message: data.message };
   },
 };

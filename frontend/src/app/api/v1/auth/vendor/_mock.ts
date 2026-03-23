@@ -31,8 +31,25 @@ export async function mockVendorRegister() {
 
   return NextResponse.json({
     status: 'pending_verification',
-    message: 'Please verify your email',
+    message: 'Registration successful. Please verify your email.',
     data: { token: `mock_${Date.now()}` },
+  });
+}
+
+export async function mockVendorResendVerificationEmail(payload: {
+  email?: string;
+}) {
+  await sleep(300);
+
+  if (!payload.email?.trim()) {
+    return NextResponse.json(
+      { message: 'Email is required.' },
+      { status: 400 }
+    );
+  }
+
+  return NextResponse.json({
+    message: 'Verification email resent successfully.',
   });
 }
 
@@ -89,7 +106,7 @@ export async function mockVendorVerifyEmail(token: string | null) {
 
   return NextResponse.json({
     status: 'success',
-    message: 'Email verified successfully',
+    message: 'Email verified successfully. Your account is pending admin approval.',
     data: { verified: true },
   });
 }

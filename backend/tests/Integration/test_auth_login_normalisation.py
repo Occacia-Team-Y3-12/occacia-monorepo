@@ -29,8 +29,8 @@ def _activate_vendor(email: str) -> None:
     try:
         vendor = db.query(Vendor).filter(Vendor.email == email).first()
         assert vendor is not None
-        vendor.email_verified = True
-        vendor.status = "ACTIVE"
+        vendor.is_verified = True
+        vendor.approval_status = "APPROVED"
         db.commit()
     finally:
         db.close()

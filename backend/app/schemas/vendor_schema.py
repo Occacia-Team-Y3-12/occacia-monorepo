@@ -3,7 +3,6 @@ app/schemas/vendor_schema.py
 """
 
 from datetime import datetime
-from enum import Enum
 from typing import Optional, Any
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -13,14 +12,31 @@ from app.schemas.event_planning_schema import TaskResponse
 from app.schemas.package_schema import FulfillmentRequestResponse
 
 
+class VendorOrganizationRegisterRequest(BaseModel):
+    name: str
+    registration_number: Optional[str] = Field(default=None, alias="registrationNumber")
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    kym_details: Optional[dict[str, Any]] = Field(default=None, alias="kymDetails")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class VendorRegisterRequest(BaseModel):
-    business_name: str
     email: EmailStr
     password: str
-    location_base: Optional[str] = None
+    display_name: str = Field(alias="displayName")
+    contact_phone: Optional[str] = Field(default=None, alias="contactPhone")
+    organization_code: Optional[str] = Field(default=None, alias="organizationCode")
+    organization: Optional[VendorOrganizationRegisterRequest] = None
+
+    # Legacy compatibility fields used by older tests / clients
+    business_name: Optional[str] = Field(default=None, alias="businessName")
+    location_base: Optional[str] = Field(default=None, alias="locationBase")
     phone: Optional[str] = None
-    display_name: Optional[str] = None
-    contact_phone: Optional[str] = None
+
+    model_config = ConfigDict(populate_by_name=True)
 
 # 2. Login Input
 
@@ -62,6 +78,7 @@ class VendorResponse(BaseModel):
     user_id: int | None = None  # Make this field optional
     business_name: str
     email: EmailStr
+    organization_id: Optional[int] = None
     location_base: Optional[str] = None
     phone: Optional[str] = None
     display_name: Optional[str] = None

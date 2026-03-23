@@ -333,6 +333,15 @@ class AuthService:
         if os.getenv("SKIP_EMAIL_VERIFICATION") != "true":
             if not getattr(vendor, "email_verified", True) and not getattr(vendor, "is_verified", True):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified.")
+        approval_status = getattr(vendor, "approval_status", None)
+        if approval_status != "APPROVED":
+            detail = {
+                "PENDING": "Your account is pending admin approval.",
+                "REJECTED": "Your vendor account has been rejected.",
+                "SUSPENDED": "Your vendor account has been suspended.",
+                "DISABLED": "Your vendor account has been disabled.",
+            }.get(approval_status, "Vendor account is not active.")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
         access_token  = create_access_token(
             data={"sub": vendor.email, "role": "VENDOR"}, expires_delta=timedelta(minutes=60),
@@ -349,7 +358,7 @@ class AuthService:
                 "userId": getattr(vendor, "vendor_id", str(getattr(vendor, "id", ""))),
                 "email":  vendor.email,
                 "role":   "VENDOR",
-                "status": getattr(vendor, "status", "ACTIVE"),
+                "status": getattr(vendor, "approval_status", getattr(vendor, "status", "ACTIVE")),
             },
         }
 
@@ -362,9 +371,11 @@ class AuthService:
         if vendor.is_verified:
             return {"message": "Email already verified"}
         vendor.is_verified = True
+        if getattr(vendor, "approval_status", None) in (None, "", "PENDING_VERIFICATION"):
+            vendor.approval_status = "PENDING"
         db.add(vendor)
         db.commit()
-        return {"message": "Email verified successfully"}
+        return {"message": "Email verified successfully. Your account is pending admin approval."}
 
     def resend_vendor_verification_email(
         self, db: Session, payload: ResendVerificationRequest,

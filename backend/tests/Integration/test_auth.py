@@ -28,7 +28,9 @@ import pytest
 from app.core.database import SessionLocal
 from app.core.security import create_access_token, create_refresh_token
 from app.models.customer import Customer
+from app.models.organization import Organization
 from app.models.vendor import Vendor
+from app.services.auth_service import auth_service
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -110,6 +112,20 @@ def _register_vendor(client, email: str, password: str = "Pass123!"):
         "email": email,
         "password": password,
     })
+
+
+def _activate_vendor(email: str) -> Vendor:
+    db = SessionLocal()
+    try:
+        v = db.query(Vendor).filter(Vendor.email == email).first()
+        assert v is not None, f"Vendor {email} not found"
+        v.is_verified = True
+        v.approval_status = "APPROVED"
+        db.commit()
+        db.refresh(v)
+        return v
+    finally:
+        db.close()
 
 
 def _login_customer(client, email: str, password: str = "Pass12345!"):
@@ -584,6 +600,84 @@ class TestVendorRegistration:
         finally:
             db.close()
 
+    def test_register_with_display_name_contract(self, client):
+        r = client.post("/api/v1/auth/vendor/register", json={
+            "email": _vendor_email(),
+            "password": "Pass123!",
+            "displayName": "Vendor Display",
+        })
+        assert r.status_code == 201
+
+    def test_register_join_existing_organization(self, client):
+        db = SessionLocal()
+        try:
+            org = Organization(
+                name=f"Org {_uid()}",
+                registration_number=f"ORG-{_uid()}",
+                email=f"org-{_uid()}@test.com",
+                status="approved",
+            )
+            db.add(org)
+            db.commit()
+            db.refresh(org)
+            org_code = org.registration_number
+            org_id = org.id
+            org_name = org.name
+        finally:
+            db.close()
+
+        email = _vendor_email()
+        r = client.post("/api/v1/auth/vendor/register", json={
+            "email": email,
+            "password": "Pass123!",
+            "displayName": "Vendor Display",
+            "organizationCode": org_code,
+        })
+        assert r.status_code == 201
+
+        db = SessionLocal()
+        try:
+            v = db.query(Vendor).filter(Vendor.email == email).first()
+            assert v is not None
+            assert v.organization_id == org_id
+            assert v.business_name == org_name
+        finally:
+            db.close()
+
+    def test_register_create_organization(self, client):
+        email = _vendor_email()
+        registration_number = f"REG-{_uid()}"
+        organization_name = f"Org {_uid()}"
+        r = client.post("/api/v1/auth/vendor/register", json={
+            "email": email,
+            "password": "Pass123!",
+            "displayName": "Vendor Display",
+            "organization": {
+                "name": organization_name,
+                "registrationNumber": registration_number,
+                "email": f"org-{_uid()}@test.com",
+                "phone": "+94770000000",
+                "address": "Colombo",
+                "kymDetails": {
+                    "businessRegNumber": registration_number,
+                },
+            },
+        })
+        assert r.status_code == 201
+
+        db = SessionLocal()
+        try:
+            v = db.query(Vendor).filter(Vendor.email == email).first()
+            org = db.query(Organization).filter(
+                Organization.registration_number == registration_number
+            ).first()
+            assert v is not None
+            assert org is not None
+            assert v.organization_id == org.id
+            assert v.business_name == organization_name
+        finally:
+            db.close()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 8. VENDOR EMAIL VERIFICATION
@@ -622,6 +716,27 @@ class TestVendorEmailVerification:
                         json={"email": email})
         assert r.status_code == 400
 
+    def test_verify_sets_pending_admin_message(self, client):
+        email = _vendor_email()
+        _register_vendor(client, email)
+        token, _ = auth_service._create_verification_token(
+            email,
+            token_type="verify_vendor_email",
+            hours=24,
+        )
+
+        r = client.get("/api/v1/auth/vendor/verify-email", params={"token": token})
+        assert r.status_code == 200
+        assert "pending admin approval" in r.json()["message"].lower()
+
+        db = SessionLocal()
+        try:
+            vendor = db.query(Vendor).filter(Vendor.email == email).first()
+            assert vendor.is_verified is True
+            assert vendor.approval_status == "PENDING"
+        finally:
+            db.close()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 9. VENDOR LOGIN
@@ -633,6 +748,7 @@ class TestVendorLogin:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
         r = _login_vendor(client, email)
         assert r.status_code == 200
         data = r.json()
@@ -650,28 +766,24 @@ class TestVendorLogin:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
         data = _login_vendor(client, email).json()
         assert "accessToken" in data or "access_token" in data
         assert "refreshToken" in data or "refresh_token" in data
 
-    def test_pending_vendor_can_login(self, client, monkeypatch):
+    def test_pending_vendor_blocked_from_login(self, client, monkeypatch):
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
-        assert _login_vendor(client, email).status_code == 200
+        r = _login_vendor(client, email)
+        assert r.status_code == 403
+        assert "pending admin approval" in r.json()["detail"].lower()
 
     def test_approved_vendor_accesses_protected_routes(self, client, monkeypatch):
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
-        db = SessionLocal()
-        try:
-            v = db.query(Vendor).filter(Vendor.email == email).first()
-            v.approval_status = "APPROVED"
-            v.is_verified = True
-            db.commit()
-        finally:
-            db.close()
+        _activate_vendor(email)
         data = _login_vendor(client, email).json()
         token = data.get("accessToken") or data.get("access_token")
         r = client.get("/api/v1/vendors/me",
@@ -682,11 +794,7 @@ class TestVendorLogin:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
-        data = _login_vendor(client, email).json()
-        token = data.get("accessToken") or data.get("access_token")
-        r = client.get("/api/v1/vendors/fulfillment-requests",
-                       headers={"Authorization": f"Bearer {token}"})
-        assert r.status_code == 403
+        assert _login_vendor(client, email).status_code == 403
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -699,6 +807,7 @@ class TestVendorLogout:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
         data = _login_vendor(client, email).json()
         return data.get("accessToken") or data.get("access_token")
 
@@ -727,6 +836,7 @@ class TestVendorLogout:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
 
         with patch("app.services.auth_service._get_redis", return_value=fake_redis), \
              patch("app.core.security.is_token_blacklisted",
@@ -749,6 +859,7 @@ class TestVendorLogout:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
 
         # Log in once to get token_a (the one we will log out).
         # Mint token_b directly with a unique jti so it is a genuinely different
@@ -882,6 +993,7 @@ class TestVendorPasswordReset:
                                    "new_password": "NewVend999!"})
             assert r3.status_code == 200
 
+        _activate_vendor(email)
         assert _login_vendor(client, email, "NewVend999!").status_code == 200
 
 
@@ -895,6 +1007,7 @@ class TestVendorTokenRefresh:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
         return _login_vendor(client, email).json()
 
     def test_refresh_success(self, client, monkeypatch):
@@ -927,6 +1040,25 @@ class TestVendorTokenRefresh:
         customer_refresh = _login_customer(client, email).json()["refreshToken"]
         r = client.post("/api/v1/auth/vendor/token/refresh",
                         json={"refreshToken": customer_refresh})
+        assert r.status_code == 401
+
+    def test_refresh_pending_vendor_rejected(self, client, monkeypatch):
+        monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
+        email = _vendor_email()
+        _register_vendor(client, email)
+        db = SessionLocal()
+        try:
+            v = db.query(Vendor).filter(Vendor.email == email).first()
+            assert v is not None
+            v.is_verified = True
+            db.commit()
+        finally:
+            db.close()
+        refresh = create_refresh_token(
+            data={"sub": email, "role": "VENDOR"}, expires_delta=timedelta(days=7),
+        )
+        r = client.post("/api/v1/auth/vendor/token/refresh",
+                        json={"refreshToken": refresh})
         assert r.status_code == 401
 
 
@@ -970,6 +1102,7 @@ class TestTokenBlacklist:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
 
         with patch("app.services.auth_service._get_redis", return_value=fake_redis), \
              patch("app.core.security.is_token_blacklisted",
@@ -1291,6 +1424,7 @@ class TestVendorPasswordChange:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
         token = _login_vendor(client, email, "Pass123!").json()["accessToken"]
         r = client.post(
             "/api/v1/auth/vendor/password/change",
@@ -1305,6 +1439,7 @@ class TestVendorPasswordChange:
         monkeypatch.setenv("SKIP_EMAIL_VERIFICATION", "true")
         email = _vendor_email()
         _register_vendor(client, email)
+        _activate_vendor(email)
         token = _login_vendor(client, email, "Pass123!").json()["accessToken"]
         r = client.post(
             "/api/v1/auth/vendor/password/change",

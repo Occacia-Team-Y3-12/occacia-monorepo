@@ -269,6 +269,10 @@ class VendorService:
             password_hash=password_hash,
             business_name=vendor_data.business_name,
             phone=getattr(vendor_data, "phone", None),
+            location_base=getattr(vendor_data, "location_base", None),
+            display_name=getattr(vendor_data, "display_name", None),
+            contact_phone=getattr(vendor_data, "contact_phone", None),
+            organization_id=getattr(vendor_data, "organization_id", None),
             is_verified=False,
             approval_status="PENDING",
         )

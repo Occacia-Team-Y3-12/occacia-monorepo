@@ -68,5 +68,13 @@ export const mockCustomerAuthService: CustomerAuthService = {
     );
   },
 
+  refreshToken: async () => {
+    await sleep(250);
+
+    return persistCustomerLoginResult(
+      createMockCustomerLoginResponse('customer@occacia.test') as CustomerLoginPayload
+    );
+  },
+
   ...customerAuthSessionMethods,
 };

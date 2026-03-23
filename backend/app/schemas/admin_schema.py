@@ -27,6 +27,7 @@ class AdminResponse(BaseModel):
 class VendorAdminView(BaseModel):
     id: int
     vendor_id: Optional[str]
+    organization_id: Optional[int] = None
     business_name: str
     email: str
     phone: Optional[str]
