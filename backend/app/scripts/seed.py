@@ -83,29 +83,65 @@ def seed_data() -> bool:
             )
             return False
 
-        # [FAIL-SAFE] Ensure offerings table has quality_tier and created_at columns
-        # This protects against cases where migrations were skipped or auto-heal didn't update existing tables.
-        if inspector.has_table("offerings"):
-            columns = [c["name"] for c in inspector.get_columns("offerings")]
-            if "quality_tier" not in columns or "created_at" not in columns:
-                logger.info("Adding missing columns to offerings table via fail-safe...")
-                # Using raw SQL to be dialect-agnostic but targeting Postgres primarily since it's the target env.
-                # 'IF NOT EXISTS' is supported by Postgres 9.6+
-                with db.bind.begin() as conn:
-                    if "quality_tier" not in columns:
-                        conn.execute(
-                            text(
-                                "ALTER TABLE offerings ADD COLUMN IF NOT EXISTS quality_tier VARCHAR NOT NULL DEFAULT 'MEDIUM'"
-                            )
-                        )
-                    if "created_at" not in columns:
-                        conn.execute(
-                            text(
-                                "ALTER TABLE offerings ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"
-                            )
-                        )
-                # Refresh inspector to reflect changes
-                inspector = inspect(db.bind)
+        # [FAIL-SAFE] Ensure critical columns exist on existing databases.
+        # This protects startup when a persisted DB volume is behind current models.
+        table_column_failsafes: dict[str, list[tuple[str, str]]] = {
+            "offerings": [
+                (
+                    "quality_tier",
+                    "ALTER TABLE offerings ADD COLUMN IF NOT EXISTS quality_tier VARCHAR NOT NULL DEFAULT 'MEDIUM'",
+                ),
+                (
+                    "created_at",
+                    "ALTER TABLE offerings ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+                ),
+            ],
+            "customers": [
+                (
+                    "password_reset_token",
+                    "ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR",
+                ),
+                (
+                    "password_reset_token_expires_at",
+                    "ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_reset_token_expires_at TIMESTAMP WITH TIME ZONE",
+                ),
+            ],
+            "vendors": [
+                (
+                    "password_reset_token",
+                    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR",
+                ),
+                (
+                    "password_reset_token_expires_at",
+                    "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS password_reset_token_expires_at TIMESTAMP WITH TIME ZONE",
+                ),
+            ],
+        }
+
+        for table_name, column_specs in table_column_failsafes.items():
+            if not inspector.has_table(table_name):
+                continue
+
+            columns = {c["name"] for c in inspector.get_columns(table_name)}
+            missing_specs = [
+                (column_name, ddl)
+                for column_name, ddl in column_specs
+                if column_name not in columns
+            ]
+            if not missing_specs:
+                continue
+
+            logger.info(
+                "Adding missing columns to %s table via fail-safe: %s",
+                table_name,
+                ", ".join(column_name for column_name, _ in missing_specs),
+            )
+            with db.bind.begin() as conn:
+                for _, ddl in missing_specs:
+                    conn.execute(text(ddl))
+
+        # Refresh inspector to reflect any fail-safe schema updates.
+        inspector = inspect(db.bind)
 
         now = now_utc()
         created_rows = 0
