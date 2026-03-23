@@ -5,85 +5,73 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { toast } from 'sonner';
-import { Mail } from 'lucide-react';
 
-import Button from '@/components/ui/Button';
 import RegisterForm from '@/components/customer/auth/RegisterForm';
 import SocialLoginButtons from '@/components/ui/SocialLoginButtons';
 import { RegisterFormValues } from '@/lib/validators';
+import { ROUTES } from '@/lib/routes';
 import { customerAuthService } from '@/services/customer/authServices';
 import type { RegisterFormData } from '@/types/customer/auth';
 
-const deriveUsername = ({ fullName, email }: RegisterFormValues): string => {
-  const emailLocalPart = email.split('@')[0]?.trim().toLowerCase() || '';
-  const normalizedName = fullName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+const getCustomerAuthErrorMessage = (error: unknown, fallback: string) => {
+  const response = (error as {
+    response?: {
+      status?: number;
+      data?: {
+        message?: string;
+        detail?: string;
+        errors?: Record<string, string[]>;
+      };
+    };
+  })?.response;
 
-  return emailLocalPart || normalizedName || `customer${Date.now()}`;
+  const data = response?.data;
+  const message = data?.message || data?.detail;
+
+  return {
+    status: response?.status,
+    message: message || fallback,
+    errors: data?.errors,
+  };
 };
 
 export default function RegisterPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
 
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
 
     try {
       const payload: RegisterFormData = {
-        ...data,
-        username: deriveUsername(data),
+        fullName: data.fullName,
+        email: data.email,
+        phone: data.mobileNumber,
+        password: data.password,
       };
 
-      await customerAuthService.register(payload);
-      setRegisteredEmail(data.email);
-      toast.success('Registration successful! Please check your email.');
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Registration failed. Please try again.';
-      
-      if (error.response?.status === 409) {
+      const response = await customerAuthService.register(payload);
+      toast.success(response.message || 'Registration successful. Please verify your email.');
+      router.replace(`${ROUTES.CUSTOMER.VERIFY_EMAIL}?email=${encodeURIComponent(data.email)}`);
+    } catch (error: unknown) {
+      const { status, message, errors } = getCustomerAuthErrorMessage(
+        error,
+        'Registration failed. Please try again.'
+      );
+
+      if (status === 400 && message.toLowerCase().includes('already registered')) {
         toast.error('An account already exists with this email address.');
-      } else if (error.response?.data?.errors) {
-        const errors = error.response.data.errors;
+      } else if (errors) {
         Object.keys(errors).forEach((field) => {
           toast.error(`${field}: ${errors[field].join(', ')}`);
         });
       } else {
-        toast.error(errorMessage);
+        toast.error(message);
       }
     } finally {
       setIsLoading(false);
     }
   };
-
-  // Check Your Email Screen
-  if (registeredEmail) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Mail className="w-10 h-10 text-green-600" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">Check Your Email</h1>
-          <p className="text-gray-600 mb-2">
-            We've sent a verification link to
-          </p>
-          <p className="font-semibold text-gray-900 mb-6">{registeredEmail}</p>
-          <p className="text-sm text-gray-500 mb-8">
-            Please click the link in the email to verify your account. 
-            If you don't see the email, check your spam folder.
-          </p>
-          <Button
-            onClick={() => router.push('/customer/auth/login')}
-            variant="primary"
-            className="w-full"
-          >
-            Go to Login
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   // Registration Form Screen
   return (

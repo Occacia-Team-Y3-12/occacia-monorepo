@@ -3,7 +3,8 @@ export const ROUTES = {
   CUSTOMER: {
     LOGIN: '/customer/auth/login',
     DASHBOARD: '/customer/dashboard',
-    REGISTER: '/customer/register',
+    REGISTER: '/customer/auth/register',
+    VERIFY_EMAIL: '/customer/auth/verify-email',
     EVENTS: '/customer/events',
     EVENTS_NEW: '/customer/events/new',
     EVENT_CHAT: (eventId: string) => `/customer/events/${eventId}/chat`,

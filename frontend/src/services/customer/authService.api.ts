@@ -13,7 +13,7 @@ export const apiCustomerAuthService: CustomerAuthService = {
 
   verifyEmail: async (token) => {
     const response = await customerAuthApi.get(
-      `/auth/customer/verify-email?token=${token}`
+      `/auth/customer/verify-email?token=${encodeURIComponent(token)}`
     );
     return response.data;
   },

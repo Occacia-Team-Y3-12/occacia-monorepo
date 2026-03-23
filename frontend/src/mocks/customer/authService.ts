@@ -39,7 +39,7 @@ export const mockCustomerAuthService: CustomerAuthService = {
 
     return {
       status: 'success',
-      message: 'Registration successful! Please check your email.',
+      message: 'Registration successful. Please verify your email.',
     };
   },
 
@@ -52,7 +52,7 @@ export const mockCustomerAuthService: CustomerAuthService = {
 
     return {
       status: 'success',
-      message: 'Email verified successfully!',
+      message: 'Email verified successfully.',
     };
   },
 
