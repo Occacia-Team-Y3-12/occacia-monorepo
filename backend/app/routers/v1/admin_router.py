@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_admin
@@ -30,10 +30,17 @@ from app.schemas.package_schema import (
     PackageOrderDetailsResponse,
     PackageOrderResponse,
 )
+from app.schemas.inquiry_schema import (
+    InquiryResponse,
+    InquiryUpdateRequest,
+    PaginatedInquiriesResponse,
+)
 from app.services.admin_service import admin_service
 from app.services.admin_dashboard_service import admin_dashboard_aggregator
 from app.services.notification_service import notification_service
 from app.services.auth_service import _send_email
+from app.services.inquiry_service import inquiry_service
+from app.services.package_order_service import package_order_service
 
 logger = logging.getLogger(__name__)
 
@@ -357,6 +364,98 @@ def get_package_order_detail(
 ):
     _ = current_admin
     order, tasks = admin_service.get_package_order_detail(db, package_order_id=packageOrderId)
+    return PackageOrderDetailsResponse(
+        packageOrder=_package_order_response(order),
+        tasks=[_task_response(task) for task in tasks],
+    )
+
+
+# --- Inquiries ---
+
+@router.get(
+    "/inquiries",
+    response_model=PaginatedInquiriesResponse,
+    response_model_by_alias=True,
+)
+def list_inquiries_admin(
+    status: str | None = None,
+    creator_role: str | None = Query(default=None, alias="creatorRole"),
+    limit: int = 20,
+    cursor: str | None = None,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    _ = current_admin
+    items, next_cursor = inquiry_service.list_all_inquiries(
+        db,
+        status=status,
+        creator_role=creator_role,
+        limit=limit,
+        cursor=cursor,
+    )
+    return PaginatedInquiriesResponse(
+        items=[InquiryResponse.model_validate(item) for item in items],
+        nextCursor=next_cursor,
+    )
+
+
+@router.get(
+    "/inquiries/{inquiry_id}",
+    response_model=InquiryResponse,
+    response_model_by_alias=True,
+)
+def get_inquiry_admin(
+    inquiry_id: str,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    _ = current_admin
+    return InquiryResponse.model_validate(
+        inquiry_service.get_inquiry_admin(db, inquiry_id)
+    )
+
+
+@router.put(
+    "/inquiries/{inquiry_id}",
+    response_model=InquiryResponse,
+    response_model_by_alias=True,
+)
+def update_inquiry_admin(
+    inquiry_id: str,
+    body: InquiryUpdateRequest,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    return InquiryResponse.model_validate(
+        inquiry_service.update_inquiry(
+            db,
+            inquiry_id=inquiry_id,
+            admin_id=str(current_admin.admin_id),
+            status=body.status,
+            admin_reply=body.admin_reply,
+        )
+    )
+
+
+# --- Admin Package Order Cancellation ---
+
+@router.put(
+    "/package-orders/{package_order_id}/cancel",
+    response_model=PackageOrderDetailsResponse,
+    response_model_by_alias=True,
+)
+def cancel_package_order_admin(
+    package_order_id: str,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    _ = current_admin
+    order = package_order_service.cancel_package_order(
+        db,
+        package_order_id=package_order_id,
+        cancelled_by="ADMIN",
+    )
+    tasks = package_order_service.get_order_tasks(db, package_order_id=package_order_id)
     return PackageOrderDetailsResponse(
         packageOrder=_package_order_response(order),
         tasks=[_task_response(task) for task in tasks],

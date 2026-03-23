@@ -64,6 +64,11 @@ from app.schemas.recommendation_schema import (
     TaskRecommendationListResponse,
     UpdateCustomPackageRequest,
 )
+from app.schemas.inquiry_schema import (
+    InquiryCreate,
+    InquiryResponse,
+    PaginatedInquiriesResponse,
+)
 from app.schemas.offering_schema import TaskOfferingListResponse, TaskOfferingResponse
 from app.schemas.package_schema import (
     ConfirmPackageOrderResponse,
@@ -80,6 +85,7 @@ from app.services.package_order_service import package_order_service
 from app.services.recommendation_service import recommendation_service
 from app.services.event_chat_service import event_chat_service
 from app.services.offering_service import offering_service
+from app.services.inquiry_service import inquiry_service
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -921,6 +927,97 @@ def get_customer_package_order(
         customer_id=current_customer.customer_id,
         package_order_id=package_order_id,
     )
+    return PackageOrderDetailsResponse(
+        packageOrder=_package_order_response(order),
+        tasks=[_task_response(task) for task in tasks],
+    )
+
+
+# --- Inquiries ---
+
+@router.get(
+    "/customers/inquiries",
+    response_model=PaginatedInquiriesResponse,
+    response_model_by_alias=True,
+)
+def list_customer_inquiries(
+    status: str | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    items, next_cursor = inquiry_service.list_user_inquiries(
+        db,
+        user_id=str(current_customer.customer_id),
+        status=status,
+        limit=limit,
+        cursor=cursor,
+    )
+    return PaginatedInquiriesResponse(
+        items=[InquiryResponse.model_validate(item) for item in items],
+        nextCursor=next_cursor,
+    )
+
+
+@router.post(
+    "/customers/inquiries",
+    response_model=InquiryResponse,
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_customer_inquiry(
+    payload: InquiryCreate,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    inquiry = inquiry_service.create_inquiry(
+        db,
+        user_id=str(current_customer.customer_id),
+        role="CUSTOMER",
+        subject=payload.subject,
+        message=payload.message,
+    )
+    return InquiryResponse.model_validate(inquiry)
+
+
+@router.get(
+    "/customers/inquiries/{inquiry_id}",
+    response_model=InquiryResponse,
+    response_model_by_alias=True,
+)
+def get_customer_inquiry(
+    inquiry_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    inquiry = inquiry_service.get_user_inquiry(
+        db,
+        inquiry_id=inquiry_id,
+        user_id=str(current_customer.customer_id),
+    )
+    return InquiryResponse.model_validate(inquiry)
+
+
+# --- Package Order Cancellation ---
+
+@router.put(
+    "/customers/package-orders/{package_order_id}/cancel",
+    response_model=PackageOrderDetailsResponse,
+    response_model_by_alias=True,
+)
+def cancel_customer_package_order(
+    package_order_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    order = package_order_service.cancel_package_order(
+        db,
+        package_order_id=package_order_id,
+        cancelled_by="CUSTOMER",
+        customer_id=str(current_customer.customer_id),
+    )
+    tasks = package_order_service.get_order_tasks(db, package_order_id=package_order_id)
     return PackageOrderDetailsResponse(
         packageOrder=_package_order_response(order),
         tasks=[_task_response(task) for task in tasks],

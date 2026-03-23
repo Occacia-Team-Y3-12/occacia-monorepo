@@ -27,6 +27,11 @@ from app.schemas.offering_schema import (
     OfferingResponse,
     OfferingUpdate,
 )
+from app.schemas.inquiry_schema import (
+    InquiryCreate,
+    InquiryResponse,
+    PaginatedInquiriesResponse,
+)
 from app.schemas.vendor_schema import (
     PaginatedFulfillmentRequestsResponse,
     PaginatedVendorTasksResponse,
@@ -38,6 +43,7 @@ from app.schemas.vendor_schema import (
 )
 from app.services.vendor_service import AdminVendorService, vendor_service
 from app.services.offering_service import offering_service
+from app.services.inquiry_service import inquiry_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/vendors", tags=["Vendors"])
@@ -434,3 +440,69 @@ def delete_offering(
 ):
     offering_service.delete_offering(db, offering_id=offering_id, vendor_id=vendor.vendor_id)
     return Response(status_code=204)
+
+
+# --- Inquiries ---
+
+@router.get(
+    "/inquiries",
+    response_model=PaginatedInquiriesResponse,
+    response_model_by_alias=True,
+)
+def list_vendor_inquiries(
+    status: str | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None),
+    vendor: Vendor = Depends(get_current_vendor),
+    db: Session = Depends(get_db),
+):
+    items, next_cursor = inquiry_service.list_user_inquiries(
+        db,
+        user_id=str(vendor.vendor_id),
+        status=status,
+        limit=limit,
+        cursor=cursor,
+    )
+    return PaginatedInquiriesResponse(
+        items=[InquiryResponse.model_validate(item) for item in items],
+        nextCursor=next_cursor,
+    )
+
+
+@router.post(
+    "/inquiries",
+    response_model=InquiryResponse,
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_vendor_inquiry(
+    payload: InquiryCreate,
+    vendor: Vendor = Depends(get_current_vendor),
+    db: Session = Depends(get_db),
+):
+    inquiry = inquiry_service.create_inquiry(
+        db,
+        user_id=str(vendor.vendor_id),
+        role="VENDOR",
+        subject=payload.subject,
+        message=payload.message,
+    )
+    return InquiryResponse.model_validate(inquiry)
+
+
+@router.get(
+    "/inquiries/{inquiry_id}",
+    response_model=InquiryResponse,
+    response_model_by_alias=True,
+)
+def get_vendor_inquiry(
+    inquiry_id: str,
+    vendor: Vendor = Depends(get_current_vendor),
+    db: Session = Depends(get_db),
+):
+    inquiry = inquiry_service.get_user_inquiry(
+        db,
+        inquiry_id=inquiry_id,
+        user_id=str(vendor.vendor_id),
+    )
+    return InquiryResponse.model_validate(inquiry)

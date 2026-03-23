@@ -18,6 +18,12 @@ from .offering_schema import (
     TaskOfferingListResponse,
     TaskOfferingResponse,
 )
+from .inquiry_schema import (
+    InquiryCreate,
+    InquiryResponse,
+    InquiryUpdateRequest,
+    PaginatedInquiriesResponse,
+)
 from .vendor_schema import VendorLoginRequest, VendorRegisterRequest, VendorResponse
 
 __all__ = [
@@ -37,6 +43,10 @@ __all__ = [
     "OfferingUpdate",
     "TaskOfferingListResponse",
     "TaskOfferingResponse",
+    "InquiryCreate",
+    "InquiryResponse",
+    "InquiryUpdateRequest",
+    "PaginatedInquiriesResponse",
     "VendorLoginRequest",
     "VendorRegister",
     "VendorRegisterRequest",
