@@ -83,9 +83,26 @@ def seed_data() -> bool:
             )
             return False
 
+        # [FAIL-SAFE] Ensure offerings table has quality_tier and created_at columns
+        # This protects against cases where migrations were skipped or auto-heal didn't update existing tables.
+        if inspector.has_table("offerings"):
+            columns = [c["name"] for c in inspector.get_columns("offerings")]
+            if "quality_tier" not in columns or "created_at" not in columns:
+                logger.info("Adding missing columns to offerings table via fail-safe...")
+                # Using raw SQL to be dialect-agnostic but targeting Postgres primarily since it's the target env.
+                # 'IF NOT EXISTS' is supported by Postgres 9.6+
+                with db.bind.begin() as conn:
+                    if "quality_tier" not in columns:
+                        conn.execute("ALTER TABLE offerings ADD COLUMN IF NOT EXISTS quality_tier VARCHAR NOT NULL DEFAULT 'MEDIUM'")
+                    if "created_at" not in columns:
+                        conn.execute("ALTER TABLE offerings ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()")
+                # Refresh inspector to reflect changes
+                inspector = inspect(db.bind)
+
         now = now_utc()
         created_rows = 0
 
+        # ── Admins & Users ──────────────────────────────────────────────────────────
         admin, created = _get_or_create(
             db,
             Admin,
@@ -110,33 +127,8 @@ def seed_data() -> bool:
         )
         created_rows += int(created)
 
-        user_customer, created = _get_or_create(
-            db,
-            User,
-            {"email": "seed.user.customer@occacia.local"},
-            {
-                "password_hash": "seed_user_customer_hash",
-                "role": "CUSTOMER",
-                "status": "ACTIVE",
-                "last_login_at": now,
-            },
-        )
-        created_rows += int(created)
-
-        _user_vendor, created = _get_or_create(
-            db,
-            User,
-            {"email": "seed.user.vendor@occacia.local"},
-            {
-                "password_hash": "seed_user_vendor_hash",
-                "role": "VENDOR",
-                "status": "ACTIVE",
-                "last_login_at": now,
-            },
-        )
-        created_rows += int(created)
-
-        customer, created = _get_or_create(
+        # ── Customers ──────────────────────────────────────────────────────────────
+        customer1, created = _get_or_create(
             db,
             Customer,
             {"email": "seed.customer@occacia.local"},
@@ -152,7 +144,24 @@ def seed_data() -> bool:
         )
         created_rows += int(created)
 
-        vendor, created = _get_or_create(
+        customer2, created = _get_or_create(
+            db,
+            Customer,
+            {"email": "jane.doe@occacia.local"},
+            {
+                "full_name": "Jane Doe",
+                "password_hash": "seed_customer_hash",
+                "phone": "+94772223333",
+                "locale": "en-US",
+                "address": "Kandy, Sri Lanka",
+                "email_verified": True,
+                "status": "ACTIVE",
+            },
+        )
+        created_rows += int(created)
+
+        # ── Vendors ────────────────────────────────────────────────────────────────
+        vendor_studio, created = _get_or_create(
             db,
             Vendor,
             {"email": "seed.vendor@occacia.local"},
@@ -170,6 +179,43 @@ def seed_data() -> bool:
         )
         created_rows += int(created)
 
+        vendor_decor, created = _get_or_create(
+            db,
+            Vendor,
+            {"email": "decor.vendor@occacia.local"},
+            {
+                "business_name": "Elegant Decorators",
+                "display_name": "Elegant Decor",
+                "location_base": "Colombo",
+                "phone": "+94115556677",
+                "contact_phone": "+94115556677",
+                "approval_status": "APPROVED",
+                "approved_at": now,
+                "is_verified": True,
+                "password_hash": "seed_vendor_hash",
+            },
+        )
+        created_rows += int(created)
+
+        vendor_photo, created = _get_or_create(
+            db,
+            Vendor,
+            {"email": "photo.vendor@occacia.local"},
+            {
+                "business_name": "Flash Moments",
+                "display_name": "Flash Moments Photography",
+                "location_base": "Kandy",
+                "phone": "+94812223344",
+                "contact_phone": "+94812223344",
+                "approval_status": "APPROVED",
+                "approved_at": now,
+                "is_verified": True,
+                "password_hash": "seed_vendor_hash",
+            },
+        )
+        created_rows += int(created)
+
+        # ── Organizations ──────────────────────────────────────────────────────────
         _organization, created = _get_or_create(
             db,
             Organization,
@@ -192,10 +238,66 @@ def seed_data() -> bool:
         )
         created_rows += int(created)
 
-        event, created = _get_or_create(
+        # ── Offerings ──────────────────────────────────────────────────────────────
+        offering_catering, created = _get_or_create(
+            db,
+            Offering,
+            {"vendor_id": vendor_studio.vendor_id, "name": "Seed Deluxe Catering"},
+            {
+                "category": "CATERING",
+                "description": "Premium buffet service for birthday and private events.",
+                "price": 8500.0,
+                "currency": "LKR",
+                "unit": "event",
+                "quality_tier": "MEDIUM",
+                "is_active": True,
+                "is_available": True,
+                "updated_at": now,
+            },
+        )
+        created_rows += int(created)
+
+        _, created = _get_or_create(
+            db,
+            Offering,
+            {"vendor_id": vendor_decor.vendor_id, "name": "Basic Floral Setup"},
+            {
+                "category": "DECOR",
+                "description": "Standard floral arrangements for small venues.",
+                "price": 15000.0,
+                "currency": "LKR",
+                "unit": "event",
+                "quality_tier": "LOW",
+                "is_active": True,
+                "is_available": True,
+                "updated_at": now,
+            },
+        )
+        created_rows += int(created)
+
+        _, created = _get_or_create(
+            db,
+            Offering,
+            {"vendor_id": vendor_decor.vendor_id, "name": "Premium Wedding Backdrop"},
+            {
+                "category": "DECOR",
+                "description": "Luxurious custom backdrop with lighting and silk flowers.",
+                "price": 75000.0,
+                "currency": "LKR",
+                "unit": "event",
+                "quality_tier": "HIGH",
+                "is_active": True,
+                "is_available": True,
+                "updated_at": now,
+            },
+        )
+        created_rows += int(created)
+
+        # ── Events & Personas ───────────────────────────────────────────────────────
+        event_birthday, created = _get_or_create(
             db,
             Event,
-            {"customer_id": customer.customer_id, "title": "Seed Birthday Event"},
+            {"customer_id": customer1.customer_id, "title": "Seed Birthday Event"},
             {
                 "event_type": "BIRTHDAY",
                 "description": "Seeded event used by automated startup pipeline.",
@@ -204,13 +306,25 @@ def seed_data() -> bool:
                 "end_at": now + timedelta(days=7, hours=4),
                 "timezone": "Asia/Colombo",
                 "is_all_day": False,
-                "reminders_enabled": True,
-                "reminder_channels": ["EMAIL"],
-                "reminder_offsets": ["PT24H"],
-                "reminder_schedule_status": "SCHEDULED",
-                "calendar_sync_state": "DISABLED",
                 "status": "CONFIRMED",
                 "confirmed_at": now,
+            },
+        )
+        created_rows += int(created)
+
+        event_grad, created = _get_or_create(
+            db,
+            Event,
+            {"customer_id": customer2.customer_id, "title": "Jane's Graduation Party"},
+            {
+                "event_type": "PARTY",
+                "description": "Graduation celebration for friends and family.",
+                "location_text": "Grand Hotel, Kandy",
+                "start_at": now + timedelta(days=30),
+                "end_at": now + timedelta(days=30, hours=5),
+                "timezone": "Asia/Colombo",
+                "is_all_day": False,
+                "status": "DRAFT",
             },
         )
         created_rows += int(created)
@@ -218,7 +332,7 @@ def seed_data() -> bool:
         persona, created = _get_or_create(
             db,
             Persona,
-            {"customer_id": customer.customer_id, "name": "Maya Perera"},
+            {"customer_id": customer1.customer_id, "name": "Maya Perera"},
             {
                 "relationship": "Friend",
                 "personality": "Warm, energetic, and enjoys outdoor celebrations.",
@@ -235,31 +349,15 @@ def seed_data() -> bool:
         _, created = _get_or_create(
             db,
             EventPersona,
-            {"event_id": event.event_id, "persona_id": persona.persona_id},
+            {"event_id": event_birthday.event_id, "persona_id": persona.persona_id},
         )
         created_rows += int(created)
 
-        offering, created = _get_or_create(
-            db,
-            Offering,
-            {"vendor_id": vendor.vendor_id, "name": "Seed Deluxe Catering"},
-            {
-                "category": "CATERING",
-                "description": "Premium buffet service for birthday and private events.",
-                "price": 8500.0,
-                "currency": "LKR",
-                "unit": "event",
-                "is_active": True,
-                "is_available": True,
-                "updated_at": now,
-            },
-        )
-        created_rows += int(created)
-
+        # ── Packages & Tasks ────────────────────────────────────────────────────────
         package, created = _get_or_create(
             db,
             Package,
-            {"vendor_id": vendor.vendor_id, "name": "Seed Signature Package"},
+            {"vendor_id": vendor_studio.vendor_id, "name": "Seed Signature Package"},
             {
                 "description": "Core package with catering, decor, and hosting support.",
                 "price": 25000.0,
@@ -276,7 +374,7 @@ def seed_data() -> bool:
         task, created = _get_or_create(
             db,
             Task,
-            {"event_id": event.event_id, "name": "Arrange Catering"},
+            {"event_id": event_birthday.event_id, "name": "Arrange Catering"},
             {
                 "description": "Arrange and confirm catering menu for guests.",
                 "quantity": 1,
@@ -285,8 +383,8 @@ def seed_data() -> bool:
                 "currency": "LKR",
                 "needs_vendor": "true",
                 "status": "ASSIGNED",
-                "selected_offering_id": offering.offering_id,
-                "assigned_vendor_id": vendor.vendor_id,
+                "selected_offering_id": offering_catering.offering_id,
+                "assigned_vendor_id": vendor_studio.vendor_id,
                 "confirmed_at": now,
                 "status_updated_at": now,
                 "due_at": now + timedelta(days=5),
@@ -294,16 +392,17 @@ def seed_data() -> bool:
         )
         created_rows += int(created)
 
+        # ── Post-Task Entities ─────────────────────────────────────────────────────
         recommendation_package, created = _get_or_create(
             db,
             RecommendationPackage,
-            {"event_id": event.event_id, "package_type": "RECOMMENDED"},
+            {"event_id": event_birthday.event_id, "package_type": "RECOMMENDED"},
             {
                 "package_total_price": 25000.0,
                 "currency": "LKR",
                 "is_customized": False,
                 "base_package_id": f"BASE-PKG-{package.id}",
-                "created_by_customer_id": customer.customer_id,
+                "created_by_customer_id": customer1.customer_id,
                 "expires_at": now + timedelta(days=2),
             },
         )
@@ -313,9 +412,9 @@ def seed_data() -> bool:
             db,
             TaskRecommendation,
             {
-                "event_id": event.event_id,
+                "event_id": event_birthday.event_id,
                 "task_id": task.task_id,
-                "offering_id": offering.offering_id,
+                "offering_id": offering_catering.offering_id,
             },
             {
                 "score": 0.95,
@@ -331,12 +430,12 @@ def seed_data() -> bool:
             {
                 "package_id": recommendation_package.package_id,
                 "task_id": task.task_id,
-                "offering_id": offering.offering_id,
+                "offering_id": offering_catering.offering_id,
             },
             {
                 "quantity": 1,
-                "unit_price": offering.price,
-                "line_total": offering.price,
+                "unit_price": offering_catering.price,
+                "line_total": offering_catering.price,
             },
         )
         created_rows += int(created)
@@ -346,7 +445,7 @@ def seed_data() -> bool:
             PackageExecutionRequest,
             {"idempotency_key": "seed-package-order-001"},
             {
-                "event_id": event.event_id,
+                "event_id": event_birthday.event_id,
                 "package_id": recommendation_package.package_id,
                 "currency": "LKR",
                 "package_total_price": recommendation_package.package_total_price,
@@ -363,8 +462,8 @@ def seed_data() -> bool:
             {
                 "package_order_id": execution_request.execution_request_id,
                 "task_id": task.task_id,
-                "vendor_id": vendor.vendor_id,
-                "offering_id": offering.offering_id,
+                "vendor_id": vendor_studio.vendor_id,
+                "offering_id": offering_catering.offering_id,
             },
             {
                 "status": "ACCEPTED",
@@ -373,90 +472,6 @@ def seed_data() -> bool:
                 "responded_at": now,
                 "response_note": "Accepted in seed flow.",
                 "attempt_no": 1,
-            },
-        )
-        created_rows += int(created)
-
-        vendor_task, created = _get_or_create(
-            db,
-            VendorTask,
-            {"vendor_id": vendor.id, "customer_id": customer.id, "title": "Seed Vendor Task"},
-            {
-                "event_id": event.id,
-                "offering_id": offering.id,
-                "description": "Legacy vendor task board seed row.",
-                "status": "assigned",
-                "priority": "medium",
-                "budget_min": 7000,
-                "budget_max": 12000,
-                "agreed_price": 8500,
-                "due_date": now + timedelta(days=5),
-                "expiry_date": now + timedelta(days=6),
-                "responded_at": now,
-            },
-        )
-        created_rows += int(created)
-
-        _, created = _get_or_create(
-            db,
-            VendorTaskMessage,
-            {
-                "task_id": vendor_task.id,
-                "sender_type": "system",
-                "message": "Task created from seed pipeline.",
-            },
-        )
-        created_rows += int(created)
-
-        _, created = _get_or_create(
-            db,
-            EventChatMessage,
-            {
-                "event_id": event.event_id,
-                "sender": "assistant",
-                "content": "Seeded welcome message for event planning chat.",
-            },
-            {"sent_at": now},
-        )
-        created_rows += int(created)
-
-        _, created = _get_or_create(
-            db,
-            Notification,
-            {"dedupe_key": "seed-notification-001"},
-            {
-                "user_id": user_customer.user_id,
-                "recipient_email": customer.email,
-                "recipient_name": customer.full_name,
-                "event_id": event.event_id,
-                "task_id": task.task_id,
-                "channel": "EMAIL",
-                "type": "EVENT_REMINDER",
-                "status": "QUEUED",
-                "payload": {"seed": True, "source": "startup_pipeline"},
-                "subject": "Seed reminder",
-                "body_text": "This is a seeded reminder notification.",
-                "body_html": "<p>This is a seeded reminder notification.</p>",
-                "attempt_count": 0,
-                "max_attempts": 4,
-            },
-        )
-        created_rows += int(created)
-
-        _, created = _get_or_create(
-            db,
-            SupportNote,
-            {
-                "admin_id": admin.admin_id,
-                "action_type": "SEED_BOOTSTRAP",
-                "event_id": event.event_id,
-                "task_id": task.task_id,
-                "vendor_id": vendor.vendor_id,
-            },
-            {
-                "package_order_id": execution_request.execution_request_id,
-                "note": "Seed support note added during pipeline startup bootstrap.",
-                "created_at": now,
             },
         )
         created_rows += int(created)
