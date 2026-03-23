@@ -11,8 +11,7 @@ from jwt.exceptions import PyJWTError as JWTError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import ALGORITHM, SECRET_KEY
-import app.core.security as _security   # module-level import so test patches are visible
+import app.core.security as _security   # module-level import for unified decoding
 from app.models.admin import Admin
 from app.models.customer import Customer
 from app.models.vendor import Vendor
@@ -42,7 +41,7 @@ def get_current_customer(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = _security.decode_token(token)
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
@@ -80,7 +79,7 @@ def get_current_vendor(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = _security.decode_token(token)
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
@@ -109,7 +108,7 @@ def get_current_admin(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = _security.decode_token(token)
         if payload.get("type") != "admin":
             raise credentials_exception
         admin_id = payload.get("sub")
