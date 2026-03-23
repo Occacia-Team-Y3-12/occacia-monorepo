@@ -70,8 +70,15 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
 
 
 def decode_token(token: str) -> dict:
-    """Decodes and validates a JWT token."""
-    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    """
+    Decodes and validates a JWT token.
+    Uses current settings for SECRET_KEY and ALGORITHM to ensure consistency.
+    """
+    return jwt.decode(
+        token, 
+        settings.SECRET_KEY, 
+        algorithms=[settings.ALGORITHM]
+    )
 
 
 def generate_reset_token() -> str:

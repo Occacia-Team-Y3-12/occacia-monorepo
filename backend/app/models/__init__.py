@@ -5,6 +5,7 @@ from .customer import Customer
 from .event import Event
 from .event_chat_message import EventChatMessage
 from .event_persona import EventPersona
+from .inquiry import Inquiry
 from .notification import Notification
 from .offering import Offering
 from .organization import Organization
@@ -28,6 +29,7 @@ __all__ = [
     "Event",
     "EventChatMessage",
     "EventPersona",
+    "Inquiry",
     "Notification",
     "Offering",
     "Organization",

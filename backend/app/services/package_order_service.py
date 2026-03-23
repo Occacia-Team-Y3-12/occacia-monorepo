@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+import logging
 
 from fastapi import HTTPException
 from sqlalchemy import and_, or_
@@ -17,6 +18,8 @@ from app.models.task import Task
 from app.models.task_recommendation import TaskRecommendation
 from app.models.task_request import TaskRequest
 from app.services.event_planning_service import event_planning_service
+
+logger = logging.getLogger(__name__)
 
 
 class PackageOrderService:
@@ -252,6 +255,121 @@ class PackageOrderService:
         tasks = self._get_tasks_by_ids(db, task_ids=task_ids)
         return order, tasks
 
+    def get_order_tasks(
+        self,
+        db: Session,
+        *,
+        package_order_id: str,
+    ) -> list[Task]:
+        order = (
+            db.query(PackageExecutionRequest)
+            .filter(PackageExecutionRequest.execution_request_id == package_order_id)
+            .first()
+        )
+        if not order:
+            raise HTTPException(status_code=404, detail="Package order not found")
+        return db.query(Task).filter(Task.event_id == order.event_id).all()
+
+    def cancel_package_order(
+        self,
+        db: Session,
+        package_order_id: str,
+        cancelled_by: str,
+        customer_id: str | None = None,
+    ) -> PackageExecutionRequest:
+        """
+        Cancel a package order.
+
+        Rules:
+        - Customer can only cancel if status == "CREATED"
+        - Admin can cancel if status != "COMPLETED"
+        - When cancelled:
+            - PackageExecutionRequest.status -> "CANCELLED_ADMIN"
+            - Tasks with status PENDING or ASSIGNED -> DRAFT
+            - Log a warning for any active fulfillment requests
+        """
+        from app.models.task import Task
+        from app.models.task_request import TaskRequest
+
+        order = (
+            db.query(PackageExecutionRequest)
+            .filter(PackageExecutionRequest.execution_request_id == package_order_id)
+            .first()
+        )
+        if not order:
+            raise HTTPException(status_code=404, detail="Package order not found")
+
+        if cancelled_by == "CUSTOMER":
+            if customer_id:
+                from app.models.event import Event
+                event = (
+                    db.query(Event)
+                    .filter(
+                        Event.event_id == order.event_id,
+                        Event.customer_id == str(customer_id),
+                    )
+                    .first()
+                )
+                if not event:
+                    raise HTTPException(status_code=403, detail="Not your package order")
+            if order.status != "CREATED":
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Cannot cancel a package order with status '{order.status}'. "
+                        "Only CREATED orders can be cancelled by the customer."
+                    ),
+                )
+
+        if cancelled_by == "ADMIN":
+            if order.status == "COMPLETED":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Cannot cancel a COMPLETED package order.",
+                )
+
+        affected_tasks = (
+            db.query(Task)
+            .filter(
+                Task.event_id == order.event_id,
+                Task.status.in_(["PENDING", "ASSIGNED"]),
+            )
+            .all()
+        )
+        for task in affected_tasks:
+            logger.info(
+                "Reverting task %s from %s to DRAFT due to package order cancellation",
+                task.task_id,
+                task.status,
+            )
+            task.status = "DRAFT"
+            task.assigned_vendor_id = None
+            task.selected_offering_id = None
+
+        open_requests = (
+            db.query(TaskRequest)
+            .filter(
+                TaskRequest.package_order_id == package_order_id,
+                TaskRequest.status.in_(["SENT"]),
+            )
+            .all()
+        )
+        for req in open_requests:
+            logger.warning(
+                "Package order %s cancelled -- fulfillment request %s was SENT to vendor %s",
+                package_order_id,
+                req.request_id,
+                req.vendor_id,
+            )
+            req.status = "EXPIRED"
+
+        order.status = "CANCELLED_ADMIN"
+        order.status_updated_at = datetime.now(timezone.utc)
+
+        db.commit()
+        db.refresh(order)
+        logger.info("Package order %s cancelled by %s", package_order_id, cancelled_by)
+        return order
     def get_order_fulfillment_requests(
         self,
         db: Session,
