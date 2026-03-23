@@ -11,9 +11,11 @@ python auto_heal.py
 HEAL_STATUS=$?
 set -e
 
+# Only stamp heads if the database was completely empty (no migrations ever run)
+# Otherwise, always run upgrade heads to ensure columns/schema match models.
 if [ $HEAL_STATUS -eq 2 ]; then
-    echo "Database was fully reconstructed. Stamping Alembic to head to gracefully skip duplicated historical migrations..."
-    alembic stamp heads
+    echo "Database missing tables were restored. Ensuring all migrations are applied..."
+    alembic upgrade heads
 else
     echo "Running Database Migrations..."
     alembic upgrade heads
