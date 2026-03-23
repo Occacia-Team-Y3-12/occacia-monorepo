@@ -1,5 +1,8 @@
 import type { VendorAuthService } from '@/services/vendor/authService.shared';
-import { persistVendorSession } from '@/services/vendor/authService.shared';
+import {
+  clearVendorSession,
+  persistVendorSession,
+} from '@/services/vendor/authService.shared';
 
 const sleep = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -27,6 +30,12 @@ export const mockVendorAuthService: VendorAuthService = {
       `mock_vendor_token_${Date.now()}`,
       `mock_vendor_refresh_${Date.now()}`
     );
+    return { ok: true };
+  },
+
+  async logout() {
+    await sleep(150);
+    clearVendorSession();
     return { ok: true };
   },
 

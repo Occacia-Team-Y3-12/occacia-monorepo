@@ -4,8 +4,10 @@ import type {
   VendorLoginResponse,
 } from './authService.shared';
 import {
+  clearVendorSession,
   getVendorAccessToken,
   getVendorRefreshToken,
+  getStoredVendorToken,
   getStoredVendorRefreshToken,
   persistVendorSession,
 } from './authService.shared';
@@ -86,6 +88,43 @@ export const apiVendorAuthService: VendorAuthService = {
 
     persistVendorSession(accessToken, nextRefreshToken);
     return { ok: true };
+  },
+
+  async logout() {
+    const token = getStoredVendorToken();
+
+    if (!token) {
+      clearVendorSession();
+      return { ok: true };
+    }
+
+    const response = await fetch(`${VENDOR_AUTH_API_BASE}/logout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    let data: { message?: string; detail?: string } = {};
+    try {
+      data = (await response.json()) as { message?: string; detail?: string };
+    } catch {
+      data = {};
+    }
+
+    if (response.ok || response.status === 401 || response.status === 403) {
+      clearVendorSession();
+      return {
+        ok: true,
+        message: data.message,
+      };
+    }
+
+    return {
+      ok: false,
+      message: data.detail || data.message || 'Logout failed. Please try again.',
+    };
   },
 
   async register(payload) {

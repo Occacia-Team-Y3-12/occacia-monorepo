@@ -17,13 +17,13 @@ interface AuthUser {
 interface AuthContextValue {
   isAuthenticated: boolean;
   user: AuthUser | null;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   isAuthenticated: false,
   user: null,
-  logout: () => {},
+  logout: async () => {},
 });
 
 const normalizeAuthUser = (
@@ -52,8 +52,8 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     setUser(normalizeAuthUser(customerAuthService.getUser()));
   }, []);
 
-  const logout = useCallback(() => {
-    customerAuthService.logout();
+  const logout = useCallback(async () => {
+    await customerAuthService.logout();
     setIsAuthenticated(false);
     setUser(null);
   }, []);

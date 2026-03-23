@@ -15,7 +15,7 @@ export type CustomerAuthService = {
   resendVerification: (email: string) => Promise<void>;
   login: (data: LoginFormData) => Promise<LoginResponse>;
   refreshToken: (refreshToken?: string) => Promise<LoginResponse>;
-  logout: () => void;
+  logout: () => Promise<void>;
   getToken: () => string | null;
   getRefreshToken: () => string | null;
   getUser: () => NonNullable<LoginResponse['user']> | null;
@@ -196,7 +196,6 @@ export const isCustomerAuthenticated = (): boolean => {
 };
 
 export const customerAuthSessionMethods = {
-  logout: logoutCustomerSession,
   getToken: getStoredCustomerToken,
   getRefreshToken: getStoredCustomerRefreshToken,
   getUser: getStoredCustomerUser,

@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+
 import { useCustomerAuth } from '@/app/context/AuthContext';
+import { ROUTES } from '@/lib/routes';
 
 type CustomerHeaderProps = {
   isSidebarOpen: boolean;
@@ -19,9 +22,18 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [savedEventTitle, setSavedEventTitle] = useState("Sister's Birthday");
 
-  const handleLogout = () => {
-    logout();
-    router.push('/customer/auth/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setIsProfileMenuOpen(false);
+      router.replace(ROUTES.CUSTOMER.LOGIN);
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Logout failed. Please try again.'
+      );
+    }
   };
   const profileMenuRef = useRef<HTMLDivElement>(null);
 

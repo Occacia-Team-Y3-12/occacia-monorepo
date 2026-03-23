@@ -55,6 +55,7 @@ export type VendorAuthService = {
     ok: boolean;
     message?: string;
   }>;
+  logout: () => Promise<{ ok: boolean; message?: string }>;
   register: (
     payload: VendorFormData & { organizationType: 'join' | 'create' }
   ) => Promise<RegisterResult>;
@@ -84,6 +85,23 @@ export const persistVendorSession = (
     sessionStorage.setItem('vendorRefreshToken', refreshToken);
   }
   localStorage.removeItem('admin_token');
+};
+
+export const clearVendorSession = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  localStorage.removeItem('vendorToken');
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('vendor_role');
+  localStorage.removeItem('vendorRefreshToken');
+  sessionStorage.removeItem('vendorToken');
+  sessionStorage.removeItem('access_token');
+  sessionStorage.removeItem('accessToken');
+  sessionStorage.removeItem('vendor_role');
+  sessionStorage.removeItem('vendorRefreshToken');
 };
 
 export const getStoredVendorToken = (): string | null => {

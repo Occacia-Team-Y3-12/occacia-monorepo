@@ -2,7 +2,9 @@ import type { CustomerAuthService, CustomerLoginPayload } from './authService.sh
 import {
   customerAuthApi,
   customerAuthSessionMethods,
+  getStoredCustomerToken,
   getStoredCustomerRefreshToken,
+  logoutCustomerSession,
   persistCustomerLoginResult,
 } from './authService.shared';
 
@@ -42,6 +44,37 @@ export const apiCustomerAuthService: CustomerAuthService = {
     });
 
     return persistCustomerLoginResult(response.data as CustomerLoginPayload);
+  },
+
+  logout: async () => {
+    const token = getStoredCustomerToken();
+
+    if (!token) {
+      logoutCustomerSession();
+      return;
+    }
+
+    try {
+      await customerAuthApi.post(
+        '/auth/customer/logout',
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      logoutCustomerSession();
+    } catch (error: unknown) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+
+      if (status === 401 || status === 403) {
+        logoutCustomerSession();
+        return;
+      }
+
+      throw error;
+    }
   },
 
   ...customerAuthSessionMethods,

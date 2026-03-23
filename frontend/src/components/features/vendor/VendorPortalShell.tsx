@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { toast } from 'sonner';
+
 import { ROUTES } from '@/lib/routes';
 import Modal from '@/components/ui/Modal';
+import { vendorAuthService } from '@/services/vendor/authService';
 
 type VendorPortalShellProps = {
   children: React.ReactNode;
@@ -34,6 +37,7 @@ export default function VendorPortalShell({ children }: VendorPortalShellProps) 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,9 +56,23 @@ export default function VendorPortalShell({ children }: VendorPortalShellProps) 
     setIsLogoutModalOpen(true);
   };
 
-  const handleConfirmLogout = () => {
-    setIsLogoutModalOpen(false);
-    router.push(ROUTES.VENDOR.LOGIN);
+  const handleConfirmLogout = async () => {
+    setIsLoggingOut(true);
+
+    try {
+      const result = await vendorAuthService.logout();
+
+      if (!result.ok) {
+        toast.error(result.message || 'Logout failed. Please try again.');
+        return;
+      }
+
+      setIsProfileMenuOpen(false);
+      setIsLogoutModalOpen(false);
+      router.replace(ROUTES.VENDOR.LOGIN);
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const isSidebarItemActive = (href: string) => {
@@ -262,6 +280,7 @@ export default function VendorPortalShell({ children }: VendorPortalShellProps) 
               <button
                 type="button"
                 onClick={() => setIsLogoutModalOpen(false)}
+                disabled={isLoggingOut}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
               >
                 Cancel
@@ -269,9 +288,10 @@ export default function VendorPortalShell({ children }: VendorPortalShellProps) 
               <button
                 type="button"
                 onClick={handleConfirmLogout}
+                disabled={isLoggingOut}
                 className="rounded-lg bg-[#1565c0] px-4 py-2 text-sm font-medium text-white hover:bg-[#0d47a1]"
               >
-                Yes, Log Out
+                {isLoggingOut ? 'Logging out...' : 'Yes, Log Out'}
               </button>
             </div>
           </div>

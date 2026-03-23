@@ -4,6 +4,7 @@ import type {
 } from '@/services/customer/authService.shared';
 import {
   customerAuthSessionMethods,
+  logoutCustomerSession,
   persistCustomerLoginResult,
 } from '@/services/customer/authService.shared';
 import type { LoginResponse } from '@/types/customer/auth';
@@ -74,6 +75,11 @@ export const mockCustomerAuthService: CustomerAuthService = {
     return persistCustomerLoginResult(
       createMockCustomerLoginResponse('customer@occacia.test') as CustomerLoginPayload
     );
+  },
+
+  logout: async () => {
+    await sleep(150);
+    logoutCustomerSession();
   },
 
   ...customerAuthSessionMethods,
