@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { toast } from 'sonner';
@@ -222,26 +221,6 @@ export function VendorTasksDashboard() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Vendor Task Board</h1>
         <p className="mt-1 text-sm text-gray-600">{totalTasks} total items</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/vendor/dashboard" className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white">
-            Dashboard
-          </Link>
-          <Link href="/vendor/activities" className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
-            Activities
-          </Link>
-          <Link href="/vendor/offerings" className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
-            Offerings
-          </Link>
-          <Link href="/vendor/orders" className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
-            Orders
-          </Link>
-          <Link href="/vendor/products" className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
-            Products
-          </Link>
-          <Link href="/vendors/tasks" className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white">
-            Tasks
-          </Link>
-        </div>
       </div>
 
       <section className="space-y-3">

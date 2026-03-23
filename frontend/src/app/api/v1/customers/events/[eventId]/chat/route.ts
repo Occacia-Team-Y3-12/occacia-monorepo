@@ -4,20 +4,20 @@ import { EventChatRequest, EventChatResponse } from '@/types/customerEventChat';
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 };
 
 export async function POST(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<EventChatResponse>> {
-  if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}/chat`) as Promise<NextResponse<EventChatResponse>>;
-  }
+  const { eventId } = await params;
 
-  const { eventId } = params;
+  if (!shouldUseCustomerPlanningMockApi()) {
+    return proxyApiRequest(request, `/customers/events/${eventId}/chat`) as Promise<NextResponse<EventChatResponse>>;
+  }
 
   if (!eventId) {
     return NextResponse.json(

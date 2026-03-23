@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Column, DateTime, Float, Integer, String, Text
+from sqlalchemy.orm import relationship
 
 from app.common.utils import generate_prefixed_id, now_utc
 from app.core.database import Base
@@ -35,3 +36,5 @@ class Task(Base):
 
     created_at = Column(DateTime(timezone=True), default=now_utc, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False)
+
+    task_offerings = relationship("TaskOffering", back_populates="task", cascade="all, delete-orphan")

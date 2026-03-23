@@ -20,11 +20,11 @@ from app.models.recommendation_package import RecommendationPackage
 from app.models.support_note import SupportNote
 from app.models.task import Task
 from app.models.task_models import VendorTask, VendorTaskMessage
+from app.models.task_offering import TaskOffering
 from app.models.task_recommendation import TaskRecommendation
 from app.models.task_request import TaskRequest
 from app.models.user import User
 from app.models.vendor import Vendor
-from app.models.chat_session import ChatSession 
 
 __all__ = [
     "Admin",
@@ -42,6 +42,7 @@ __all__ = [
     "RecommendationPackage",
     "SupportNote",
     "Task",
+    "TaskOffering",
     "VendorTask",
     "VendorTaskMessage",
     "TaskRecommendation",

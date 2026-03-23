@@ -64,6 +64,7 @@ from app.schemas.recommendation_schema import (
     TaskRecommendationListResponse,
     UpdateCustomPackageRequest,
 )
+from app.schemas.offering_schema import TaskOfferingListResponse, TaskOfferingResponse
 from app.schemas.package_schema import (
     ConfirmPackageOrderResponse,
     FulfillmentRequestResponse,
@@ -77,16 +78,8 @@ from app.services.customer_service import customer_service
 from app.services.event_planning_service import event_planning_service
 from app.services.package_order_service import package_order_service
 from app.services.recommendation_service import recommendation_service
-from app.services.planning_service import planning_service
-from app.services.ai_service import ai_service
-from app.services.chat_service import chat_service
-from app.services.vendor_service import vendor_service as _vendor_service
-from app.schemas.planning_schema import PlanResponse
-
-try:
-    from app.services.persona_service import persona_service as _persona_service
-except ImportError:
-    _persona_service = None
+from app.services.event_chat_service import event_chat_service
+from app.services.offering_service import offering_service
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -433,118 +426,17 @@ async def send_event_chat_message(
 ):
     """
     Unified event chat endpoint (UC-13).
-
-    Flow:
-      1. event_planning_service.send_chat_message()
-         - Validates event ownership
-         - Extracts schedule / timezone / reminders from message
-         - Builds template-based suggested tasks
-         - Saves both sides of the message to EventChatMessage
-         - Returns a rule-based fallback reply
-
-      2. planning_service.process_plan()  [session_id = event_id]
-         - First message: greets, asks about persona
-         - Persona collection: name, vibe, food, music (in-memory via Redis)
-         - After persona complete: asks to save profile
-         - Venue collection: location, date, budget, guests
-         - FIX #4: After all 4 fields confirmed → dedicated vibe/theme question
-         - Once all fields known: shows 3 packages + 3 gifts (within budget)
-         - FIX #2: Budget hard-filter applied before showing options
-         - FIX #1: AI fallback if DB has no matches
-         - User selects 1/2/3: booking created, redirect_url returned
-         - FIX #3: redirect_url = /customers/package-orders/{bookingId}
-         - User rolls back: AI re-collects changed details, re-recommends
-
-    AI reply from step 2 wins; rule-based reply from step 1 used only
-    if step 2 fails entirely.
+    Delegates entirely to event_chat_service which orchestrates:
+      - event + persona + history loading
+      - Groq AI call (structured JSON output)
+      - persona save + event date update + task persistence
+      - message persistence
     """
-    # ── Step 1: rule-based (DB writes + message persistence) ─────────────────
-    rule_reply, suggested_tasks = event_planning_service.send_chat_message(
-        db,
-        customer_id=str(current_customer.customer_id),
+    return await event_chat_service.send_message(
+        db=db,
+        customer=current_customer,
         event_id=event_id,
         content=body.content,
-    )
-
-    # ── Build event context for AI ────────────────────────────────────────────
-    try:
-        _event = event_planning_service.get_event_for_customer(
-            db, customer_id=str(current_customer.customer_id), event_id=event_id
-        )
-        _tasks = event_planning_service.list_tasks(
-            db, customer_id=str(current_customer.customer_id), event_id=event_id
-        )
-        _event_context = {
-            "title":          _event.title,
-            "event_type":     _event.event_type,
-            "start_at":       _event.start_at.date().isoformat() if _event.start_at else None,
-            "location_text":  _event.location_text,
-            "existing_tasks": [t.name for t in _tasks] if _tasks else [],
-        }
-    except Exception:
-        _event_context = None
-
-    # ── Step 2: AI planning service ───────────────────────────────────────────
-    plan: PlanResponse | None = None
-    try:
-        plan = await planning_service.process_plan(
-            db=db,
-            customer=current_customer,
-            session_id=event_id,
-            user_query=body.content,
-            persona_svc=_persona_service,
-            ai_svc=ai_service,
-            chat_svc=chat_service,
-            vendor_svc=_vendor_service,
-            event_context=_event_context,
-        )
-    except Exception as exc:
-        logger.warning(
-            "planning_service.process_plan failed for event %s: %s — "
-            "falling back to rule-based reply",
-            event_id, exc,
-        )
-
-    # ── Merge: AI reply wins; fallback to rule-based if AI failed ────────────
-    final_reply = (plan.chat_response or rule_reply) if plan else rule_reply
-
-    # Save AI reply to EventChatMessage so GET /messages shows it
-    try:
-        event_planning_service.save_ai_reply(db, event_id=event_id, content=final_reply)
-    except Exception as _save_err:
-        logger.warning("save_ai_reply failed: %s", _save_err)
-
-    return ChatSendResponse(
-        # ── Spec fields ───────────────────────────────────────────────────────
-        reply          = final_reply,
-        suggestedTasks = suggested_tasks,
-        # ── Planning engine fields ────────────────────────────────────────────
-        intent             = plan.intent              if plan else None,
-        reasoning          = plan.reasoning           if plan else None,
-        personalityProfile = plan.personality_profile if plan else None,
-        giftSuggestion     = plan.gift_suggestion     if plan else None,
-        eventType          = plan.event_type          if plan else None,
-        eventDate          = plan.event_date          if plan else None,
-        location           = plan.location            if plan else None,
-        budgetPerHead      = plan.budget_per_head     if plan else None,
-        guestCount         = plan.guest_count         if plan else None,
-        venueTags          = plan.venue_tags          if plan else [],
-        missingInfo        = plan.missing_info        if plan else [],
-        matchedVenues      = plan.matched_venues      if plan else [],
-        matchedGifts       = plan.matched_gifts       if plan else [],
-        matchedPackages    = plan.matched_packages    if plan else [],
-        venueMatchTier     = plan.venue_match_tier    if plan else None,
-        # ── Persona flow flags ────────────────────────────────────────────────
-        askSavePersona   = plan.ask_save_persona  if plan else False,
-        personaSaved     = plan.persona_saved     if plan else False,
-        personaConfirmed = plan.persona_confirmed if plan else False,
-        # ── Booking ───────────────────────────────────────────────────────────
-        bookingCreated = plan.booking_created if plan else False,
-        bookingId      = plan.booking_id      if plan else None,
-        # ── FIX #3: Redirect URL after booking ───────────────────────────────
-        redirectUrl    = plan.redirect_url    if plan else None,
-        # ── FIX #1: AI fallback flag ──────────────────────────────────────────
-        isAiFallback   = plan.is_ai_fallback  if plan else False,
     )
 
 @router.post(
@@ -709,6 +601,107 @@ def reassign_event_task(
     return ReassignTaskResponse(
         task=_task_response(task),
         fulfillmentRequest=_fulfillment_request_response(fulfillment_request),
+    )
+
+
+@router.get(
+    "/customers/events/{event_id}/tasks/{task_id}/offerings",
+    response_model=TaskOfferingListResponse,
+    response_model_by_alias=True,
+)
+def get_task_offerings(
+    event_id: str,
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    event_planning_service.get_event_for_customer(
+        db,
+        customer_id=str(current_customer.customer_id),
+        event_id=event_id,
+    )
+    task = db.query(Task).filter(Task.task_id == task_id, Task.event_id == event_id).first()
+    if not task:
+        from fastapi import HTTPException as _HTTPEx
+        raise _HTTPEx(status_code=404, detail="Task not found")
+    task_offerings = offering_service.get_task_offerings(db, task_id=task_id)
+    items = []
+    for task_offering in task_offerings:
+        offering = task_offering.offering
+        vendor_name = None
+        if offering and offering.vendor:
+            vendor_name = getattr(offering.vendor, "display_name", None) or getattr(
+                offering.vendor, "business_name", None
+            )
+        items.append(
+            TaskOfferingResponse(
+                offeringId=offering.offering_id,
+                name=offering.name,
+                category=offering.category,
+                description=offering.description,
+                price=offering.price,
+                currency=offering.currency,
+                unit=offering.unit,
+                qualityTier=offering.quality_tier,
+                vendorId=offering.vendor_id,
+                vendorName=vendor_name,
+                rank=task_offering.rank,
+                score=task_offering.score,
+                isSelected=task_offering.is_selected,
+                selectedAt=task_offering.selected_at,
+            )
+        )
+    return TaskOfferingListResponse(items=items)
+
+
+@router.post(
+    "/customers/events/{event_id}/tasks/{task_id}/offerings/{offering_id}/select",
+    response_model=TaskOfferingResponse,
+    response_model_by_alias=True,
+)
+def select_task_offering(
+    event_id: str,
+    task_id: str,
+    offering_id: str,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    event_planning_service.get_event_for_customer(
+        db,
+        customer_id=str(current_customer.customer_id),
+        event_id=event_id,
+    )
+    task = db.query(Task).filter(Task.task_id == task_id, Task.event_id == event_id).first()
+    if not task:
+        from fastapi import HTTPException as _HTTPEx
+        raise _HTTPEx(status_code=404, detail="Task not found")
+    task_offering = offering_service.select_offering(
+        db,
+        task_id=task_id,
+        offering_id=offering_id,
+        customer_id=str(current_customer.customer_id),
+    )
+    offering = task_offering.offering
+    vendor_name = None
+    if offering and offering.vendor:
+        vendor_name = getattr(offering.vendor, "display_name", None) or getattr(
+            offering.vendor, "business_name", None
+        )
+    return TaskOfferingResponse(
+        offeringId=offering.offering_id,
+        name=offering.name,
+        category=offering.category,
+        description=offering.description,
+        price=offering.price,
+        currency=offering.currency,
+        unit=offering.unit,
+        qualityTier=offering.quality_tier,
+        vendorId=offering.vendor_id,
+        vendorName=vendor_name,
+        rank=task_offering.rank,
+        score=task_offering.score,
+        isSelected=task_offering.is_selected,
+        selectedAt=task_offering.selected_at,
     )
 
 

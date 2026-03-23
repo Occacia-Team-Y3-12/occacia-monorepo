@@ -52,12 +52,6 @@ export default function PackageDetailPage() {
   const [expired, setExpired] = useState(false);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem(`packages_${eventId}`);
-    if (stored) {
-      const parsed: RecommendationPackage[] = JSON.parse(stored);
-      const found = parsed.find(p => p.packageId === packageId);
-      if (found) { setPkg(found); setLoading(false); return; }
-    }
     packageService.getPackageById(eventId, packageId)
       .then(data => setPkg(data))
       .catch((err: unknown) => {
@@ -82,7 +76,7 @@ export default function PackageDetailPage() {
 
   useEffect(() => {
     if (expired) {
-      sessionStorage.removeItem(`packages_${eventId}`);
+      packageService.clearCachedPackages(eventId);
       toast.error('Package expired. Please regenerate.');
       router.push(ROUTES.CUSTOMER.EVENT_PACKAGES(eventId));
     }

@@ -4,6 +4,7 @@ from . import (
     admin_router,
     customer_router,
     health_router,
+    metadata_router,
     organization_router,
     persona_router,
     vendor_router,
@@ -20,7 +21,6 @@ router.include_router(vendor_router.admin_router)      # /admin/vendors/*
 router.include_router(organization_router.router)      # /admin/organizations/*
 router.include_router(persona_router.router)           # /customers/personas/*
 router.include_router(health_router.router)            # /health
-# planning_router retired: POST /planning/generate merged into
-# POST /customers/events/{eventId}/chat (see customer_router.py)
+router.include_router(metadata_router.router)          # /offering-categories, /version
 
 __all__ = ["router"]

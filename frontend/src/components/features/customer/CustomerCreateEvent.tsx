@@ -5,7 +5,11 @@ import { useCreateEvent } from '@/hooks/customer/useCreateEvent';
 
 const DEFAULT_PERSONA_IMAGE = '/icons/customer/dashboard/profile.svg';
 
-const CustomerCreateEvent = () => {
+type CustomerCreateEventProps = {
+  initialTemplate?: string;
+};
+
+const CustomerCreateEvent = ({ initialTemplate }: CustomerCreateEventProps) => {
   const {
     eventType,
     eventTypes,
@@ -24,7 +28,7 @@ const CustomerCreateEvent = () => {
     addNewPersona,
     handleCreate,
     handleCancel,
-  } = useCreateEvent();
+  } = useCreateEvent(initialTemplate);
 
   const [isAddPersonOpen, setIsAddPersonOpen] = useState(false);
   const [newPersonName, setNewPersonName] = useState('');
@@ -216,5 +220,4 @@ const CustomerCreateEvent = () => {
 };
 
 export default CustomerCreateEvent;
-
 

@@ -11,7 +11,8 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_customer, get_current_vendor
+from app.core.dependencies import get_current_admin, get_current_customer, get_current_vendor
+from app.models.admin import Admin
 from app.models.customer import Customer
 from app.models.vendor import Vendor
 from app.schemas.auth_schema import (
@@ -47,6 +48,11 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class AdminLoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -69,7 +75,7 @@ async def _parse_login_payload(request: Request) -> LoginRequest | SimpleNamespa
     password = form.get("password")
     if not username or not password:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="email/username and password are required.",
         )
     return SimpleNamespace(username=str(username), password=str(password))
@@ -159,6 +165,15 @@ def customer_forgot_password(
     return auth_service.request_customer_password_reset_otp(db, str(payload.email))
 
 
+@router.post("/customer/password/forgot/resend-otp", response_model=AuthMessageResponse)
+def customer_resend_password_otp(
+    payload: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    """Resend customer password reset OTP."""
+    return auth_service.resend_customer_password_reset_otp(db, str(payload.email))
+
+
 @router.post("/customer/password/verify-otp")
 def customer_verify_password_otp(
     payload: VerifyOTPRequest,
@@ -185,6 +200,18 @@ def customer_reset_password(
     Submit the reset token from Step 2 along with the new password.
     """
     return auth_service.confirm_customer_password_reset(db, payload.reset_token, payload.new_password)
+
+
+@router.post("/customer/password/change", response_model=AuthMessageResponse)
+def customer_change_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(get_current_customer),
+):
+    """Authenticated customer password change."""
+    return auth_service.change_customer_password_authenticated(
+        db, customer, payload.current_password, payload.new_password
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -266,6 +293,15 @@ def vendor_forgot_password(
     return auth_service.request_vendor_password_reset_otp(db, str(payload.email))
 
 
+@router.post("/vendor/password/forgot/resend-otp", response_model=AuthMessageResponse)
+def vendor_resend_password_otp(
+    payload: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    """Resend vendor password reset OTP."""
+    return auth_service.resend_vendor_password_reset_otp(db, str(payload.email))
+
+
 @router.post("/vendor/password/verify-otp")
 def vendor_verify_password_otp(
     payload: VerifyOTPRequest,
@@ -291,6 +327,18 @@ def vendor_reset_password(
     Submit the reset token from Step 2 and the new password.
     """
     return auth_service.confirm_vendor_password_reset(db, payload.reset_token, payload.new_password)
+
+
+@router.post("/vendor/password/change", response_model=AuthMessageResponse)
+def vendor_change_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    vendor: Vendor = Depends(get_current_vendor),
+):
+    """Authenticated vendor password change."""
+    return auth_service.change_vendor_password_authenticated(
+        db, vendor, payload.current_password, payload.new_password
+    )
 
 
 # ── Vendor token refresh ──────────────────────────────────────────────────────
@@ -370,6 +418,31 @@ def admin_verify_login_otp(payload: AdminOTPVerifyRequest, db: Session = Depends
     """
     from app.services.admin_service import admin_service
     return admin_service.verify_admin_login_otp(db, payload.email, payload.otp)
+
+
+@router.post(
+    "/admin/logout",
+    response_model=AuthMessageResponse,
+    tags=["Authentication"],
+)
+def admin_logout(
+    request: Request,
+    db: Session = Depends(get_db),
+    _: Admin = Depends(get_current_admin),
+):
+    """Invalidate current admin access token using blacklist semantics."""
+    from app.services.admin_service import admin_service
+    return admin_service.logout_admin(db, authorization=request.headers.get("Authorization"))
+
+
+@router.post(
+    "/admin/token/refresh",
+    tags=["Authentication"],
+)
+def refresh_admin_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
+    """Refresh admin access token using an admin refresh token."""
+    from app.services.admin_service import admin_service
+    return admin_service.refresh_admin_token(db, payload.refresh_token)
 
 
 # ── Admin forgot password — 3-step OTP flow ──────────────────────────────────

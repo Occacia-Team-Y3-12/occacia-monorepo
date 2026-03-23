@@ -7,7 +7,6 @@ import {
   isVendorFinalValid,
   validateVendorField,
 } from '@/lib/validation';
-import { featureFlags } from '@/config/featureFlags';
 import { vendorAuthService } from '@/services/vendor/authService';
 
 type VendorStep = 'account' | 'organization';
@@ -141,10 +140,11 @@ export const useVendorRegister = () => {
       });
 
       if (result.ok) {
-        if (featureFlags.useVendorAuthMock) {
-          const mockToken =
-            result.data?.data?.token || `mock_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-          router.push(`${ROUTES.VENDOR.VERIFY_EMAIL}?token=${mockToken}`);
+        const verificationToken = result.data?.data?.token;
+        if (verificationToken) {
+          router.push(
+            `${ROUTES.VENDOR.VERIFY_EMAIL}?token=${verificationToken}`
+          );
           return;
         }
         router.push(`${ROUTES.VENDOR.LOGIN}?registered=1`);

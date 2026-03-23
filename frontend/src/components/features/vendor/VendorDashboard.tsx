@@ -2,16 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ROUTES } from '@/lib/routes';
 import Modal from '@/components/ui/Modal';
 
 type SidebarItem = {
 	label: string;
+  href: string;
   icon: string;
 	badge?: number;
-	active?: boolean;
 };
 
 type StatCard = {
@@ -33,11 +33,12 @@ type OrderRow = {
 };
 
 const sidebarItems: SidebarItem[] = [
-  { label: 'Dashboard', icon: '/icons/vendor/dashboard/dashboard.svg', active: true },
-  { label: 'Orders', icon: '/icons/vendor/dashboard/shopping-cart.svg', badge: 12 },
-  { label: 'Packages', icon: '/icons/vendor/dashboard/clipboard.svg' },
-  { label: 'Analytics', icon: '/icons/vendor/dashboard/calendar.svg' },
-  { label: 'Recipients', icon: '/icons/vendor/dashboard/users.svg' },
+  { label: 'Dashboard', href: ROUTES.VENDOR.DASHBOARD, icon: '/icons/vendor/dashboard/dashboard.svg' },
+  { label: 'Activities', href: ROUTES.VENDOR.ACTIVITIES, icon: '/icons/vendor/dashboard/calendar.svg' },
+  { label: 'Offerings', href: ROUTES.VENDOR.OFFERINGS, icon: '/icons/vendor/dashboard/clipboard.svg' },
+  { label: 'Orders', href: ROUTES.VENDOR.ORDERS, icon: '/icons/vendor/dashboard/shopping-cart.svg', badge: 12 },
+  { label: 'Products', href: ROUTES.VENDOR.PRODUCTS, icon: '/icons/vendor/dashboard/users.svg' },
+  { label: 'Tasks', href: ROUTES.VENDOR.TASKS, icon: '/icons/vendor/dashboard/calendar.svg' },
 ];
 
 const statCards: StatCard[] = [
@@ -97,6 +98,7 @@ const recipientTypes = [
 
 export default function VendorDashboard() {
   const router = useRouter();
+  const pathname = usePathname();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
@@ -122,6 +124,14 @@ export default function VendorDashboard() {
   const handleConfirmLogout = () => {
     setIsLogoutModalOpen(false);
     router.push(ROUTES.VENDOR.LOGIN);
+  };
+
+  const isSidebarItemActive = (href: string) => {
+    if (href === ROUTES.VENDOR.DASHBOARD) {
+      return pathname === href;
+    }
+
+    return pathname === href || pathname.startsWith(`${href}/`);
   };
 
   return (
@@ -151,13 +161,15 @@ export default function VendorDashboard() {
 
           <nav className="mt-6 space-y-1">
             {sidebarItems.map((item) => (
-              <button
-                key={item.label}
+              <Link
+                key={item.href}
+                href={item.href}
                 onClick={() => setIsSidebarOpen(false)}
-              className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-base transition-colors xl:text-[18px]
-                  ${item.active ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}
-                `}
-                type="button"
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-base transition-colors xl:text-[18px] ${
+                  isSidebarItemActive(item.href)
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
               >
                 <span className="flex items-center gap-3 font-medium">
                   <Image src={item.icon} alt="" width={20} height={20} className="h-5 w-5 opacity-90" />
@@ -166,7 +178,7 @@ export default function VendorDashboard() {
                 {item.badge ? (
                   <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">{item.badge}</span>
                 ) : null}
-              </button>
+              </Link>
             ))}
           </nav>
 

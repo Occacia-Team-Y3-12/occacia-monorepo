@@ -7,14 +7,14 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 # =============================================================================
-# 1. INJECT (The GPS) - Must happen before any 'app' imports
+# 1. INJECT  - Must happen before any 'app' imports
 # =============================================================================
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # =============================================================================
-# 2. SATISFY (The Fake ID) - Feed dummy vars so FastAPI doesn't crash on import
+# 2. SATISFY  - Feed dummy vars so FastAPI doesn't crash on import
 # =============================================================================
 load_dotenv()
 
@@ -30,19 +30,9 @@ for key, value in dummy_env.items():
     os.environ.setdefault(key, value)
 
 # =============================================================================
-# 3. MAP (The Eye of Sauron) - THIS CANNOT BE HIDDEN IN A FUNCTION
+# 3. MAP  - THIS CANNOT BE HIDDEN IN A FUNCTION
 # =============================================================================
 from app.core.database import Base
-
-# 🚨 CRITICAL: EVERY MODEL GOES HERE!
-# (Adjust the import paths if your files are named differently)
-from app.models.customer import Customer 
-from app.models.vendor import Vendor
-from app.models.chat_model import ChatMessage
-from app.models.task_models import VendorTask, VendorTaskMessage
-
-# If you have a 'Plan' model, uncomment the line below:
-# from app.models.planning import Plan 
 
 target_metadata = Base.metadata
 

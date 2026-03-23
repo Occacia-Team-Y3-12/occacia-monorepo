@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -21,6 +21,12 @@ from app.schemas.admin_schema import VendorAdminView
 from app.schemas.event_planning_schema import TaskResponse
 from app.schemas.package_schema import FulfillmentRequestResponse
 from app.schemas.package_schema import PackageCreate, PackageUpdate, PackageResponse
+from app.schemas.offering_schema import (
+    OfferingCreate,
+    OfferingListResponse,
+    OfferingResponse,
+    OfferingUpdate,
+)
 from app.schemas.vendor_schema import (
     PaginatedFulfillmentRequestsResponse,
     PaginatedVendorTasksResponse,
@@ -31,6 +37,7 @@ from app.schemas.vendor_schema import (
     VendorUpdate,
 )
 from app.services.vendor_service import AdminVendorService, vendor_service
+from app.services.offering_service import offering_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/vendors", tags=["Vendors"])
@@ -98,7 +105,11 @@ def _fulfillment_request_response(request: TaskRequest) -> FulfillmentRequestRes
     )
 
 
-@admin_router.get("/vendors", response_model=list[VendorAdminView])
+@admin_router.get(
+    "/vendors",
+    response_model=list[VendorAdminView],
+    operation_id="admin_list_vendors_vendor_router",
+)
 async def list_vendors(
     approval_status: str | None = Query(default=None),
     status: str | None = Query(default=None),
@@ -251,7 +262,11 @@ def respond_to_fulfillment_request(
     )
 
 
-@router.get("/tasks", response_model=PaginatedVendorTasksResponse)
+@router.get(
+    "/tasks",
+    response_model=PaginatedVendorTasksResponse,
+    operation_id="vendors_list_tasks_v1_vendor_router",
+)
 def list_vendor_tasks(
     status: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
@@ -353,3 +368,69 @@ def delete_package(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Package not found or unauthorized.")
     return None
+
+
+@router.get("/offerings", response_model=OfferingListResponse, response_model_by_alias=True)
+def list_my_offerings(
+    include_inactive: bool = Query(default=False, alias="includeInactive"),
+    vendor: Vendor = Depends(get_current_vendor),
+    db: Session = Depends(get_db),
+):
+    items = offering_service.list_vendor_offerings(
+        db,
+        vendor_id=vendor.vendor_id,
+        include_inactive=include_inactive,
+    )
+    return OfferingListResponse(items=[OfferingResponse.model_validate(item) for item in items])
+
+
+@router.post("/offerings", response_model=OfferingResponse, response_model_by_alias=True, status_code=201)
+def create_offering(
+    payload: OfferingCreate,
+    vendor: Vendor = Depends(require_approved_vendor),
+    db: Session = Depends(get_db),
+):
+    offering = offering_service.create_offering(
+        db,
+        vendor_id=vendor.vendor_id,
+        data=payload.model_dump(exclude_none=False),
+    )
+    return OfferingResponse.model_validate(offering)
+
+
+@router.get("/offerings/{offering_id}", response_model=OfferingResponse, response_model_by_alias=True)
+def get_offering(
+    offering_id: str,
+    vendor: Vendor = Depends(get_current_vendor),
+    db: Session = Depends(get_db),
+):
+    offering = offering_service.get_offering_by_id(db, offering_id)
+    if offering.vendor_id != vendor.vendor_id:
+        raise HTTPException(status_code=403, detail="Not your offering")
+    return OfferingResponse.model_validate(offering)
+
+
+@router.put("/offerings/{offering_id}", response_model=OfferingResponse, response_model_by_alias=True)
+def update_offering(
+    offering_id: str,
+    payload: OfferingUpdate,
+    vendor: Vendor = Depends(require_approved_vendor),
+    db: Session = Depends(get_db),
+):
+    offering = offering_service.update_offering(
+        db,
+        offering_id=offering_id,
+        vendor_id=vendor.vendor_id,
+        data=payload.model_dump(exclude_unset=True),
+    )
+    return OfferingResponse.model_validate(offering)
+
+
+@router.delete("/offerings/{offering_id}", status_code=204)
+def delete_offering(
+    offering_id: str,
+    vendor: Vendor = Depends(require_approved_vendor),
+    db: Session = Depends(get_db),
+):
+    offering_service.delete_offering(db, offering_id=offering_id, vendor_id=vendor.vendor_id)
+    return Response(status_code=204)

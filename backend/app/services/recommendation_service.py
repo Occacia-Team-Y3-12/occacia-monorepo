@@ -29,8 +29,9 @@ from app.schemas.recommendation_schema import (
     TaskRecommendationResponse,
     UpdateCustomPackageRequest,
 )
-from app.services.ai_service import ai_service
+from app.services.groq_ai_service import groq_ai_service as ai_service
 from app.services.event_planning_service import event_planning_service
+from app.services.offering_service import offering_service
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,19 @@ class RecommendationService:
         tasks = self._get_confirmed_tasks(db, event_id=event_id)
         if not tasks:
             raise HTTPException(status_code=400, detail="No confirmed tasks available for recommendations")
+
+        # Regenerate full shortlist (5) for all confirmed tasks (UC-16 source of truth).
+        for task in tasks:
+            try:
+                shortlist = offering_service.find_offerings_for_task(db=db, task=task, limit=5)
+                if shortlist:
+                    offering_service.save_task_offering_shortlist(
+                        db=db,
+                        task_id=task.task_id,
+                        offerings_with_rank=shortlist,
+                    )
+            except Exception as exc:
+                logger.warning("Task offering shortlist generation failed for %s: %s", task.task_id, exc)
 
         personas = self._get_event_personas(db, event_id=event_id)
         ranked_by_task: dict[str, list[RankedOffering]] = {}

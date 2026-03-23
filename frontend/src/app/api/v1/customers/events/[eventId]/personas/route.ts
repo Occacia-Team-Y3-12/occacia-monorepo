@@ -4,22 +4,22 @@ import { UpdateEventPersonasPayload, UpdateEventPersonasResponse } from '@/types
 import { eventStore } from '@/app/api/v1/customers/_eventStore';
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 };
 
 export async function PUT(
   request: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse<UpdateEventPersonasResponse>> {
+  const { eventId } = await params;
+
   if (!shouldUseCustomerPlanningMockApi()) {
-    return proxyApiRequest(request, `/customers/events/${params.eventId}/personas`) as Promise<NextResponse<UpdateEventPersonasResponse>>;
+    return proxyApiRequest(request, `/customers/events/${eventId}/personas`) as Promise<NextResponse<UpdateEventPersonasResponse>>;
   }
 
   try {
-    const { eventId } = params;
-
     if (!eventId) {
       return NextResponse.json(
         {

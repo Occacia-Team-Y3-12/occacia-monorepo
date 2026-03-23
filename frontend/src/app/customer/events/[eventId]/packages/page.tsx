@@ -4,9 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Sparkles, CheckCircle2, Clock, RefreshCw } from 'lucide-react';
-import { featureFlags } from '@/config/featureFlags';
 import { ROUTES } from '@/lib/routes';
-import { MOCK_EVENT, createMockPackages } from '@/mocks/customerExperience';
 import { packageService } from '@/services/customer/packageService';
 import type { RecommendationPackage, PackageType } from '@/types/customer/package';
 
@@ -146,54 +144,71 @@ export default function CustomerEventPackagesPage() {
 
   const [phase, setPhase] = useState<'ready' | 'generating' | 'packages' | 'expired'>('ready');
   const [packages, setPackages] = useState<RecommendationPackage[]>([]);
-  const [event] = useState(MOCK_EVENT);
+  const eventTitle = packages[0]?.eventName || 'Current Event';
+  const eventSubtitle = eventId ? `Event ${eventId}` : 'Event';
+  const confirmedTasks = packages[0]?.items ?? [];
 
-  // Check sessionStorage for cached packages
   useEffect(() => {
-    const stored = sessionStorage.getItem(`packages_${eventId}`);
-    if (stored) {
-      const parsed: RecommendationPackage[] = JSON.parse(stored);
-      const stillValid = parsed.every(p => new Date(p.expiresAt).getTime() > Date.now());
-      if (stillValid) { setPackages(parsed); setPhase('packages'); }
-      else setPhase('expired');
-    }
+    let active = true;
+
+    const loadPackages = async () => {
+      try {
+        const existingPackages = await packageService.getPackages(eventId);
+
+        if (!active || existingPackages.length === 0) {
+          return;
+        }
+
+        const stillValid = existingPackages.every(
+          (pkg) => new Date(pkg.expiresAt).getTime() > Date.now()
+        );
+
+        if (stillValid) {
+          setPackages(existingPackages);
+          setPhase('packages');
+          return;
+        }
+
+        packageService.clearCachedPackages(eventId);
+        setPhase('expired');
+      } catch {
+        if (active) {
+          setPhase('ready');
+        }
+      }
+    };
+
+    void loadPackages();
+
+    return () => {
+      active = false;
+    };
   }, [eventId]);
 
   const generatePackages = useCallback(async () => {
     setPhase('generating');
     try {
       const data = await packageService.generatePackages(eventId);
-      sessionStorage.setItem(`packages_${eventId}`, JSON.stringify(data));
       setPackages(data);
       setPhase('packages');
       toast.success('Packages generated successfully!');
     } catch {
-      if (!featureFlags.useCustomerPackagesMock) {
-        setPhase('ready');
-        toast.error('Failed to generate packages. Please try again.');
-        return;
-      }
-
-      await new Promise(r => setTimeout(r, 2000));
-      const data = createMockPackages();
-      sessionStorage.setItem(`packages_${eventId}`, JSON.stringify(data));
-      setPackages(data);
-      setPhase('packages');
-      toast.success('Packages generated successfully!');
+      setPhase('ready');
+      toast.error('Failed to generate packages. Please try again.');
     }
   }, [eventId]);
 
   const handleExpire = useCallback(() => {
-    sessionStorage.removeItem(`packages_${eventId}`);
+    packageService.clearCachedPackages(eventId);
     setPhase('expired');
   }, [eventId]);
 
   // ── Expired ──
   if (phase === 'expired') return (
     <div>
-      <div className="mb-6">
+        <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Recommendation Packages</h1>
-        <p className="text-sm text-gray-500 mt-1">{event.eventTitle} · {event.eventType}</p>
+        <p className="text-sm text-gray-500 mt-1">{eventTitle} · {eventSubtitle}</p>
       </div>
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-10 text-center max-w-md w-full">
@@ -217,7 +232,7 @@ export default function CustomerEventPackagesPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Recommendation Packages</h1>
-        <p className="text-sm text-gray-500 mt-1">{event.eventTitle} · {event.eventType}</p>
+        <p className="text-sm text-gray-500 mt-1">{eventTitle} · {eventSubtitle}</p>
       </div>
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-10 text-center max-w-md w-full">
@@ -241,7 +256,7 @@ export default function CustomerEventPackagesPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Recommendation Packages</h1>
-        <p className="text-sm text-gray-500 mt-1">{event.eventTitle} · {event.eventType}</p>
+        <p className="text-sm text-gray-500 mt-1">{eventTitle} · {eventSubtitle}</p>
       </div>
       <p className="text-center text-sm text-gray-500 mb-6">
         Select a package to view full details and proceed.
@@ -266,7 +281,7 @@ export default function CustomerEventPackagesPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Recommendation Packages</h1>
-        <p className="text-sm text-gray-500 mt-1">{event.eventTitle} · {event.eventType}</p>
+        <p className="text-sm text-gray-500 mt-1">{eventTitle} · {eventSubtitle}</p>
       </div>
       <div className="flex items-center justify-center min-h-[500px]">
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 max-w-lg w-full">
@@ -276,13 +291,13 @@ export default function CustomerEventPackagesPage() {
           <h2 className="text-xl font-bold text-gray-900 text-center mb-2">Smart Package Selection</h2>
           <p className="text-sm text-gray-500 text-center mb-6">
             We'll curate three packages tailored to your event based on your{' '}
-            <span className="font-semibold text-gray-700">{event.confirmedTasks.length} confirmed</span> tasks.
+            <span className="font-semibold text-gray-700">{confirmedTasks.length} confirmed</span> tasks.
           </p>
           <div className="space-y-2 mb-6">
-            {event.confirmedTasks.map(task => (
-              <div key={task.id} className="flex items-center gap-3 border border-gray-100 rounded-xl px-4 py-3 bg-gray-50">
+            {confirmedTasks.map(task => (
+              <div key={task.taskId} className="flex items-center gap-3 border border-gray-100 rounded-xl px-4 py-3 bg-gray-50">
                 <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                <span className="text-sm font-medium text-gray-700">{task.title}</span>
+                <span className="text-sm font-medium text-gray-700">{task.taskName}</span>
               </div>
             ))}
           </div>

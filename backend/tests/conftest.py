@@ -37,7 +37,6 @@ from app.main import app  # noqa: E402
 from app.models import registry  # noqa: F401
 from app.models.admin import Admin
 from app.models.chat_model import ChatMessage
-from app.models.chat_session import ChatSession
 from app.models.customer import Customer
 from app.models.event import Event
 from app.models.event_chat_message import EventChatMessage
@@ -51,6 +50,7 @@ from app.models.persona import Persona
 from app.models.recommendation_package import RecommendationPackage
 from app.models.support_note import SupportNote
 from app.models.task import Task
+from app.models.task_offering import TaskOffering
 from app.models.task_recommendation import TaskRecommendation
 from app.models.task_request import TaskRequest
 from app.models.user import User
@@ -75,11 +75,11 @@ def clean_tables():
             ChatMessage,
             EventChatMessage,
             Notification,
-            ChatSession,
             PackageExecutionRequest,
             TaskRequest,
             PackageItem,
             RecommendationPackage,
+            TaskOffering,
             TaskRecommendation,
             Task,
             EventPersona,

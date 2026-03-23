@@ -236,7 +236,7 @@ export const useEventChatPlanner = (eventId: string) => {
       return;
     }
 
-    setTasks((prev) => [...prev, result.data!.data!.task]);
+    setTasks((prev) => [result.data!.data!.task, ...prev]);
     setNewTaskTitle('');
     setIsBusy(false);
   };
@@ -262,7 +262,7 @@ export const useEventChatPlanner = (eventId: string) => {
     setTasks((prev) => prev.filter((task) => task.id !== taskId));
   };
 
-  const saveSchedule = async () => {
+  const saveSchedule = async (): Promise<boolean> => {
     setIsBusy(true);
     setError(null);
     setWarning(null);
@@ -285,7 +285,7 @@ export const useEventChatPlanner = (eventId: string) => {
     if (!scheduleResult.ok) {
       setError(scheduleResult.error || scheduleResult.data?.message || 'Failed to save schedule.');
       setIsBusy(false);
-      return;
+      return false;
     }
 
     if (scheduleResult.data?.data?.clarification) {
@@ -294,9 +294,10 @@ export const useEventChatPlanner = (eventId: string) => {
 
     setSuccess('Schedule saved.');
     setIsBusy(false);
+    return true;
   };
 
-  const saveReminders = async () => {
+  const saveReminders = async (): Promise<boolean> => {
     setIsBusy(true);
     setError(null);
     setWarning(null);
@@ -326,11 +327,12 @@ export const useEventChatPlanner = (eventId: string) => {
     if (!remindersResult.ok) {
       setError(remindersResult.error || remindersResult.data?.message || 'Failed to save reminders.');
       setIsBusy(false);
-      return;
+      return false;
     }
 
     setSuccess('Reminder settings saved.');
     setIsBusy(false);
+    return true;
   };
 
   const connectCalendar = async (): Promise<boolean> => {

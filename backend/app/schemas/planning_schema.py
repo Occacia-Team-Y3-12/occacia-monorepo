@@ -17,7 +17,6 @@ class VenueDisplay(BaseModel):
         extra="ignore",
         populate_by_name=True,
     )
-    # Union[int, str] so DB integer IDs and AI-generated string IDs (AI-VENUE-1) both work
     id: Optional[Union[int, str]] = None
     name: str
     description: Optional[str] = None
@@ -36,25 +35,6 @@ class VenueDisplay(BaseModel):
     tweak_note: Optional[str] = Field(default=None, alias="tweakNote")
 
 
-class GiftDisplay(BaseModel):
-    model_config = ConfigDict(
-        from_attributes=True,
-        extra="ignore",
-        populate_by_name=True,
-    )
-    # Union[int, str] so DB integer IDs and AI-generated string IDs (AI-GIFT-1) both work
-    id: Optional[Union[int, str]] = None
-    name: str
-    description: Optional[str] = None
-    price_per_head: Optional[float] = Field(default=None, alias="pricePerHead")
-    estimated_price: Optional[float] = Field(default=None, alias="estimatedPrice")
-    tags: List[str] = []
-    location: Optional[str] = None
-    vendor_name: Optional[str] = Field(default=None, alias="vendorName")
-    match_score_label: Optional[str] = None
-    tweak_note: Optional[str] = Field(default=None, alias="tweakNote")
-
-
 class PlanResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -62,8 +42,6 @@ class PlanResponse(BaseModel):
     reasoning: Optional[str] = None
     personality_profile: Optional[str] = None
     chat_response: Optional[str] = Field(default=None, alias="reply")
-    gift_suggestion: Optional[str] = None
-    gift_category: Optional[str] = None
     event_type: Optional[str] = None
     event_date: Optional[str] = None
     location: Optional[str] = None
@@ -72,7 +50,6 @@ class PlanResponse(BaseModel):
     venue_tags: List[str] = []
     missing_info: List[str] = []
     matched_venues: List[VenueDisplay] = []
-    matched_gifts: List[GiftDisplay] = []
     matched_packages: List[Dict[str, Any]] = []
 
     # Frontend state flags
@@ -82,9 +59,4 @@ class PlanResponse(BaseModel):
     venue_match_tier: Optional[int] = None
     booking_created: bool = False
     booking_id: Optional[str] = None
-
-    # FIX #3 — frontend redirect after booking (e.g. /customers/package-orders/{id})
     redirect_url: Optional[str] = None
-
-    # FIX #1 — True when showing AI-curated suggestions (not real DB packages)
-    is_ai_fallback: bool = False

@@ -4,11 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Star, X, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { featureFlags } from '@/config/featureFlags';
 import { ROUTES } from '@/lib/routes';
-import { MOCK_PACKAGE, MOCK_SHORTLIST } from '@/mocks/customerExperience';
 import { packageService } from '@/services/customer/packageService';
-import type { RecommendationPackage, PackageItem, ShortlistedOffering } from '@/types/customer/package';
+import type { PackageItem, ShortlistedOffering } from '@/types/customer/package';
 
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
@@ -109,48 +107,44 @@ export default function CustomizePackagePage() {
   const [packageLabel, setPackageLabel] = useState('Package');
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Load package from sessionStorage or mock
   useEffect(() => {
-    const stored = sessionStorage.getItem(`packages_${eventId}`);
-    let pkg: RecommendationPackage | null = null;
+    let active = true;
 
-    if (stored) {
-      const parsed: RecommendationPackage[] = JSON.parse(stored);
-      pkg = parsed.find(p => p.packageId === packageId) ?? null;
-    }
+    const loadPackage = async () => {
+      try {
+        const pkg = await packageService.getPackageById(eventId, packageId);
+        const shortlistEntries = await Promise.all(
+          pkg.items.map(async (item) => [
+            item.taskId,
+            await packageService.getTaskRecommendations(eventId, item.taskId),
+          ] as const)
+        );
 
-    if (!pkg && featureFlags.useCustomerPackagesMock) {
-      pkg = MOCK_PACKAGE;
-    }
+        if (!active) {
+          return;
+        }
 
-    if (!pkg) {
-      setLoadError('Package not found.');
-      return;
-    }
-
-    setPackageLabel(pkg.type.charAt(0) + pkg.type.slice(1).toLowerCase().replace('_', ' ') + ' Package');
-    setItems(pkg.items);
-
-    // Load shortlists — try API, fallback to mock
-    const loadShortlists = async () => {
-      const map: Record<string, ShortlistedOffering[]> = {};
-      for (const item of pkg!.items) {
-        try {
-          map[item.taskId] = await packageService.getTaskRecommendations(eventId, item.taskId);
-        } catch {
-          if (!featureFlags.useCustomerPackagesMock) {
-            setLoadError('Unable to load package recommendations.');
-            return;
-          }
-          map[item.taskId] = MOCK_SHORTLIST.map(o => ({ ...o, offeringId: `${item.taskId}-${o.offeringId}` }));
-          // keep first as best match aligned to current item
-          map[item.taskId][0] = { ...map[item.taskId][0], offeringId: item.offeringId, vendorName: item.vendorName, taskPrice: item.taskPrice, isBestMatch: true };
+        setPackageLabel(
+          `${pkg.type.charAt(0)}${pkg.type
+            .slice(1)
+            .toLowerCase()
+            .replace('_', ' ')} Package`
+        );
+        setItems(pkg.items);
+        setShortlists(Object.fromEntries(shortlistEntries));
+        setLoadError(null);
+      } catch {
+        if (active) {
+          setLoadError('Unable to load package recommendations.');
         }
       }
-      setShortlists(map);
     };
 
-    loadShortlists();
+    void loadPackage();
+
+    return () => {
+      active = false;
+    };
   }, [eventId, packageId]);
 
   const handleSelect = useCallback((taskId: string, offering: ShortlistedOffering) => {
@@ -174,21 +168,7 @@ export default function CustomizePackagePage() {
       toast.success('Customization saved!');
       router.push(ROUTES.CUSTOMER.EVENT_PACKAGE_DETAIL(eventId, packageId));
     } catch {
-      if (!featureFlags.useCustomerPackagesMock) {
-        toast.error('Failed to save customization.');
-        return;
-      }
-      // Update sessionStorage mock
-      const stored = sessionStorage.getItem(`packages_${eventId}`);
-      if (stored) {
-        const parsed: RecommendationPackage[] = JSON.parse(stored);
-        const updated = parsed.map(p =>
-          p.packageId === packageId ? { ...p, items, packageTotalPrice: totalPrice } : p
-        );
-        sessionStorage.setItem(`packages_${eventId}`, JSON.stringify(updated));
-      }
-      toast.success('Customization saved!');
-      router.push(ROUTES.CUSTOMER.EVENT_PACKAGE_DETAIL(eventId, packageId));
+      toast.error('Failed to save customization.');
     } finally {
       setSaving(false);
     }

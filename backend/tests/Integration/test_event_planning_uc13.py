@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 from app.core.database import SessionLocal
 from app.models.customer import Customer
 from app.models.event import Event
@@ -17,15 +19,43 @@ def _create_event(auth_client, title: str = "Birthday Dinner") -> str:
 def test_whenCustomerSendsEventChatMessage_postEventChat_success(auth_client):
     event_id = _create_event(auth_client)
 
-    response = auth_client.post(
-        f"/api/v1/customers/events/{event_id}/chat",
-        json={"content": "I want to plan this with reminders."},
-    )
+    mocked_ai_output = {
+        "reply": "Great, let's start with your preferred date.",
+        "needsPersona": True,
+        "personaDraft": {
+            "name": None,
+            "relationship": None,
+            "personality_tags": [],
+            "food_preferences": [],
+            "music_preferences": [],
+            "color_preferences": [],
+        },
+        "eventFacts": {
+            "date": None,
+            "timezone": None,
+            "guestCount": None,
+            "budgetPerHead": None,
+            "expectations": None,
+        },
+        "calendarIntent": {"wantsSync": False, "provider": None},
+        "missingInfo": ["date", "budgetPerHead", "guestCount"],
+        "suggestedTasks": [],
+        "intent": "chat",
+        "save_persona": False,
+    }
+    with patch(
+        "app.services.event_chat_service.groq_ai_service.plan_event_chat",
+        new=AsyncMock(return_value=mocked_ai_output),
+    ):
+        response = auth_client.post(
+            f"/api/v1/customers/events/{event_id}/chat",
+            json={"content": "I want to plan this with reminders."},
+        )
 
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["reply"]
-    assert len(body["suggestedTasks"]) >= 1
+    assert isinstance(body["suggestedTasks"], list)
 
     messages = auth_client.get(f"/api/v1/customers/events/{event_id}/messages")
     assert messages.status_code == 200

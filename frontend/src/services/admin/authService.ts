@@ -1,3 +1,5 @@
+import { featureFlags } from '@/config/featureFlags';
+import { adminAuthServiceMock } from '@/mocks/admin/authService';
 import { api } from '@/services/api';
 import type { AdminLoginRequest, AdminLoginResponse } from '@/types/admin/auth';
 
@@ -16,27 +18,12 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
-export const adminAuthService = {
-  async login(payload: AdminLoginRequest): Promise<AdminLoginResponse> {
-    const formData = new URLSearchParams();
-    formData.set('username', payload.email);
-    formData.set('password', payload.password);
+function persistAdminSession(data: AdminLoginResponse) {
+  localStorage.setItem(ADMIN_TOKEN_KEY, data.access_token);
+  localStorage.setItem(ADMIN_ROLE_KEY, data.role);
+}
 
-    const { data } = await api.post<AdminLoginResponse>(
-      '/auth/admin/login',
-      formData,
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      }
-    );
-
-    localStorage.setItem(ADMIN_TOKEN_KEY, data.access_token);
-    localStorage.setItem(ADMIN_ROLE_KEY, data.role);
-    return data;
-  },
-
+const sharedAdminAuthMethods = {
   logout(): void {
     localStorage.removeItem(ADMIN_TOKEN_KEY);
     localStorage.removeItem(ADMIN_ROLE_KEY);
@@ -77,3 +64,30 @@ export const adminAuthService = {
     return 'UNKNOWN';
   },
 };
+
+const apiAdminAuthService = {
+  async login(payload: AdminLoginRequest): Promise<AdminLoginResponse> {
+    const formData = new URLSearchParams();
+    formData.set('username', payload.email);
+    formData.set('password', payload.password);
+
+    const { data } = await api.post<AdminLoginResponse>(
+      '/auth/admin/login',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    );
+
+    persistAdminSession(data);
+    return data;
+  },
+
+  ...sharedAdminAuthMethods,
+};
+
+export const adminAuthService = featureFlags.useAdminAuthMock
+  ? adminAuthServiceMock
+  : apiAdminAuthService;

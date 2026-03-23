@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
+import { vendorAuthService } from '@/services/vendor/authService';
 
 export default function VendorResetPasswordForm() {
   const router = useRouter();
@@ -60,31 +61,23 @@ export default function VendorResetPasswordForm() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/vendor/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token, password }),
-      });
+      const result = await vendorAuthService.resetPassword({ token, password });
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (result.ok) {
         setResetSuccess(true);
         toast.success('Password reset successful!');
         setTimeout(() => {
           router.push('/vendor/auth/login');
         }, 3000);
       } else {
-        if (response.status === 400 || response.status === 401) {
+        if (result.message?.toLowerCase().includes('invalid')) {
           setTokenError(true);
-          toast.error(data.message || 'Invalid or expired reset link');
+          toast.error(result.message || 'Invalid or expired reset link');
         } else {
-          toast.error(data.message || 'Failed to reset password');
+          toast.error(result.message || 'Failed to reset password');
         }
       }
-    } catch (error) {
+    } catch {
       toast.error('An error occurred. Please try again.');
     } finally {
       setIsLoading(false);
