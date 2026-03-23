@@ -73,7 +73,7 @@ export default function LoginPage() {
         <div className="max-w-lg w-full">
           {/* Logo */}
           <div className="flex items-center justify-center gap-2 sm:gap-3 mb-6 sm:mb-10">
-            <img src="/icons/logo.svg" alt="Occacia" className="h-10 sm:h-12 w-auto" />
+            <img src="/icons/logo.svg" alt="Occacia" loading="eager" className="h-10 sm:h-12 w-auto" />
             <span className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-[#0D47A1] to-[#4285F4] bg-clip-text text-transparent">Occacia</span>
           </div>
 

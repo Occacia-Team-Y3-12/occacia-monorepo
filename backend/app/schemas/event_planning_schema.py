@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 
 class ChatMessageResponse(BaseModel):
@@ -151,11 +151,15 @@ class TaskListResponse(BaseModel):
 
 
 class TaskCreateRequest(BaseModel):
-    name: str
+    name: str = Field(validation_alias=AliasChoices("name", "title"))
     description: str | None = None
     quantity: int = 1
     needs_vendor: bool = Field(default=False, alias="needsVendor")
-    vendor_category: str | None = Field(default=None, alias="vendorCategory")
+    vendor_category: str | None = Field(
+        default=None,
+        alias="vendorCategory",
+        validation_alias=AliasChoices("vendorCategory", "category"),
+    )
     budget_min: float | None = Field(default=None, alias="budgetMin")
     budget_max: float | None = Field(default=None, alias="budgetMax")
     currency: str = "LKR"
@@ -189,11 +193,15 @@ class TaskCreateRequest(BaseModel):
 
 
 class TaskUpdateRequest(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, validation_alias=AliasChoices("name", "title"))
     description: str | None = None
     quantity: int | None = None
     needs_vendor: bool | None = Field(default=None, alias="needsVendor")
-    vendor_category: str | None = Field(default=None, alias="vendorCategory")
+    vendor_category: str | None = Field(
+        default=None,
+        alias="vendorCategory",
+        validation_alias=AliasChoices("vendorCategory", "category"),
+    )
     budget_min: float | None = Field(default=None, alias="budgetMin")
     budget_max: float | None = Field(default=None, alias="budgetMax")
     currency: str | None = None

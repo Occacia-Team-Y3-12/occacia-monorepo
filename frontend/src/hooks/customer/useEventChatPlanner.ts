@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ROUTES } from '@/lib/routes';
+import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 import { customerEventChatService } from '@/services/customer/eventChatService';
 import {
   CalendarConnectionStatus,
@@ -89,6 +91,13 @@ export const useEventChatPlanner = (eventId: string) => {
   const activeTaskCount = useMemo(() => tasks.length, [tasks]);
 
   const fetchAll = useCallback(async () => {
+    const token = getStoredCustomerToken();
+    if (!token) {
+      setIsInitialLoading(false);
+      router.replace(ROUTES.CUSTOMER.LOGIN);
+      return;
+    }
+
     setIsInitialLoading(true);
     setError(null);
 
@@ -99,6 +108,20 @@ export const useEventChatPlanner = (eventId: string) => {
       customerEventChatService.getCalendarProviders(),
       customerEventChatService.getCalendarStatus(),
     ]);
+
+    const hasUnauthorized = [
+      eventResult,
+      messagesResult,
+      tasksResult,
+      providersResult,
+      calendarStatusResult,
+    ].some((result) => result.status === 401);
+
+    if (hasUnauthorized) {
+      setIsInitialLoading(false);
+      router.replace(ROUTES.CUSTOMER.LOGIN);
+      return;
+    }
 
     if (eventResult.ok && eventResult.data?.data?.event) {
       const event = eventResult.data.data.event;
@@ -150,7 +173,7 @@ export const useEventChatPlanner = (eventId: string) => {
     }
 
     setIsInitialLoading(false);
-  }, [eventId]);
+  }, [eventId, router]);
 
   useEffect(() => {
     void fetchAll();
@@ -267,6 +290,12 @@ export const useEventChatPlanner = (eventId: string) => {
     setError(null);
     setWarning(null);
 
+    if (dateTBD || !startDate) {
+      setWarning('Set an event date to save schedule to the backend.');
+      setIsBusy(false);
+      return true;
+    }
+
     const scheduleResult = await customerEventChatService.saveSchedule(eventId, {
       dateTBD,
       startAt: dateTBD ? undefined : `${startDate}T${isAllDay ? '00:00' : startTime}`,
@@ -343,7 +372,6 @@ export const useEventChatPlanner = (eventId: string) => {
 
     const result = await customerEventChatService.connectCalendar({
       provider: selectedProvider,
-      redirectUri: typeof window !== 'undefined' ? window.location.href : undefined,
     });
     if (!result.ok) {
       const responseMessage = result.data && 'message' in result.data ? result.data.message : undefined;
@@ -360,6 +388,10 @@ export const useEventChatPlanner = (eventId: string) => {
     if (result.data && 'authorizationUrl' in result.data) {
       setSuccess('Redirecting to calendar provider...');
       if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(
+          'customer:calendarReturnPath',
+          window.location.pathname + window.location.search
+        );
         window.location.assign(result.data.authorizationUrl);
       }
       setIsBusy(false);

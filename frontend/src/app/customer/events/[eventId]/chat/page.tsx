@@ -218,7 +218,7 @@ export default function CustomerEventChatPage() {
                   className={isAssistant ? 'flex min-w-0 gap-3' : 'flex justify-end'}
                 >
                   {isAssistant ? (
-                    <img src="/icons/logo.svg" alt="assistant" className="mt-1 h-10 w-10 shrink-0 object-contain" />
+                    <img src="/icons/logo.svg" alt="assistant" loading="eager" className="mt-1 h-10 w-10 shrink-0 object-contain" />
                   ) : null}
 
                   <div className={isAssistant ? 'min-w-0 w-full max-w-[650px]' : 'min-w-0 w-full max-w-[650px] text-right'}>

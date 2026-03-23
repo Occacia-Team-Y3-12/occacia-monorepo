@@ -143,6 +143,17 @@ def test_whenCustomerConfirmsTasks_postConfirmTasks_activatesEvent(auth_client):
     assert body["tasks"][0]["status"] == "PENDING"
 
 
+def test_whenCustomerCreatesTaskWithLegacyTitle_postTask_success(auth_client):
+    event_id = _create_event(auth_client)
+
+    response = auth_client.post(
+        f"/api/v1/customers/events/{event_id}/tasks",
+        json={"title": "Hello", "needsVendor": False, "category": "custom"},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["name"] == "Hello"
+
+
 def test_whenCustomerConnectsCalendarAndEnablesSync_putEventCalendarSync_success(
     auth_client,
     active_customer,
@@ -201,6 +212,21 @@ def test_whenCustomerConnectsCalendarAndEnablesSync_putEventCalendarSync_success
         assert event.external_calendar_event_id == "google-event-123"
     finally:
         db.close()
+
+
+def test_whenCustomerConnectsCalendarWithLowercaseProvider_postCalendarConnect_success(
+    auth_client,
+    mock_google_calendar,
+):
+    connect = auth_client.post(
+        "/api/v1/customers/calendar/connect",
+        json={"provider": "google", "redirectUri": "https://app.occacia.com/oauth/callback"},
+    )
+    assert connect.status_code == 200, connect.text
+    body = connect.json()
+    assert body["provider"] == "GOOGLE"
+    assert body["authorizationUrl"]
+    assert body["state"]
 
 
 def test_whenCustomerProvidesInvalidRecurrence_putEventSchedule_failsWithException(auth_client):

@@ -57,6 +57,8 @@ export const useEventTasks = (eventId: string) => {
     getTaskDetails,
     reassignTask,
     removeTask,
-    rejectedCount: event?.tasks.filter((t) => t.status === 'Rejected').length || 0,
+    rejectedCount: Array.isArray(event?.tasks)
+      ? event.tasks.filter((t) => t.status === 'Rejected').length
+      : 0,
   };
 };
