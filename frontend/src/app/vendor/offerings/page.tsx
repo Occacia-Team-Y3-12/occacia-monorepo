@@ -28,8 +28,9 @@ export default function OfferingsPage() {
     if (searchParams.get('new') === '1') {
       setEditingOffering(null);
       setShowForm(true);
+      router.replace(ROUTES.VENDOR.OFFERINGS, { scroll: false });
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const fetchOfferings = async () => {
     setIsLoading(true);

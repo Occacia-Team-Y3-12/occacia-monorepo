@@ -191,8 +191,8 @@ export const useEventChatPlanner = (eventId: string) => {
     setMessages((prev) => [...prev, optimistic]);
     setChatInput('');
 
-    const result = await customerEventChatService.postChat(eventId, { message });
-    if (!result.ok || !result.data?.data?.message) {
+    const result = await customerEventChatService.postChat(eventId, { content: message });
+    if (!result.ok) {
       setError(result.error || result.data?.message || 'Failed to send message.');
       setMessages((prev) => prev.filter((item) => item.id !== optimistic.id));
       setIsBusy(false);
@@ -341,14 +341,33 @@ export const useEventChatPlanner = (eventId: string) => {
     setWarning(null);
     setSuccess(null);
 
-    const result = await customerEventChatService.connectCalendar({ provider: selectedProvider });
-    if (!result.ok || !result.data?.data?.status) {
-      const message = result.error || result.data?.message || 'Failed to connect calendar provider.';
+    const result = await customerEventChatService.connectCalendar({
+      provider: selectedProvider,
+      redirectUri: typeof window !== 'undefined' ? window.location.href : undefined,
+    });
+    if (!result.ok) {
+      const responseMessage = result.data && 'message' in result.data ? result.data.message : undefined;
+      const message = result.error || responseMessage || 'Failed to connect calendar provider.';
       if (message === GENERIC_ERROR_TEXT) {
         setWarning('Google Calendar service is temporarily unavailable. Continue with local reminders and try again later.');
       } else {
         setError(message);
       }
+      setIsBusy(false);
+      return false;
+    }
+
+    if (result.data && 'authorizationUrl' in result.data) {
+      setSuccess('Redirecting to calendar provider...');
+      if (typeof window !== 'undefined') {
+        window.location.assign(result.data.authorizationUrl);
+      }
+      setIsBusy(false);
+      return true;
+    }
+
+    if (!result.data?.data?.status) {
+      setError('Failed to connect calendar provider.');
       setIsBusy(false);
       return false;
     }

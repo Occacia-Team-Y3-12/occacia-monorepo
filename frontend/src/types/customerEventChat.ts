@@ -123,7 +123,8 @@ export type EventTasksConfirmResponse = ApiEnvelope<{
 }>;
 
 export type EventChatRequest = {
-  message: string;
+  content: string;
+  message?: string;
 };
 
 export type EventChatResponse = ApiEnvelope<{
@@ -169,9 +170,19 @@ export type CalendarStatusResponse = ApiEnvelope<{ status: CalendarConnectionSta
 
 export type CalendarConnectRequest = {
   provider: CalendarProviderId;
+  redirectUri?: string;
+  scopes?: string[];
 };
 
-export type CalendarConnectResponse = ApiEnvelope<{ status: CalendarConnectionStatus }>;
+export type CalendarConnectOauthResponse = {
+  provider: string;
+  authorizationUrl: string;
+  state: string;
+};
+
+export type CalendarConnectResponse =
+  | ApiEnvelope<{ status: CalendarConnectionStatus }>
+  | CalendarConnectOauthResponse;
 
 export type CalendarSyncRequest = {
   enabled: boolean;

@@ -1,5 +1,6 @@
 import { featureFlags } from '@/config/featureFlags';
 import { mockTaskService } from '@/mocks/customer/taskService';
+import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 import { ServiceResult } from '@/types/customer';
 import {
   EventWithTasks,
@@ -11,9 +12,23 @@ import {
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
+const withCustomerAuthHeaders = (headers?: HeadersInit) => {
+  const merged = new Headers(headers);
+  const token = getStoredCustomerToken();
+
+  if (token && !merged.has('Authorization')) {
+    merged.set('Authorization', `Bearer ${token}`);
+  }
+
+  return merged;
+};
+
 const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<ServiceResult<T>> => {
   try {
-    const response = await fetch(input, init);
+    const response = await fetch(input, {
+      ...init,
+      headers: withCustomerAuthHeaders(init?.headers),
+    });
     const data = response.ok ? await response.json() : undefined;
 
     if (!response.ok) {

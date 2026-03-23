@@ -101,13 +101,30 @@ class EventChatService:
         self._save_message(db, event_id=event_id, sender="CUSTOMER", content=content)
 
         # ── 8. Call Groq ──────────────────────────────────────────────
-        ai_output = await groq_ai_service.plan_event_chat(
-            content=content,
-            history=history,
-            personas=personas,
-            event_context=event_context,
-            needs_persona=needs_persona,
-        )
+        try:
+            ai_output = await groq_ai_service.plan_event_chat(
+                content=content,
+                history=history,
+                personas=personas,
+                event_context=event_context,
+                needs_persona=needs_persona,
+            )
+        except Exception as exc:
+            logger.exception("Event chat AI provider failed for event %s: %s", event_id, exc)
+            fallback_reply = (
+                "I’m having trouble reaching the planning assistant right now. "
+                "You can continue by adding tasks manually, and try chat again in a moment."
+            )
+            self._save_message(db, event_id=event_id, sender="AI", content=fallback_reply)
+            return ChatSendResponse(
+                reply=fallback_reply,
+                suggestedTasks=[],
+                intent="chat",
+                missingInfo=[],
+                askSavePersona=False,
+                personaSaved=False,
+                personaConfirmed=False,
+            )
 
         reply: str = ai_output.get("reply", "")
 

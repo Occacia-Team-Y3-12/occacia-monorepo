@@ -1,5 +1,6 @@
 import { featureFlags } from '@/config/featureFlags';
 import { mockCustomerEventService } from '@/mocks/customer/eventService';
+import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 import {
   CreateCustomerEventPayload,
   CreateCustomerEventResponse,
@@ -50,9 +51,23 @@ const parseBody = <T>(raw: string, contentType: string): (T & { message?: string
   }
 };
 
+const withCustomerAuthHeaders = (headers?: HeadersInit) => {
+  const merged = new Headers(headers);
+  const token = getStoredCustomerToken();
+
+  if (token && !merged.has('Authorization')) {
+    merged.set('Authorization', `Bearer ${token}`);
+  }
+
+  return merged;
+};
+
 const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<ServiceResult<T>> => {
   try {
-    const response = await fetch(input, init);
+    const response = await fetch(input, {
+      ...init,
+      headers: withCustomerAuthHeaders(init?.headers),
+    });
     const raw = await response.text();
     const contentType = response.headers.get('content-type') || '';
     const data = parseBody<T>(raw, contentType);
