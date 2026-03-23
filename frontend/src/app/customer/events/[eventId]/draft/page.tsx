@@ -103,7 +103,7 @@ export default function CustomerEventDraftPage() {
       return;
     }
 
-    router.push(ROUTES.CUSTOMER.EVENTS);
+    router.replace(ROUTES.CUSTOMER.EVENTS);
   };
 
   const onAddCustomTask = () => {
