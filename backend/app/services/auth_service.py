@@ -8,6 +8,7 @@ import os
 import random
 import string
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import jwt
 from fastapi import HTTPException, status
@@ -79,6 +80,12 @@ def _send_email(to: str, subject: str, text_body: str) -> bool:
 # ── AuthService ───────────────────────────────────────────────────────────────
 
 class AuthService:
+    @staticmethod
+    def _as_utc(value: datetime) -> datetime:
+        """Normalize potentially naive DB datetimes to UTC-aware values."""
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
     # ── Customer registration & login ─────────────────────────────────────────
 
@@ -291,15 +298,14 @@ class AuthService:
             raise HTTPException(status_code=404, detail="User not found.")
         if customer.password_reset_token != reset_token:
             raise HTTPException(status_code=400, detail="Invalid reset token.")
-        if (
-            customer.password_reset_token_expires_at is not None and
-            customer.password_reset_token_expires_at < datetime.now(UTC)
-        ):
-            customer.password_reset_token = None
-            customer.password_reset_token_expires_at = None
-            db.add(customer)
-            db.commit()
-            raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new password reset link.")
+        if customer.password_reset_token_expires_at is not None:
+            expires_at = self._as_utc(customer.password_reset_token_expires_at)
+            if expires_at < datetime.now(UTC):
+                customer.password_reset_token = None
+                customer.password_reset_token_expires_at = None
+                db.add(customer)
+                db.commit()
+                raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new password reset link.")
         customer.password_hash = get_password_hash(new_password)
         customer.password_reset_token = None
         customer.password_reset_token_expires_at = None
@@ -469,15 +475,14 @@ class AuthService:
             raise HTTPException(status_code=404, detail="Vendor not found.")
         if vendor.password_reset_token != reset_token:
             raise HTTPException(status_code=400, detail="Invalid reset token.")
-        if (
-            vendor.password_reset_token_expires_at is not None and
-            vendor.password_reset_token_expires_at < datetime.now(UTC)
-        ):
-            vendor.password_reset_token = None
-            vendor.password_reset_token_expires_at = None
-            db.add(vendor)
-            db.commit()
-            raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new password reset link.")
+        if vendor.password_reset_token_expires_at is not None:
+            expires_at = self._as_utc(vendor.password_reset_token_expires_at)
+            if expires_at < datetime.now(UTC):
+                vendor.password_reset_token = None
+                vendor.password_reset_token_expires_at = None
+                db.add(vendor)
+                db.commit()
+                raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new password reset link.")
         vendor.password_hash = get_password_hash(new_password)
         vendor.password_reset_token = None
         vendor.password_reset_token_expires_at = None
@@ -545,9 +550,17 @@ class AuthService:
         self, email: str, role: str, token_type: str = "pwd_reset_verified",
     ) -> tuple[str, datetime]:
         """Short-lived JWT authorising the final password reset."""
-        expires_at = datetime.now(UTC) + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
         token = jwt.encode(
-            {"sub": email, "type": token_type, "role": role, "exp": expires_at},
+            {
+                "sub": email,
+                "type": token_type,
+                "role": role,
+                "iat": now,
+                "exp": expires_at,
+                "jti": uuid4().hex,
+            },
             SECRET_KEY, algorithm=ALGORITHM,
         )
         return token, expires_at
