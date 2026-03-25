@@ -136,6 +136,20 @@ export default function CustomerEventChatPage() {
     }
   };
 
+  const onSaveDraft = async () => {
+    const scheduleSaved = await saveSchedule();
+    if (!scheduleSaved) {
+      return;
+    }
+
+    const remindersSaved = await saveReminders();
+    if (!remindersSaved) {
+      return;
+    }
+
+    router.replace(ROUTES.CUSTOMER.EVENTS);
+  };
+
   const handleCalendarSyncToggle = async (nextEnabled: boolean) => {
     if (nextEnabled) {
       if (!calendarStatus.connected) {
@@ -573,15 +587,15 @@ export default function CustomerEventChatPage() {
           <div className="mt-auto border-t border-[#EAEAEA] bg-[#F4F8FA] px-6 py-6">
             <button
               type="button"
-              onClick={() => router.push(ROUTES.CUSTOMER.EVENT_DRAFT_REVIEW(eventId || ''))}
+              onClick={() => void onSaveDraft()}
+              disabled={isBusy}
               className="mb-3 h-10 w-full rounded-[12px] border border-[#EAEAEA] bg-white text-[12px] font-semibold uppercase tracking-[0.08em] text-[#666666]"
             >
               Save As Draft
             </button>
             <button
               type="button"
-              onClick={() => void confirmTasks()}
-              disabled={isBusy}
+              onClick={() => router.push(ROUTES.CUSTOMER.EVENT_DRAFT_REVIEW(eventId || ''))}
               className="h-14 w-full rounded-[18px] bg-[#0D47A1] px-6 text-[13px] font-semibold uppercase tracking-[0.08em] text-white disabled:opacity-60"
             >
               Confirm Tasks & View Recommendations
