@@ -1,10 +1,7 @@
-Here's the complete updated OpenAPI YAML with every change applied:
-
-```yaml
 openapi: 3.1.0
 info:
   title: Occacia API
-  version: 1.1.3
+  version: 1.1.4
   description: 'Occacia API contract aligned with use cases, EERD, and class diagram.
     Core flow: Event -> Tasks -> Recommendations -> Packages -> Confirm Package ->
     Package Order -> Vendor Fulfillment Requests -> Task execution.
@@ -27,6 +24,12 @@ info:
     vendor package management endpoints, vendor pending stats, and organization
     delete. Fixed customer/vendor password verify-otp paths.
 
+
+    Update 1.1.4: Added all previously undocumented router-only endpoints:
+    account deletion (customer/vendor/admin), task offering list and select,
+    vendor task dashboard stats, admin notifications, and admin package order
+    cancellation.
+
     '
 servers:
 - url: https://app.occacia.com/api/v1
@@ -45,10 +48,12 @@ tags:
 - name: Metadata
 - name: System & Ops
 paths:
+
+  # ─── Authentication — Customer ─────────────────────────────────────────────
+
   /auth/customer/register:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Register customer
       security: []
       requestBody:
@@ -66,18 +71,18 @@ paths:
                 $ref: '#/components/schemas/RegisterResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/customer/verify-email:
     get:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Verify customer email
       security: []
       parameters:
-      - name: token
-        in: query
-        required: true
-        schema:
-          type: string
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Email verified; customer becomes ACTIVE
@@ -87,10 +92,10 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/customer/email-verification/resend:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Resend customer verification email
       security: []
       requestBody:
@@ -108,10 +113,10 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/customer/login:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Customer login
       security: []
       requestBody:
@@ -129,10 +134,10 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /auth/customer/logout:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Customer logout
       responses:
         '200':
@@ -143,10 +148,10 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /auth/customer/token/refresh:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Refresh customer access token
       security: []
       requestBody:
@@ -164,12 +169,13 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /auth/customer/password/change:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Change customer password (authenticated)
-      description: Authenticated password change only (currentPassword + newPassword).
+      description: >
+        Authenticated password change only (currentPassword + newPassword).
         Use the /password/forgot, /password/verify-otp, and /password/reset
         flow for forgotten passwords.
       requestBody:
@@ -187,14 +193,14 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/customer/password/forgot:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Send customer password reset OTP
-      description: Sends a one-time password (OTP) to the customer's email address.
-        After success, the frontend should navigate the user to the OTP entry
-        screen.
+      description: >
+        Sends a one-time password (OTP) to the customer's email address.
+        After success, the frontend should navigate the user to the OTP entry screen.
       security: []
       requestBody:
         required: true
@@ -209,14 +215,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+
   /auth/customer/password/verify-otp:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Verify customer password reset OTP
-      description: Verifies the OTP sent to the customer's email and returns a
-        short-lived reset token. After success, the frontend should redirect
-        the user to the password reset screen.
+      description: >
+        Verifies the OTP sent to the customer's email and returns a short-lived
+        reset token. After success, the frontend should redirect the user to the
+        password reset screen.
       security: []
       requestBody:
         required: true
@@ -233,12 +240,13 @@ paths:
                 $ref: '#/components/schemas/PasswordResetOtpVerificationResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/customer/password/forgot/resend-otp:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Resend customer password reset OTP
-      description: Resends the password reset OTP to the customer's email address
+      description: >
+        Resends the password reset OTP to the customer's email address
         for an in-progress forgot-password flow.
       security: []
       requestBody:
@@ -256,13 +264,14 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/customer/password/reset:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Reset customer password after OTP verification
-      description: Completes the forgot-password flow using the short-lived reset
-        token returned by /auth/customer/password/verify-otp.
+      description: >
+        Completes the forgot-password flow using the short-lived reset token
+        returned by /auth/customer/password/verify-otp.
       security: []
       requestBody:
         required: true
@@ -279,10 +288,30 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  # NEW (1.1.4) — was only in router, not in spec
+  /auth/customer/delete:
+    delete:
+      tags: [Authentication]
+      summary: Delete customer account
+      description: >
+        Permanently deletes the authenticated customer's account.
+        Blacklists the current access token immediately after deletion.
+      responses:
+        '200':
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── Authentication — Vendor ───────────────────────────────────────────────
+
   /auth/vendor/register:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Register vendor
       security: []
       requestBody:
@@ -300,18 +329,18 @@ paths:
                 $ref: '#/components/schemas/RegisterResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/vendor/verify-email:
     get:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Verify vendor email
       security: []
       parameters:
-      - name: token
-        in: query
-        required: true
-        schema:
-          type: string
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Email verified; vendor becomes PENDING admin approval
@@ -321,10 +350,10 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/vendor/email-verification/resend:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Resend vendor verification email
       security: []
       requestBody:
@@ -342,10 +371,10 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/vendor/login:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Vendor login
       security: []
       requestBody:
@@ -363,10 +392,10 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /auth/vendor/logout:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Vendor logout
       responses:
         '200':
@@ -377,10 +406,10 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /auth/vendor/token/refresh:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Refresh vendor access token
       security: []
       requestBody:
@@ -398,11 +427,15 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /auth/vendor/password/change:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Change vendor password (authenticated)
+      description: >
+        Authenticated password change only (currentPassword + newPassword).
+        Use the /password/forgot, /password/verify-otp, and /password/reset
+        flow for forgotten passwords.
       requestBody:
         required: true
         content:
@@ -418,17 +451,14 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-      description: Authenticated password change only (currentPassword + newPassword).
-        Use the /password/forgot, /password/verify-otp, and /password/reset
-        flow for forgotten passwords.
+
   /auth/vendor/password/forgot:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Send vendor password reset OTP
-      description: Sends a one-time password (OTP) to the vendor's email address.
-        After success, the frontend should navigate the user to the OTP entry
-        screen.
+      description: >
+        Sends a one-time password (OTP) to the vendor's email address.
+        After success, the frontend should navigate the user to the OTP entry screen.
       security: []
       requestBody:
         required: true
@@ -443,14 +473,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+
   /auth/vendor/password/verify-otp:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Verify vendor password reset OTP
-      description: Verifies the OTP sent to the vendor's email and returns a short-lived
-        reset token. After success, the frontend should redirect the user to
-        the password reset screen.
+      description: >
+        Verifies the OTP sent to the vendor's email and returns a short-lived
+        reset token. After success, the frontend should redirect the user to the
+        password reset screen.
       security: []
       requestBody:
         required: true
@@ -467,12 +498,13 @@ paths:
                 $ref: '#/components/schemas/PasswordResetOtpVerificationResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/vendor/password/forgot/resend-otp:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Resend vendor password reset OTP
-      description: Resends the password reset OTP to the vendor's email address
+      description: >
+        Resends the password reset OTP to the vendor's email address
         for an in-progress forgot-password flow.
       security: []
       requestBody:
@@ -490,13 +522,14 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/vendor/password/reset:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Reset vendor password after OTP verification
-      description: Completes the forgot-password flow using the short-lived reset
-        token returned by /auth/vendor/password/verify-otp.
+      description: >
+        Completes the forgot-password flow using the short-lived reset token
+        returned by /auth/vendor/password/verify-otp.
       security: []
       requestBody:
         required: true
@@ -513,10 +546,30 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  # NEW (1.1.4)
+  /auth/vendor/delete:
+    delete:
+      tags: [Authentication]
+      summary: Delete vendor account
+      description: >
+        Permanently deletes the authenticated vendor's account.
+        Blacklists the current access token immediately after deletion.
+      responses:
+        '200':
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── Authentication — Admin ────────────────────────────────────────────────
+
   /auth/admin/register:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Provision admin account (internal)
       description: Restricted/internal endpoint; not self-service.
       responses:
@@ -530,13 +583,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+
   /auth/admin/login:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Admin login - Step 1
-      description: Validates email and password. Sends a 6-digit OTP to the admin
-        email. OTP expires in 5 minutes. After this call POST /auth/admin/login/verify-otp
+      description: >
+        Validates email and password. Sends a 6-digit OTP to the admin email.
+        OTP expires in 5 minutes. After this call POST /auth/admin/login/verify-otp
         with the OTP to receive the JWT token.
       security: []
       requestBody:
@@ -554,13 +608,14 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /auth/admin/login/verify-otp:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Admin login - Step 2 (verify OTP)
-      description: Submit the 6-digit OTP sent to the admin email. Returns JWT
-        access token on success. OTP is single-use.
+      description: >
+        Submit the 6-digit OTP sent to the admin email. Returns JWT access
+        token on success. OTP is single-use.
       security: []
       requestBody:
         required: true
@@ -579,10 +634,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /auth/admin/logout:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Admin logout
       responses:
         '200':
@@ -591,10 +646,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+
   /auth/admin/token/refresh:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Refresh admin access token
       security: []
       requestBody:
@@ -612,13 +667,12 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /auth/admin/password/forgot:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Send admin password reset OTP
-      description: Sends a 6-digit password reset OTP to the admin email.
-        OTP expires in 5 minutes.
+      description: Sends a 6-digit password reset OTP to the admin email. OTP expires in 5 minutes.
       security: []
       requestBody:
         required: true
@@ -635,13 +689,14 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/admin/password/verify-otp:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Verify admin password reset OTP
-      description: Submit the 6-digit OTP from the email. Returns a short-lived
-        reset token (valid 10 minutes) on success.
+      description: >
+        Submit the 6-digit OTP from the email. Returns a short-lived reset token
+        (valid 10 minutes) on success.
       security: []
       requestBody:
         required: true
@@ -658,10 +713,10 @@ paths:
                 $ref: '#/components/schemas/PasswordResetOtpVerificationResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /auth/admin/password/reset:
     post:
-      tags:
-      - Authentication
+      tags: [Authentication]
       summary: Reset admin password after OTP verification
       description: Submit the reset token from verify-otp and the new password.
       security: []
@@ -680,10 +735,32 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  # NEW (1.1.4)
+  /auth/admin/delete:
+    delete:
+      tags: [Authentication]
+      summary: Delete admin account
+      description: >
+        Permanently deletes the authenticated admin's account.
+        Blacklists the current access token immediately after deletion.
+      responses:
+        '200':
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ─── User Profile ──────────────────────────────────────────────────────────
+
   /customers/me:
     get:
-      tags:
-      - User Profile
+      tags: [User Profile]
       summary: Get current customer profile
       responses:
         '200':
@@ -693,8 +770,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CustomerProfile'
     put:
-      tags:
-      - User Profile
+      tags: [User Profile]
       summary: Update current customer profile
       requestBody:
         required: true
@@ -709,10 +785,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomerProfile'
+
   /vendors/me:
     get:
-      tags:
-      - User Profile
+      tags: [User Profile]
       summary: Get current vendor profile
       responses:
         '200':
@@ -722,8 +798,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VendorProfile'
     put:
-      tags:
-      - User Profile
+      tags: [User Profile]
       summary: Update current vendor profile
       requestBody:
         required: true
@@ -738,13 +813,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VendorProfile'
+
+  /admin/me:
+    get:
+      tags: [User Profile]
+      summary: Get current admin profile
+      responses:
+        '200':
+          description: Admin profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProfile'
+
+  # ─── Vendor Packages ───────────────────────────────────────────────────────
+
   /vendors/me/packages:
     get:
-      tags:
-      - Vendor
+      tags: [Vendor]
       summary: List current vendor's packages
-      description: Returns all packages belonging to the authenticated vendor.
-        Any logged-in vendor can view their own packages.
+      description: Returns all packages belonging to the authenticated vendor. Any logged-in vendor can view their own packages.
       responses:
         '200':
           description: Vendor packages
@@ -755,8 +843,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
-      tags:
-      - Vendor
+      tags: [Vendor]
       summary: Create a package
       description: Only APPROVED vendors can create packages.
       requestBody:
@@ -776,16 +863,16 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '403':
           $ref: '#/components/responses/Forbidden'
+
   /vendors/me/packages/{packageId}:
     parameters:
-    - name: packageId
-      in: path
-      required: true
-      schema:
-        type: integer
+      - name: packageId
+        in: path
+        required: true
+        schema:
+          type: integer
     put:
-      tags:
-      - Vendor
+      tags: [Vendor]
       summary: Update a package
       description: Only APPROVED vendors can update their own packages.
       requestBody:
@@ -808,8 +895,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
-      tags:
-      - Vendor
+      tags: [Vendor]
       summary: Delete a package
       description: Only APPROVED vendors can delete their own packages.
       responses:
@@ -819,36 +905,26 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-  /admin/me:
-    get:
-      tags:
-      - User Profile
-      summary: Get current admin profile
-      responses:
-        '200':
-          description: Admin profile
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminProfile'
+
+  # ─── Admin — Vendor Management ─────────────────────────────────────────────
+
   /admin/vendors:
     get:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: List vendors (management)
       parameters:
-      - name: approval_status
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/VendorApprovalStatus'
-      - name: status
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/AccountStatus'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
+        - name: approval_status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/VendorApprovalStatus'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/AccountStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
           description: Vendors
@@ -856,13 +932,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedVendors'
+
   /admin/vendors/stats/pending:
     get:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Get pending vendor and organization counts
-      description: Returns counts of vendors and organizations currently in pending
-        approval state.
+      description: Returns counts of vendors and organizations currently in pending approval state.
       responses:
         '200':
           description: Pending stats
@@ -874,12 +949,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+
   /admin/vendors/{vendorId}:
     parameters:
-    - $ref: '#/components/parameters/VendorId'
+      - $ref: '#/components/parameters/VendorId'
     get:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Get vendor detail (management)
       responses:
         '200':
@@ -890,12 +965,12 @@ paths:
                 $ref: '#/components/schemas/VendorAdminView'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /admin/vendors/{vendorId}/status:
     parameters:
-    - $ref: '#/components/parameters/VendorId'
+      - $ref: '#/components/parameters/VendorId'
     put:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Update vendor account status (ACTIVE/SUSPENDED/DISABLED)
       requestBody:
         required: true
@@ -912,12 +987,12 @@ paths:
                 $ref: '#/components/schemas/VendorAdminView'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /admin/vendors/{vendorId}/approve:
     parameters:
-    - $ref: '#/components/parameters/VendorId'
+      - $ref: '#/components/parameters/VendorId'
     post:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Approve vendor registration
       responses:
         '200':
@@ -928,12 +1003,12 @@ paths:
                 $ref: '#/components/schemas/VendorAdminView'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /admin/vendors/{vendorId}/reject:
     parameters:
-    - $ref: '#/components/parameters/VendorId'
+      - $ref: '#/components/parameters/VendorId'
     post:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Reject vendor registration
       requestBody:
         required: false
@@ -950,19 +1025,21 @@ paths:
                 $ref: '#/components/schemas/VendorAdminView'
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  # ─── Admin — Customer Management ───────────────────────────────────────────
+
   /admin/customers:
     get:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: List customers (management)
       parameters:
-      - name: status
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/AccountStatus'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/AccountStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
           description: Customers
@@ -970,12 +1047,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedCustomers'
+
   /admin/customers/{customerId}:
     parameters:
-    - $ref: '#/components/parameters/CustomerId'
+      - $ref: '#/components/parameters/CustomerId'
     get:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Get customer detail (management)
       responses:
         '200':
@@ -986,12 +1063,12 @@ paths:
                 $ref: '#/components/schemas/CustomerAdminView'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /admin/customers/{customerId}/status:
     parameters:
-    - $ref: '#/components/parameters/CustomerId'
+      - $ref: '#/components/parameters/CustomerId'
     put:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Update customer account status (ACTIVE/SUSPENDED/DISABLED)
       requestBody:
         required: true
@@ -1008,19 +1085,21 @@ paths:
                 $ref: '#/components/schemas/CustomerAdminView'
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  # ─── Admin — Organizations ─────────────────────────────────────────────────
+
   /admin/organizations:
     get:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: List organizations (management)
       parameters:
-      - name: status
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/OrganizationStatus'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/OrganizationStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
           description: Organizations
@@ -1028,12 +1107,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedOrganizations'
+
   /admin/organizations/{orgId}:
     parameters:
-    - $ref: '#/components/parameters/OrgId'
+      - $ref: '#/components/parameters/OrgId'
     get:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Get organization detail (management)
       responses:
         '200':
@@ -1045,8 +1124,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Delete an organization
       description: Permanently deletes an organization. Admin only.
       responses:
@@ -1060,12 +1138,12 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /admin/organizations/{orgId}/status:
     parameters:
-    - $ref: '#/components/parameters/OrgId'
+      - $ref: '#/components/parameters/OrgId'
     put:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Update organization status (ACTIVE/INACTIVE)
       requestBody:
         required: true
@@ -1082,98 +1160,75 @@ paths:
                 $ref: '#/components/schemas/Organization'
         '400':
           $ref: '#/components/responses/BadRequest'
-  /customers/inquiries:
-    post:
-      tags:
-      - Support & Inquiries
-      summary: Create customer inquiry (UC-30)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InquiryCreateRequest'
-      responses:
-        '201':
-          description: Inquiry created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Inquiry'
+
+  # ─── Admin — Notifications (NEW 1.1.4) ────────────────────────────────────
+
+  /admin/notifications:
     get:
-      tags:
-      - Support & Inquiries
-      summary: List customer inquiries (UC-30)
+      tags: [Admin]
+      summary: List notifications (admin)
+      description: >
+        Returns a paginated list of system notifications. Supports filtering
+        by user, event, task, status, and type.
       parameters:
-      - name: status
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/InquiryStatus'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
+        - name: userId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: eventId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: taskId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
-          description: Inquiries
+          description: Notifications
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedInquiries'
-  /vendors/inquiries:
-    post:
-      tags:
-      - Support & Inquiries
-      summary: Create vendor inquiry (UC-30)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InquiryCreateRequest'
-      responses:
-        '201':
-          description: Inquiry created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Inquiry'
-    get:
-      tags:
-      - Support & Inquiries
-      summary: List vendor inquiries (UC-30)
-      parameters:
-      - name: status
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/InquiryStatus'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
-      responses:
-        '200':
-          description: Inquiries
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedInquiries'
+                $ref: '#/components/schemas/PaginatedNotificationsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ─── Admin — Inquiries ─────────────────────────────────────────────────────
+
   /admin/inquiries:
     get:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: List inquiries (UC-30)
       parameters:
-      - name: status
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/InquiryStatus'
-      - name: creatorRole
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/InquiryCreatorRole'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/InquiryStatus'
+        - name: creatorRole
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/InquiryCreatorRole'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
           description: Inquiries
@@ -1181,12 +1236,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedInquiries'
+
   /admin/inquiries/{inquiryId}:
     parameters:
-    - $ref: '#/components/parameters/InquiryId'
+      - $ref: '#/components/parameters/InquiryId'
     get:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Get inquiry
       responses:
         '200':
@@ -1198,8 +1253,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     put:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Update inquiry (reply / status)
       requestBody:
         required: true
@@ -1214,34 +1268,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Inquiry'
+
+  # ─── Admin — Internal Notes ────────────────────────────────────────────────
+
   /admin/internal-notes:
     get:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: List internal notes (UC-28)
       parameters:
-      - name: eventId
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/UUID'
-      - name: taskId
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/UUID'
-      - name: vendorId
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/UUID'
-      - name: packageOrderId
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/UUID'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
+        - name: eventId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: taskId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: vendorId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: packageOrderId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
           description: Internal notes
@@ -1250,8 +1306,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedInternalNotes'
     post:
-      tags:
-      - Admin
+      tags: [Admin]
       summary: Create internal note (UC-28)
       requestBody:
         required: true
@@ -1268,14 +1323,279 @@ paths:
                 $ref: '#/components/schemas/InternalNote'
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  # ─── Admin — Dashboard, Package Orders, Tasks ──────────────────────────────
+
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      summary: Admin dashboard summary
+      responses:
+        '200':
+          description: Summary metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDashboardResponse'
+
+  /admin/package-orders:
+    get:
+      tags: [Admin]
+      summary: List package orders (UC-28)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/PackageOrderStatus'
+        - name: eventId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Package orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPackageOrders'
+
+  /admin/package-orders/{packageOrderId}:
+    parameters:
+      - $ref: '#/components/parameters/PackageOrderId'
+    get:
+      tags: [Admin]
+      summary: Get package order detail (UC-28)
+      responses:
+        '200':
+          description: Package order detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageOrderDetailsResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # NEW (1.1.4)
+  /admin/package-orders/{packageOrderId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/PackageOrderId'
+    put:
+      tags: [Admin]
+      summary: Cancel package order (admin)
+      description: >
+        Admin-side cancellation of a package order. Sets status to
+        CANCELLED_ADMIN and returns the updated order with its tasks.
+      responses:
+        '200':
+          description: Package order cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageOrderDetailsResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot cancel in current status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/tasks:
+    get:
+      tags: [Admin]
+      summary: List tasks (UC-28)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TaskStatus'
+        - name: eventId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: vendorId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTasks'
+
+  /admin/tasks/{taskId}:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [Admin]
+      summary: Get task details (UC-28)
+      responses:
+        '200':
+          description: Task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Admin]
+      summary: Admin support action on a task (UC-28)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminTaskSupportActionRequest'
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+  /admin/tasks/{taskId}/fulfillment-requests:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [Admin]
+      summary: Fulfillment request attempt history for a task (UC-28)
+      responses:
+        '200':
+          description: Fulfillment requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFulfillmentRequests'
+
+  # ─── Support & Inquiries ───────────────────────────────────────────────────
+
+  /customers/inquiries:
+    post:
+      tags: [Support & Inquiries]
+      summary: Create customer inquiry (UC-30)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InquiryCreateRequest'
+      responses:
+        '201':
+          description: Inquiry created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inquiry'
+    get:
+      tags: [Support & Inquiries]
+      summary: List customer inquiries (UC-30)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/InquiryStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Inquiries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedInquiries'
+
+  /customers/inquiries/{inquiryId}:
+    parameters:
+      - $ref: '#/components/parameters/InquiryId'
+    get:
+      tags: [Support & Inquiries]
+      summary: Get customer inquiry (UC-30)
+      responses:
+        '200':
+          description: Inquiry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inquiry'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /vendors/inquiries:
+    post:
+      tags: [Support & Inquiries]
+      summary: Create vendor inquiry (UC-30)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InquiryCreateRequest'
+      responses:
+        '201':
+          description: Inquiry created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inquiry'
+    get:
+      tags: [Support & Inquiries]
+      summary: List vendor inquiries (UC-30)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/InquiryStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Inquiries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedInquiries'
+
+  /vendors/inquiries/{inquiryId}:
+    parameters:
+      - $ref: '#/components/parameters/InquiryId'
+    get:
+      tags: [Support & Inquiries]
+      summary: Get vendor inquiry (UC-30)
+      responses:
+        '200':
+          description: Inquiry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inquiry'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Customer — Personas ───────────────────────────────────────────────────
+
   /customers/personas:
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: List personas
       parameters:
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
           description: Personas
@@ -1286,8 +1606,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/Persona'
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Create persona
       requestBody:
         required: true
@@ -1302,13 +1621,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Persona'
+
   /customers/personas/confirmed:
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: List confirmed personas
-      description: Returns only personas that have been confirmed for the current
-        customer.
+      description: Returns only personas that have been confirmed for the current customer.
       responses:
         '200':
           description: Confirmed personas
@@ -1320,12 +1638,12 @@ paths:
                   $ref: '#/components/schemas/Persona'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /customers/personas/{personaId}:
     parameters:
-    - $ref: '#/components/parameters/PersonaId'
+      - $ref: '#/components/parameters/PersonaId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Get persona
       responses:
         '200':
@@ -1337,8 +1655,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     put:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Update persona
       requestBody:
         required: true
@@ -1354,20 +1671,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/Persona'
     delete:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Delete persona
       responses:
         '204':
           description: Deleted
         '404':
           $ref: '#/components/responses/NotFound'
+
   /customers/personas/{personaId}/confirm:
     parameters:
-    - $ref: '#/components/parameters/PersonaId'
+      - $ref: '#/components/parameters/PersonaId'
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Confirm a persona
       description: Marks a persona as confirmed for the current planning session.
       responses:
@@ -1380,8 +1696,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Unconfirm a persona
       description: Removes the confirmed state from a persona.
       responses:
@@ -1393,19 +1708,21 @@ paths:
                 $ref: '#/components/schemas/Persona'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  # ─── Customer — Events ─────────────────────────────────────────────────────
+
   /customers/events:
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: List events
       parameters:
-      - name: status
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/EventStatus'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/EventStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
           description: Events
@@ -1414,8 +1731,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedEvents'
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Create draft event (UC-12)
       requestBody:
         required: true
@@ -1430,12 +1746,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventCreateResponse'
+
   /customers/events/{eventId}:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Get event
       responses:
         '200':
@@ -1447,20 +1763,19 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Delete draft event
       responses:
         '204':
           description: Deleted
         '404':
           $ref: '#/components/responses/NotFound'
+
   /customers/events/{eventId}/personas:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     put:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Set personas linked to an event (replace links)
       requestBody:
         required: true
@@ -1475,12 +1790,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Event'
+
+  # ─── Customer — Chat & Summary ─────────────────────────────────────────────
+
   /customers/events/{eventId}/chat:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Send chat message + AI reply (UC-13)
       requestBody:
         required: true
@@ -1495,12 +1812,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChatSendResponse'
+
   /customers/events/{eventId}/summarize:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Summarize event context from chat history (UC-13)
       responses:
         '200':
@@ -1509,16 +1826,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventSummaryResponse'
+
   /customers/events/{eventId}/messages:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: List chat messages for event (optional)
       parameters:
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
           description: Messages
@@ -1526,12 +1843,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedChatMessages'
+
+  # ─── Customer — Tasks ──────────────────────────────────────────────────────
+
   /customers/events/{eventId}/tasks:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: List tasks for event
       responses:
         '200':
@@ -1541,8 +1860,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/TaskListResponse'
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Create task manually
       requestBody:
         required: true
@@ -1557,40 +1875,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Task'
-  /customers/events/{eventId}/tasks/{taskId}:
-    parameters:
-    - $ref: '#/components/parameters/EventId'
-    - $ref: '#/components/parameters/TaskId'
-    put:
-      tags:
-      - Customer
-      summary: Update task (editable states only)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TaskUpdateRequest'
-      responses:
-        '200':
-          description: Updated task
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Task'
-    delete:
-      tags:
-      - Customer
-      summary: Delete task (pre-confirm only)
-      responses:
-        '204':
-          description: Deleted
+
   /customers/events/{eventId}/tasks/confirm:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Confirm tasks (UC-13)
       description: Confirms tasks and activates event (DRAFT -> ACTIVE).
       requestBody:
@@ -1606,15 +1896,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConfirmTasksResponse'
+
+  /customers/events/{eventId}/tasks/{taskId}:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/TaskId'
+    put:
+      tags: [Customer]
+      summary: Update task (editable states only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdateRequest'
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+    delete:
+      tags: [Customer]
+      summary: Delete task (pre-confirm only)
+      responses:
+        '204':
+          description: Deleted
+
   /customers/events/{eventId}/tasks/{taskId}/reassign:
     parameters:
-    - $ref: '#/components/parameters/EventId'
-    - $ref: '#/components/parameters/TaskId'
+      - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/TaskId'
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Reassign rejected task (UC-21)
-      description: Validate shortlist (Atomic reassign) -> set task PENDING -> create
+      description: >
+        Validate shortlist (Atomic reassign) -> set task PENDING -> create
         new Fulfillment Request attempt.
       requestBody:
         required: true
@@ -1629,15 +1947,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReassignTaskResponse'
+
+  # NEW (1.1.4) — task offering list and select
+  /customers/events/{eventId}/tasks/{taskId}/offerings:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [Customer]
+      summary: List shortlisted offerings for a task
+      description: >
+        Returns the ranked offering shortlist for the given task. Each item
+        includes vendor details, price, quality tier, score, and whether
+        it has been selected.
+      responses:
+        '200':
+          description: Task offerings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskOfferingListResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /customers/events/{eventId}/tasks/{taskId}/offerings/{offeringId}/select:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/TaskId'
+      - name: offeringId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+    post:
+      tags: [Customer]
+      summary: Select an offering for a task
+      description: >
+        Marks the given offering as selected for the task. Clears any
+        previously selected offering for the same task.
+      responses:
+        '200':
+          description: Selected offering
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskOffering'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Task is locked and cannot have its offering changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ─── Customer — Recommendations & Packages ─────────────────────────────────
+
   /customers/events/{eventId}/recommendations:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Generate recommendation packages (UC-14)
-      description: Generates 3 packages (BUDGET/RECOMMENDED/HIGH_QUALITY) and stores
-        shortlist per task.
+      description: Generates 3 packages (BUDGET/RECOMMENDED/HIGH_QUALITY) and stores shortlist per task.
       responses:
         '201':
           description: Packages generated
@@ -1645,13 +2017,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenerateRecommendationsResponse'
+
   /customers/events/{eventId}/tasks/{taskId}/recommendations:
     parameters:
-    - $ref: '#/components/parameters/EventId'
-    - $ref: '#/components/parameters/TaskId'
+      - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/TaskId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Get shortlisted offerings for a task (UC-16)
       responses:
         '200':
@@ -1660,12 +2032,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskRecommendationListResponse'
+
   /customers/events/{eventId}/packages:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: List packages for event
       responses:
         '200':
@@ -1675,8 +2047,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PackageListResponse'
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Create custom package (UC-16)
       requestBody:
         required: true
@@ -1691,13 +2062,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PackageDetailsResponse'
+
   /customers/events/{eventId}/packages/{packageId}:
     parameters:
-    - $ref: '#/components/parameters/EventId'
-    - $ref: '#/components/parameters/PackageId'
+      - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/PackageId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Get package details (UC-15)
       responses:
         '200':
@@ -1709,8 +2080,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     put:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Update custom package (UC-16)
       requestBody:
         required: true
@@ -1726,8 +2096,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PackageDetailsResponse'
     delete:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Delete custom package (UC-16)
       responses:
         '204':
@@ -1736,26 +2105,25 @@ paths:
           $ref: '#/components/responses/NotFound'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /customers/events/{eventId}/packages/{packageId}/confirm:
     parameters:
-    - $ref: '#/components/parameters/EventId'
-    - $ref: '#/components/parameters/PackageId'
+      - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/PackageId'
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Confirm package -> create Package Order (UC-17)
-      description: 'Creates a Package Order (idempotent per eventId+packageId), sets
-        included tasks to PENDING + locks selection, and creates vendor-facing Fulfillment
-        Requests.
-
-        '
+      description: >
+        Creates a Package Order (idempotent per eventId+packageId), sets
+        included tasks to PENDING + locks selection, and creates vendor-facing
+        Fulfillment Requests.
       parameters:
-      - name: Idempotency-Key
-        in: header
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: Package order created or reused (idempotent)
@@ -1765,16 +2133,16 @@ paths:
                 $ref: '#/components/schemas/ConfirmPackageOrderResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /customers/events/{eventId}/package-orders:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: List package orders for an event (UC-18)
       parameters:
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
           description: Package orders
@@ -1782,14 +2150,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedPackageOrders'
+
   /customers/package-orders:
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: List all package orders for current customer (optional)
       parameters:
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
           description: Package orders
@@ -1797,12 +2165,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedPackageOrders'
+
   /customers/package-orders/{packageOrderId}:
     parameters:
-    - $ref: '#/components/parameters/PackageOrderId'
+      - $ref: '#/components/parameters/PackageOrderId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Get package order detail (optional)
       responses:
         '200':
@@ -1813,370 +2181,36 @@ paths:
                 $ref: '#/components/schemas/PackageOrderDetailsResponse'
         '404':
           $ref: '#/components/responses/NotFound'
-  /vendors/offerings:
-    get:
-      tags:
-      - Vendor
-      summary: List vendor offerings
-      responses:
-        '200':
-          description: Offerings
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OfferingListResponse'
-    post:
-      tags:
-      - Vendor
-      summary: Create offering
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OfferingCreateRequest'
-      responses:
-        '201':
-          description: Created offering
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Offering'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-  /vendors/offerings/{id}:
+
+  /customers/package-orders/{packageOrderId}/cancel:
     parameters:
-    - $ref: '#/components/parameters/OfferingId'
-    get:
-      tags:
-      - Vendor
-      summary: Get offering details
-      responses:
-        '200':
-          description: Offering
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Offering'
-        '404':
-          $ref: '#/components/responses/NotFound'
+      - $ref: '#/components/parameters/PackageOrderId'
     put:
-      tags:
-      - Vendor
-      summary: Update offering
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OfferingUpdateRequest'
+      tags: [Customer]
+      summary: Cancel package order (optional)
       responses:
         '200':
-          description: Updated offering
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Offering'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-    delete:
-      tags:
-      - Vendor
-      summary: Deactivate offering (soft delete)
-      responses:
-        '204':
-          description: Deactivated
-  /vendors/fulfillment-requests:
-    get:
-      tags:
-      - Vendor
-      summary: List fulfillment requests (vendor inbox) (UC-20)
-      parameters:
-      - name: status
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/FulfillmentRequestStatus'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
-      responses:
-        '200':
-          description: Fulfillment requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedFulfillmentRequests'
-  /vendors/fulfillment-requests/{fulfillmentRequestId}/response:
-    parameters:
-    - $ref: '#/components/parameters/FulfillmentRequestId'
-    post:
-      tags:
-      - Vendor
-      summary: Respond to fulfillment request (accept/reject) (UC-20)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RespondFulfillmentRequestRequest'
-      responses:
-        '200':
-          description: Response recorded; task status updated as appropriate
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RespondFulfillmentRequestResponse'
-  /vendors/tasks:
-    get:
-      tags:
-      - Vendor
-      summary: List vendor tasks (Assigned/In Progress/Done) (UC-19)
-      parameters:
-      - name: status
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/TaskStatus'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
-      responses:
-        '200':
-          description: Vendor tasks
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedTasks'
-  /vendors/tasks/{taskId}:
-    parameters:
-    - $ref: '#/components/parameters/TaskId'
-    get:
-      tags:
-      - Vendor
-      summary: Get vendor task
-      responses:
-        '200':
-          description: Task
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Task'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    put:
-      tags:
-      - Vendor
-      summary: Update vendor task progress (ASSIGNED -> IN_PROGRESS -> DONE)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VendorTaskUpdateRequest'
-      responses:
-        '200':
-          description: Updated task
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Task'
-  /admin/dashboard:
-    get:
-      tags:
-      - Admin
-      summary: Admin dashboard summary
-      responses:
-        '200':
-          description: Summary metrics
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminDashboardResponse'
-  /admin/package-orders:
-    get:
-      tags:
-      - Admin
-      summary: List package orders (UC-28)
-      parameters:
-      - name: status
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/PackageOrderStatus'
-      - name: eventId
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/UUID'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
-      responses:
-        '200':
-          description: Package orders
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedPackageOrders'
-  /admin/package-orders/{packageOrderId}:
-    parameters:
-    - $ref: '#/components/parameters/PackageOrderId'
-    get:
-      tags:
-      - Admin
-      summary: Get package order detail (UC-28)
-      responses:
-        '200':
-          description: Package order detail
+          description: Package order cancelled
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PackageOrderDetailsResponse'
         '404':
           $ref: '#/components/responses/NotFound'
-  /admin/tasks:
-    get:
-      tags:
-      - Admin
-      summary: List tasks (UC-28)
-      parameters:
-      - name: status
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/TaskStatus'
-      - name: eventId
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/UUID'
-      - name: vendorId
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/UUID'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
-      responses:
-        '200':
-          description: Tasks
+        '409':
+          description: Cannot cancel in current status
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedTasks'
-  /admin/tasks/{taskId}:
-    parameters:
-    - $ref: '#/components/parameters/TaskId'
-    get:
-      tags:
-      - Admin
-      summary: Get task details (UC-28)
-      responses:
-        '200':
-          description: Task
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Task'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    patch:
-      tags:
-      - Admin
-      summary: Admin support action on a task (UC-28)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AdminTaskSupportActionRequest'
-      responses:
-        '200':
-          description: Updated task
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Task'
-  /admin/tasks/{taskId}/fulfillment-requests:
-    parameters:
-    - $ref: '#/components/parameters/TaskId'
-    get:
-      tags:
-      - Admin
-      summary: Fulfillment request attempt history for a task (UC-28)
-      responses:
-        '200':
-          description: Fulfillment requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedFulfillmentRequests'
-  /event-types:
-    get:
-      tags:
-      - Metadata
-      summary: List event types
-      responses:
-        '200':
-          description: Event types
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StringListResponse'
-  /event-templates:
-    get:
-      tags:
-      - Metadata
-      summary: List event templates (quick start)
-      responses:
-        '200':
-          description: Templates
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StringListResponse'
-  /offering-categories:
-    get:
-      tags:
-      - Metadata
-      summary: List offering categories
-      responses:
-        '200':
-          description: Categories
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StringListResponse'
-  /health:
-    get:
-      tags:
-      - System & Ops
-      summary: Health check
-      security: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MessageResponse'
-  /version:
-    get:
-      tags:
-      - System & Ops
-      summary: Build/version info
-      security: []
-      responses:
-        '200':
-          description: Version
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VersionResponse'
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ─── Customer — Schedule, Reminders, Occurrences, Calendar ────────────────
+
   /customers/events/{eventId}/schedule:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Get event schedule (UC-13)
       responses:
         '200':
@@ -2188,8 +2222,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     put:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Upsert event schedule (recurrence/timezone/all-day) (UC-13)
       requestBody:
         required: true
@@ -2208,12 +2241,12 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /customers/events/{eventId}/reminders:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Get event reminders configuration (UC-13)
       responses:
         '200':
@@ -2225,8 +2258,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     put:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Upsert event reminders (offsets + channels) (UC-13)
       requestBody:
         required: true
@@ -2245,22 +2277,22 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /customers/events/{eventId}/occurrences:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: List upcoming occurrences for a recurring event (UC-13)
       parameters:
-      - name: from
-        in: query
-        required: false
-        schema:
-          $ref: '#/components/schemas/ISODateTime'
-        description: Return occurrences starting from this datetime (inclusive)
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
+        - name: from
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ISODateTime'
+          description: Return occurrences starting from this datetime (inclusive)
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
           description: Occurrences
@@ -2270,12 +2302,12 @@ paths:
                 $ref: '#/components/schemas/PaginatedEventOccurrences'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /customers/events/{eventId}/calendar-sync:
     parameters:
-    - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Get per-event external calendar sync status (UC-13)
       responses:
         '200':
@@ -2287,8 +2319,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     put:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Enable/disable per-event external calendar sync (UC-13)
       requestBody:
         required: true
@@ -2307,10 +2338,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /customers/calendar/providers:
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: List supported external calendar providers (UC-13)
       responses:
         '200':
@@ -2319,10 +2350,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CalendarProviderListResponse'
+
   /customers/calendar/connect:
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Start calendar OAuth connect (UC-13)
       requestBody:
         required: true
@@ -2339,10 +2370,10 @@ paths:
                 $ref: '#/components/schemas/CalendarConnectResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /customers/calendar/exchange-code:
     post:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Exchange OAuth code and link calendar provider (UC-13)
       requestBody:
         required: true
@@ -2359,10 +2390,10 @@ paths:
                 $ref: '#/components/schemas/CalendarConnectionStatus'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /customers/calendar/status:
     get:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Get calendar connection status (UC-13)
       responses:
         '200':
@@ -2371,74 +2402,114 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CalendarConnectionStatus'
+
   /customers/calendar/disconnect:
     delete:
-      tags:
-      - Customer
+      tags: [Customer]
       summary: Disconnect external calendar provider (UC-13)
       responses:
         '204':
           description: Disconnected
-  /customers/inquiries/{inquiryId}:
-    parameters:
-    - $ref: '#/components/parameters/InquiryId'
+
+  # ─── Vendor — Offerings ────────────────────────────────────────────────────
+
+  /vendors/offerings:
     get:
-      tags:
-      - Support & Inquiries
-      summary: Get customer inquiry (UC-30)
+      tags: [Vendor]
+      summary: List vendor offerings
       responses:
         '200':
-          description: Inquiry
+          description: Offerings
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Inquiry'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /vendors/inquiries/{inquiryId}:
-    parameters:
-    - $ref: '#/components/parameters/InquiryId'
-    get:
-      tags:
-      - Support & Inquiries
-      summary: Get vendor inquiry (UC-30)
+                $ref: '#/components/schemas/OfferingListResponse'
+    post:
+      tags: [Vendor]
+      summary: Create offering
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OfferingCreateRequest'
       responses:
-        '200':
-          description: Inquiry
+        '201':
+          description: Created offering
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Inquiry'
+                $ref: '#/components/schemas/Offering'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /vendors/offerings/{id}:
+    parameters:
+      - $ref: '#/components/parameters/OfferingId'
+    get:
+      tags: [Vendor]
+      summary: Get offering details
+      responses:
+        '200':
+          description: Offering
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offering'
         '404':
           $ref: '#/components/responses/NotFound'
-  /customers/package-orders/{packageOrderId}/cancel:
-    parameters:
-    - $ref: '#/components/parameters/PackageOrderId'
     put:
-      tags:
-      - Customer
-      summary: Cancel package order (optional)
+      tags: [Vendor]
+      summary: Update offering
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OfferingUpdateRequest'
       responses:
         '200':
-          description: Package order cancelled
+          description: Updated offering
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PackageOrderDetailsResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Cannot cancel in current status
+                $ref: '#/components/schemas/Offering'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    delete:
+      tags: [Vendor]
+      summary: Deactivate offering (soft delete)
+      responses:
+        '204':
+          description: Deactivated
+
+  # ─── Vendor — Fulfillment Requests ────────────────────────────────────────
+
+  /vendors/fulfillment-requests:
+    get:
+      tags: [Vendor]
+      summary: List fulfillment requests (vendor inbox) (UC-20)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/FulfillmentRequestStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Fulfillment requests
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PaginatedFulfillmentRequests'
+
   /vendors/fulfillment-requests/{fulfillmentRequestId}:
     parameters:
-    - $ref: '#/components/parameters/FulfillmentRequestId'
+      - $ref: '#/components/parameters/FulfillmentRequestId'
     get:
-      tags:
-      - Vendor
+      tags: [Vendor]
       summary: Get fulfillment request detail (UC-20)
       responses:
         '200':
@@ -2449,12 +2520,176 @@ paths:
                 $ref: '#/components/schemas/FulfillmentRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /vendors/fulfillment-requests/{fulfillmentRequestId}/response:
+    parameters:
+      - $ref: '#/components/parameters/FulfillmentRequestId'
+    post:
+      tags: [Vendor]
+      summary: Respond to fulfillment request (accept/reject) (UC-20)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RespondFulfillmentRequestRequest'
+      responses:
+        '200':
+          description: Response recorded; task status updated as appropriate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespondFulfillmentRequestResponse'
+
+  # ─── Vendor — Tasks ────────────────────────────────────────────────────────
+
+  /vendors/tasks:
+    get:
+      tags: [Vendor]
+      summary: List vendor tasks (Assigned/In Progress/Done) (UC-19)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TaskStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Vendor tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTasks'
+
+  # NEW (1.1.4)
+  /vendors/tasks/stats/dashboard:
+    get:
+      tags: [Vendor]
+      summary: Vendor task dashboard statistics
+      description: >
+        Returns quick counts and urgent items for the vendor dashboard.
+        Includes totals per status bucket and any tasks nearing expiry.
+      responses:
+        '200':
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorTaskDashboardStats'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /vendors/tasks/{taskId}:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [Vendor]
+      summary: Get vendor task
+      responses:
+        '200':
+          description: Task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Vendor]
+      summary: Update vendor task progress (ASSIGNED -> IN_PROGRESS -> DONE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendorTaskUpdateRequest'
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+  # ─── Metadata ──────────────────────────────────────────────────────────────
+
+  /event-types:
+    get:
+      tags: [Metadata]
+      summary: List event types
+      responses:
+        '200':
+          description: Event types
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringListResponse'
+
+  /event-templates:
+    get:
+      tags: [Metadata]
+      summary: List event templates (quick start)
+      responses:
+        '200':
+          description: Templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringListResponse'
+
+  /offering-categories:
+    get:
+      tags: [Metadata]
+      summary: List offering categories
+      responses:
+        '200':
+          description: Categories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringListResponse'
+
+  # ─── System & Ops ──────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      tags: [System & Ops]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  /version:
+    get:
+      tags: [System & Ops]
+      summary: Build/version info
+      security: []
+      responses:
+        '200':
+          description: Version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+
+# ─── Components ────────────────────────────────────────────────────────────────
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
   parameters:
     Limit:
       name: limit
@@ -2537,6 +2772,7 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/UUID'
+
   responses:
     BadRequest:
       description: Bad request / validation error
@@ -2562,23 +2798,23 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+
   schemas:
     UUID:
       type: string
       format: uuid
+
     ISODateTime:
       type: string
       format: date-time
+
     ErrorResponse:
       type: object
-      required:
-      - error
+      required: [error]
       properties:
         error:
           type: object
-          required:
-          - code
-          - message
+          required: [code, message]
           properties:
             code:
               type: string
@@ -2593,17 +2829,17 @@ components:
                     type: string
                   issue:
                     type: string
+
     MessageResponse:
       type: object
-      required:
-      - message
+      required: [message]
       properties:
         message:
           type: string
+
     VersionResponse:
       type: object
-      required:
-      - version
+      required: [version]
       properties:
         version:
           type: string
@@ -2611,96 +2847,82 @@ components:
           type: string
         builtAt:
           $ref: '#/components/schemas/ISODateTime'
+
+    # ── Enums ────────────────────────────────────────────────────────────────
+
     UserRole:
       type: string
-      enum:
-      - CUSTOMER
-      - VENDOR
-      - ADMIN
+      enum: [CUSTOMER, VENDOR, ADMIN]
+
     AccountStatus:
       type: string
-      enum:
-      - ACTIVE
-      - PENDING
-      - SUSPENDED
-      - DISABLED
+      enum: [ACTIVE, PENDING, SUSPENDED, DISABLED]
+
     VendorApprovalStatus:
       type: string
-      enum:
-      - PENDING
-      - APPROVED
-      - REJECTED
+      enum: [PENDING, APPROVED, REJECTED]
+
     OrganizationStatus:
       type: string
-      enum:
-      - ACTIVE
-      - INACTIVE
+      enum: [ACTIVE, INACTIVE]
+
     EventStatus:
       type: string
-      enum:
-      - DRAFT
-      - ACTIVE
+      enum: [DRAFT, ACTIVE]
+
     TaskStatus:
       type: string
-      enum:
-      - DRAFT
-      - PENDING
-      - ASSIGNED
-      - IN_PROGRESS
-      - DONE
-      - REJECTED
-      - EXPIRED
+      enum: [DRAFT, PENDING, ASSIGNED, IN_PROGRESS, DONE, REJECTED, EXPIRED]
+
     PackageType:
       type: string
-      enum:
-      - BUDGET
-      - RECOMMENDED
-      - HIGH_QUALITY
-      - CUSTOM
+      enum: [BUDGET, RECOMMENDED, HIGH_QUALITY, CUSTOM]
+
     PackageOrderStatus:
       type: string
-      enum:
-      - CREATED
-      - COMPLETED
-      - CANCELLED_ADMIN
+      enum: [CREATED, COMPLETED, CANCELLED_ADMIN]
+
     FulfillmentRequestStatus:
       type: string
-      enum:
-      - SENT
-      - ACCEPTED
-      - REJECTED
-      - EXPIRED
+      enum: [SENT, ACCEPTED, REJECTED, EXPIRED]
+
     ChatSender:
       type: string
-      enum:
-      - CUSTOMER
-      - AI
+      enum: [CUSTOMER, AI]
+
     SupportActionType:
       type: string
-      enum:
-      - NOTE_ONLY
-      - REASSIGN_VENDOR
-      - UNASSIGN_VENDOR
-      - UNLOCK_EDITING
-      - EXTEND_EXPIRY
-      - OVERRIDE_STATUS
-      - ESCALATE
+      enum: [NOTE_ONLY, REASSIGN_VENDOR, UNASSIGN_VENDOR, UNLOCK_EDITING, EXTEND_EXPIRY, OVERRIDE_STATUS, ESCALATE]
+
     InquiryCreatorRole:
       type: string
-      enum:
-      - CUSTOMER
-      - VENDOR
+      enum: [CUSTOMER, VENDOR]
+
     InquiryStatus:
       type: string
-      enum:
-      - OPEN
-      - IN_PROGRESS
-      - RESOLVED
+      enum: [OPEN, IN_PROGRESS, RESOLVED]
+
+    ReminderChannel:
+      type: string
+      enum: [PUSH, EMAIL, IN_APP]
+
+    CalendarProviderType:
+      type: string
+      enum: [GOOGLE, MICROSOFT]
+
+    CalendarSyncState:
+      type: string
+      enum: [DISABLED, ENABLED]
+
+    CalendarSyncLastStatus:
+      type: string
+      enum: [SUCCESS, FAILED, PENDING]
+
+    # ── Auth request/response ────────────────────────────────────────────────
+
     AdminOTPVerifyRequest:
       type: object
-      required:
-      - email
-      - otp
+      required: [email, otp]
       properties:
         email:
           type: string
@@ -2709,11 +2931,10 @@ components:
           type: string
           minLength: 6
           maxLength: 6
+
     LoginRequest:
       type: object
-      required:
-      - email
-      - password
+      required: [email, password]
       properties:
         email:
           type: string
@@ -2721,19 +2942,17 @@ components:
         password:
           type: string
           minLength: 8
+
     RefreshTokenRequest:
       type: object
-      required:
-      - refreshToken
+      required: [refreshToken]
       properties:
         refreshToken:
           type: string
+
     CustomerRegisterRequest:
       type: object
-      required:
-      - fullName
-      - email
-      - password
+      required: [fullName, email, password]
       properties:
         fullName:
           type: string
@@ -2747,12 +2966,10 @@ components:
           type: string
         locale:
           type: string
+
     VendorRegisterRequest:
       type: object
-      required:
-      - email
-      - password
-      - displayName
+      required: [email, password, displayName]
       properties:
         email:
           type: string
@@ -2776,67 +2993,73 @@ components:
             kymDetails:
               type: object
               additionalProperties: true
+
     ResendVerificationRequest:
       type: object
-      required:
-      - email
+      required: [email]
       properties:
         email:
           type: string
           format: email
+
     ForgotPasswordRequest:
       type: object
-      required:
-      - email
+      required: [email]
       properties:
         email:
           type: string
           format: email
+
     PasswordResetOtpVerifyRequest:
       type: object
-      required:
-      - email
-      - otp
+      required: [email, otp]
       properties:
         email:
           type: string
           format: email
         otp:
           type: string
+
     PasswordResetOtpVerificationResponse:
       type: object
-      required:
-      - message
-      - resetToken
+      required: [message, resetToken]
       properties:
         message:
           type: string
         resetToken:
           type: string
+
     ResetPasswordRequest:
       type: object
-      required:
-      - resetToken
-      - newPassword
+      required: [resetToken, newPassword]
       properties:
         resetToken:
           type: string
         newPassword:
           type: string
           minLength: 8
+
+    PasswordChangeRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          minLength: 8
+        newPassword:
+          type: string
+          minLength: 8
+
     RegisterResponse:
       type: object
-      required:
-      - message
+      required: [message]
       properties:
         message:
           type: string
+
     AuthResponse:
       type: object
-      required:
-      - accessToken
-      - refreshToken
-      - user
+      required: [accessToken, refreshToken, user]
       properties:
         accessToken:
           type: string
@@ -2844,11 +3067,7 @@ components:
           type: string
         user:
           type: object
-          required:
-          - userId
-          - role
-          - status
-          - email
+          required: [userId, role, status, email]
           properties:
             userId:
               $ref: '#/components/schemas/UUID'
@@ -2859,13 +3078,12 @@ components:
               $ref: '#/components/schemas/UserRole'
             status:
               $ref: '#/components/schemas/AccountStatus'
+
+    # ── Profiles ─────────────────────────────────────────────────────────────
+
     CustomerProfile:
       type: object
-      required:
-      - customerId
-      - email
-      - fullName
-      - status
+      required: [customerId, email, fullName, status]
       properties:
         customerId:
           $ref: '#/components/schemas/UUID'
@@ -2880,6 +3098,7 @@ components:
           type: string
         status:
           $ref: '#/components/schemas/AccountStatus'
+
     CustomerProfileUpdateRequest:
       type: object
       properties:
@@ -2889,13 +3108,10 @@ components:
           type: string
         locale:
           type: string
+
     VendorProfile:
       type: object
-      required:
-      - vendorId
-      - email
-      - displayName
-      - approvalStatus
+      required: [vendorId, email, displayName, approvalStatus]
       properties:
         vendorId:
           $ref: '#/components/schemas/UUID'
@@ -2912,6 +3128,7 @@ components:
           $ref: '#/components/schemas/UUID'
         approvedAt:
           $ref: '#/components/schemas/ISODateTime'
+
     VendorProfileUpdateRequest:
       type: object
       properties:
@@ -2919,12 +3136,10 @@ components:
           type: string
         contactPhone:
           type: string
+
     AdminProfile:
       type: object
-      required:
-      - adminId
-      - email
-      - role
+      required: [adminId, email, role]
       properties:
         adminId:
           $ref: '#/components/schemas/UUID'
@@ -2935,15 +3150,12 @@ components:
           $ref: '#/components/schemas/UserRole'
         staffRole:
           type: string
+
+    # ── Organization ──────────────────────────────────────────────────────────
+
     Organization:
       type: object
-      required:
-      - orgId
-      - name
-      - code
-      - status
-      - createdAt
-      - updatedAt
+      required: [orgId, name, code, status, createdAt, updatedAt]
       properties:
         orgId:
           $ref: '#/components/schemas/UUID'
@@ -2961,10 +3173,10 @@ components:
           $ref: '#/components/schemas/ISODateTime'
         updatedAt:
           $ref: '#/components/schemas/ISODateTime'
+
     PaginatedOrganizations:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
@@ -2972,14 +3184,19 @@ components:
             $ref: '#/components/schemas/Organization'
         nextCursor:
           type: string
+
+    OrganizationStatusUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrganizationStatus'
+
+    # ── Vendor admin ──────────────────────────────────────────────────────────
+
     VendorAdminView:
       type: object
-      required:
-      - vendorId
-      - email
-      - displayName
-      - approvalStatus
-      - status
+      required: [vendorId, email, displayName, approvalStatus, status]
       properties:
         vendorId:
           $ref: '#/components/schemas/UUID'
@@ -3000,10 +3217,10 @@ components:
           $ref: '#/components/schemas/Organization'
         status:
           $ref: '#/components/schemas/AccountStatus'
+
     PaginatedVendors:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
@@ -3011,18 +3228,20 @@ components:
             $ref: '#/components/schemas/VendorAdminView'
         nextCursor:
           type: string
+
     VendorStatusUpdateRequest:
       type: object
-      required:
-      - status
+      required: [status]
       properties:
         status:
           $ref: '#/components/schemas/AccountStatus'
+
     VendorRejectRequest:
       type: object
       properties:
         reason:
           type: string
+
     VendorPendingStatsResponse:
       type: object
       properties:
@@ -3032,12 +3251,12 @@ components:
         pendingOrganizations:
           type: integer
           description: Number of organizations awaiting admin approval
+
+    # ── Vendor packages ───────────────────────────────────────────────────────
+
     VendorPackage:
       type: object
-      required:
-      - id
-      - vendorId
-      - name
+      required: [id, vendorId, name]
       properties:
         id:
           type: integer
@@ -3068,10 +3287,10 @@ components:
             format: date
         isActive:
           type: boolean
+
     VendorPackageCreateRequest:
       type: object
-      required:
-      - name
+      required: [name]
       properties:
         name:
           type: string
@@ -3099,6 +3318,7 @@ components:
         isActive:
           type: boolean
           default: true
+
     VendorPackageUpdateRequest:
       type: object
       properties:
@@ -3127,22 +3347,52 @@ components:
             format: date
         isActive:
           type: boolean
+
     VendorPackageListResponse:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/VendorPackage'
+
+    # NEW (1.1.4) — vendor task dashboard stats
+    VendorTaskDashboardStats:
+      type: object
+      properties:
+        pendingResponse:
+          type: integer
+          description: Tasks awaiting accept/reject decision
+        assigned:
+          type: integer
+          description: Tasks currently in progress
+        completed:
+          type: integer
+          description: Tasks marked as done
+        rejectedOrExpired:
+          type: integer
+          description: Tasks that were rejected or expired
+        urgentItems:
+          type: array
+          description: Tasks nearing expiry or requiring immediate action
+          items:
+            type: object
+            properties:
+              taskId:
+                $ref: '#/components/schemas/UUID'
+              name:
+                type: string
+              expiresAt:
+                $ref: '#/components/schemas/ISODateTime'
+              status:
+                $ref: '#/components/schemas/TaskStatus'
+
+    # ── Customer admin ────────────────────────────────────────────────────────
+
     CustomerAdminView:
       type: object
-      required:
-      - customerId
-      - email
-      - fullName
-      - status
+      required: [customerId, email, fullName, status]
       properties:
         customerId:
           $ref: '#/components/schemas/UUID'
@@ -3157,10 +3407,10 @@ components:
           type: string
         status:
           $ref: '#/components/schemas/AccountStatus'
+
     PaginatedCustomers:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
@@ -3168,29 +3418,52 @@ components:
             $ref: '#/components/schemas/CustomerAdminView'
         nextCursor:
           type: string
+
     CustomerStatusUpdateRequest:
       type: object
-      required:
-      - status
+      required: [status]
       properties:
         status:
           $ref: '#/components/schemas/AccountStatus'
-    OrganizationStatusUpdateRequest:
+
+    # ── Notifications (NEW 1.1.4) ─────────────────────────────────────────────
+
+    NotificationResponse:
       type: object
-      required:
-      - status
       properties:
+        notificationId:
+          $ref: '#/components/schemas/UUID'
+        userId:
+          $ref: '#/components/schemas/UUID'
+        eventId:
+          $ref: '#/components/schemas/UUID'
+        taskId:
+          $ref: '#/components/schemas/UUID'
+        type:
+          type: string
         status:
-          $ref: '#/components/schemas/OrganizationStatus'
+          type: string
+        message:
+          type: string
+        createdAt:
+          $ref: '#/components/schemas/ISODateTime'
+
+    PaginatedNotificationsResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationResponse'
+        nextCursor:
+          type: string
+
+    # ── Persona ───────────────────────────────────────────────────────────────
+
     Persona:
       type: object
-      required:
-      - personaId
-      - customerId
-      - name
-      - isConfirmed
-      - createdAt
-      - updatedAt
+      required: [personaId, customerId, name, isConfirmed, createdAt, updatedAt]
       properties:
         personaId:
           $ref: '#/components/schemas/UUID'
@@ -3226,10 +3499,10 @@ components:
           $ref: '#/components/schemas/ISODateTime'
         updatedAt:
           $ref: '#/components/schemas/ISODateTime'
+
     PersonaCreateRequest:
       type: object
-      required:
-      - name
+      required: [name]
       properties:
         name:
           type: string
@@ -3253,6 +3526,7 @@ components:
           type: array
           items:
             type: string
+
     PersonaUpdateRequest:
       type: object
       properties:
@@ -3278,27 +3552,12 @@ components:
           type: array
           items:
             type: string
-    PaginatedPersonas:
-      type: object
-      required:
-      - items
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/Persona'
-        nextCursor:
-          type: string
+
+    # ── Event ─────────────────────────────────────────────────────────────────
+
     Event:
       type: object
-      required:
-      - eventId
-      - customerId
-      - eventType
-      - title
-      - status
-      - createdAt
-      - updatedAt
+      required: [eventId, customerId, eventType, title, status, createdAt, updatedAt]
       properties:
         eventId:
           $ref: '#/components/schemas/UUID'
@@ -3328,11 +3587,10 @@ components:
           $ref: '#/components/schemas/ISODateTime'
         updatedAt:
           $ref: '#/components/schemas/ISODateTime'
+
     EventCreateRequest:
       type: object
-      required:
-      - eventType
-      - title
+      required: [eventType, title]
       properties:
         eventType:
           type: string
@@ -3343,29 +3601,28 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UUID'
+
     EventCreateResponse:
       type: object
-      required:
-      - eventId
-      - status
+      required: [eventId, status]
       properties:
         eventId:
           $ref: '#/components/schemas/UUID'
         status:
           $ref: '#/components/schemas/EventStatus'
+
     SetEventPersonasRequest:
       type: object
-      required:
-      - personaIds
+      required: [personaIds]
       properties:
         personaIds:
           type: array
           items:
             $ref: '#/components/schemas/UUID'
+
     PaginatedEvents:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
@@ -3373,13 +3630,12 @@ components:
             $ref: '#/components/schemas/Event'
         nextCursor:
           type: string
+
+    # ── Chat ──────────────────────────────────────────────────────────────────
+
     ChatMessage:
       type: object
-      required:
-      - messageId
-      - sender
-      - content
-      - sentAt
+      required: [messageId, sender, content, sentAt]
       properties:
         messageId:
           $ref: '#/components/schemas/UUID'
@@ -3389,10 +3645,10 @@ components:
           type: string
         sentAt:
           $ref: '#/components/schemas/ISODateTime'
+
     PaginatedChatMessages:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
@@ -3400,18 +3656,18 @@ components:
             $ref: '#/components/schemas/ChatMessage'
         nextCursor:
           type: string
+
     ChatSendRequest:
       type: object
-      required:
-      - content
+      required: [content]
       properties:
         content:
           type: string
           minLength: 1
+
     SuggestedTaskDraft:
       type: object
-      required:
-      - name
+      required: [name]
       properties:
         name:
           type: string
@@ -3428,10 +3684,10 @@ components:
         currency:
           type: string
           default: LKR
+
     ChatSendResponse:
       type: object
-      required:
-      - reply
+      required: [reply]
       properties:
         reply:
           type: string
@@ -3439,23 +3695,19 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SuggestedTaskDraft'
+
     EventSummaryResponse:
       type: object
-      required:
-      - summary
+      required: [summary]
       properties:
         summary:
           type: string
+
+    # ── Task ──────────────────────────────────────────────────────────────────
+
     Task:
       type: object
-      required:
-      - taskId
-      - eventId
-      - name
-      - status
-      - currency
-      - createdAt
-      - updatedAt
+      required: [taskId, eventId, name, status, currency, createdAt, updatedAt]
       properties:
         taskId:
           $ref: '#/components/schemas/UUID'
@@ -3499,10 +3751,10 @@ components:
           $ref: '#/components/schemas/ISODateTime'
         updatedAt:
           $ref: '#/components/schemas/ISODateTime'
+
     TaskCreateRequest:
       type: object
-      required:
-      - name
+      required: [name]
       properties:
         name:
           type: string
@@ -3519,6 +3771,7 @@ components:
         currency:
           type: string
           default: LKR
+
     TaskUpdateRequest:
       type: object
       properties:
@@ -3535,19 +3788,19 @@ components:
           type: number
         currency:
           type: string
+
     TaskListResponse:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/Task'
+
     PaginatedTasks:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
@@ -3555,6 +3808,7 @@ components:
             $ref: '#/components/schemas/Task'
         nextCursor:
           type: string
+
     ConfirmTasksRequest:
       type: object
       properties:
@@ -3562,11 +3816,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UUID'
+
     ConfirmTasksResponse:
       type: object
-      required:
-      - event
-      - tasks
+      required: [event, tasks]
       properties:
         event:
           $ref: '#/components/schemas/Event'
@@ -3574,30 +3827,68 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Task'
+
     VendorTaskUpdateRequest:
       type: object
-      required:
-      - status
+      required: [status]
       properties:
         status:
           type: string
-          enum:
-          - IN_PROGRESS
-          - DONE
+          enum: [IN_PROGRESS, DONE]
         note:
           type: string
+
+    # ── Task Offerings (NEW 1.1.4) ────────────────────────────────────────────
+
+    TaskOffering:
+      type: object
+      required: [offeringId, name, category, price, currency, vendorId, rank, isSelected]
+      properties:
+        offeringId:
+          $ref: '#/components/schemas/UUID'
+        name:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        currency:
+          type: string
+        unit:
+          type: string
+        qualityTier:
+          type: string
+        vendorId:
+          $ref: '#/components/schemas/UUID'
+        vendorName:
+          type: string
+        rank:
+          type: integer
+          description: Position in the shortlist (1 = best match)
+        score:
+          type: number
+          description: Recommendation score
+        isSelected:
+          type: boolean
+        selectedAt:
+          $ref: '#/components/schemas/ISODateTime'
+
+    TaskOfferingListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskOffering'
+
+    # ── Offering ──────────────────────────────────────────────────────────────
+
     Offering:
       type: object
-      required:
-      - offeringId
-      - vendorId
-      - name
-      - category
-      - price
-      - currency
-      - isActive
-      - isAvailable
-      - updatedAt
+      required: [offeringId, vendorId, name, category, price, currency, isActive, isAvailable, updatedAt]
       properties:
         offeringId:
           $ref: '#/components/schemas/UUID'
@@ -3621,13 +3912,10 @@ components:
           type: boolean
         updatedAt:
           $ref: '#/components/schemas/ISODateTime'
+
     OfferingCreateRequest:
       type: object
-      required:
-      - name
-      - category
-      - price
-      - currency
+      required: [name, category, price, currency]
       properties:
         name:
           type: string
@@ -3648,6 +3936,7 @@ components:
         isAvailable:
           type: boolean
           default: true
+
     OfferingUpdateRequest:
       type: object
       properties:
@@ -3667,25 +3956,21 @@ components:
           type: boolean
         isAvailable:
           type: boolean
+
     OfferingListResponse:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/Offering'
+
+    # ── Recommendations & Packages ────────────────────────────────────────────
+
     TaskRecommendation:
       type: object
-      required:
-      - recommendationId
-      - eventId
-      - taskId
-      - offeringId
-      - score
-      - rank
-      - generatedAt
+      required: [recommendationId, eventId, taskId, offeringId, score, rank, generatedAt]
       properties:
         recommendationId:
           $ref: '#/components/schemas/UUID'
@@ -3701,25 +3986,19 @@ components:
           type: integer
         generatedAt:
           $ref: '#/components/schemas/ISODateTime'
+
     TaskRecommendationListResponse:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/TaskRecommendation'
+
     PackageItem:
       type: object
-      required:
-      - packageItemId
-      - packageId
-      - taskId
-      - offeringId
-      - quantity
-      - unitPrice
-      - lineTotal
+      required: [packageItemId, packageId, taskId, offeringId, quantity, unitPrice, lineTotal]
       properties:
         packageItemId:
           $ref: '#/components/schemas/UUID'
@@ -3736,16 +4015,10 @@ components:
           type: number
         lineTotal:
           type: number
+
     RecommendationPackage:
       type: object
-      required:
-      - packageId
-      - eventId
-      - packageType
-      - currency
-      - packageTotalPrice
-      - generatedAt
-      - updatedAt
+      required: [packageId, eventId, packageType, currency, packageTotalPrice, generatedAt, updatedAt]
       properties:
         packageId:
           $ref: '#/components/schemas/UUID'
@@ -3771,32 +4044,32 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PackageItem'
+
     PackageListResponse:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/RecommendationPackage'
+
     PackageDetailsResponse:
       allOf:
-      - $ref: '#/components/schemas/RecommendationPackage'
-      - type: object
-        required:
-        - allowedOfferingsByTask
-        properties:
-          allowedOfferingsByTask:
-            type: object
-            additionalProperties:
-              type: array
-              items:
-                $ref: '#/components/schemas/TaskRecommendation'
+        - $ref: '#/components/schemas/RecommendationPackage'
+        - type: object
+          required: [allowedOfferingsByTask]
+          properties:
+            allowedOfferingsByTask:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskRecommendation'
+
     CreateCustomPackageRequest:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         basePackageId:
           $ref: '#/components/schemas/UUID'
@@ -3804,29 +4077,25 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PackageItem'
+
     UpdateCustomPackageRequest:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/PackageItem'
+
     GenerateRecommendationsResponse:
       type: object
-      required:
-      - packages
+      required: [packages]
       properties:
         packages:
           type: array
           items:
             type: object
-            required:
-            - packageId
-            - packageType
-            - packageTotalPrice
-            - currency
+            required: [packageId, packageType, packageTotalPrice, currency]
             properties:
               packageId:
                 $ref: '#/components/schemas/UUID'
@@ -3836,17 +4105,12 @@ components:
                 type: number
               currency:
                 type: string
+
+    # ── Package Orders ────────────────────────────────────────────────────────
+
     PackageOrder:
       type: object
-      required:
-      - packageOrderId
-      - eventId
-      - packageId
-      - packageOrderTotalPrice
-      - currency
-      - status
-      - createdAt
-      - statusUpdatedAt
+      required: [packageOrderId, eventId, packageId, packageOrderTotalPrice, currency, status, createdAt, statusUpdatedAt]
       properties:
         packageOrderId:
           $ref: '#/components/schemas/UUID'
@@ -3869,18 +4133,49 @@ components:
         idempotencyKey:
           type: string
           format: uuid
+
+    PaginatedPackageOrders:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackageOrder'
+        nextCursor:
+          type: string
+
+    PackageOrderDetailsResponse:
+      type: object
+      required: [packageOrder, tasks]
+      properties:
+        packageOrder:
+          $ref: '#/components/schemas/PackageOrder'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+
+    ConfirmPackageOrderResponse:
+      type: object
+      required: [packageOrder, tasks, fulfillmentRequests]
+      properties:
+        packageOrder:
+          $ref: '#/components/schemas/PackageOrder'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        fulfillmentRequests:
+          type: array
+          items:
+            $ref: '#/components/schemas/FulfillmentRequest'
+
+    # ── Fulfillment Requests ──────────────────────────────────────────────────
+
     FulfillmentRequest:
       type: object
-      required:
-      - fulfillmentRequestId
-      - packageOrderId
-      - taskId
-      - vendorId
-      - offeringId
-      - status
-      - requestedAt
-      - respondBy
-      - attemptNo
+      required: [fulfillmentRequestId, packageOrderId, taskId, vendorId, offeringId, status, requestedAt, respondBy, attemptNo]
       properties:
         fulfillmentRequestId:
           $ref: '#/components/schemas/UUID'
@@ -3905,33 +4200,10 @@ components:
         attemptNo:
           type: integer
           minimum: 1
-    PaginatedPackageOrders:
-      type: object
-      required:
-      - items
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/PackageOrder'
-        nextCursor:
-          type: string
-    PackageOrderDetailsResponse:
-      type: object
-      required:
-      - packageOrder
-      - tasks
-      properties:
-        packageOrder:
-          $ref: '#/components/schemas/PackageOrder'
-        tasks:
-          type: array
-          items:
-            $ref: '#/components/schemas/Task'
+
     PaginatedFulfillmentRequests:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
@@ -3939,72 +4211,49 @@ components:
             $ref: '#/components/schemas/FulfillmentRequest'
         nextCursor:
           type: string
-    ConfirmPackageOrderResponse:
-      type: object
-      required:
-      - packageOrder
-      - tasks
-      - fulfillmentRequests
-      properties:
-        packageOrder:
-          $ref: '#/components/schemas/PackageOrder'
-        tasks:
-          type: array
-          items:
-            $ref: '#/components/schemas/Task'
-        fulfillmentRequests:
-          type: array
-          items:
-            $ref: '#/components/schemas/FulfillmentRequest'
+
     RespondFulfillmentRequestRequest:
       type: object
-      required:
-      - decision
+      required: [decision]
       properties:
         decision:
           type: string
-          enum:
-          - ACCEPT
-          - REJECT
+          enum: [ACCEPT, REJECT]
         responseNote:
           type: string
+
     RespondFulfillmentRequestResponse:
       type: object
-      required:
-      - fulfillmentRequest
-      - task
+      required: [fulfillmentRequest, task]
       properties:
         fulfillmentRequest:
           $ref: '#/components/schemas/FulfillmentRequest'
         task:
           $ref: '#/components/schemas/Task'
+
     ReassignTaskRequest:
       type: object
-      required:
-      - offeringId
+      required: [offeringId]
       properties:
         offeringId:
           $ref: '#/components/schemas/UUID'
         note:
           type: string
+
     ReassignTaskResponse:
       type: object
-      required:
-      - task
-      - fulfillmentRequest
+      required: [task, fulfillmentRequest]
       properties:
         task:
           $ref: '#/components/schemas/Task'
         fulfillmentRequest:
           $ref: '#/components/schemas/FulfillmentRequest'
+
+    # ── Internal Notes ────────────────────────────────────────────────────────
+
     InternalNote:
       type: object
-      required:
-      - noteId
-      - adminId
-      - actionType
-      - note
-      - createdAt
+      required: [noteId, adminId, actionType, note, createdAt]
       properties:
         noteId:
           $ref: '#/components/schemas/UUID'
@@ -4024,11 +4273,10 @@ components:
           type: string
         createdAt:
           $ref: '#/components/schemas/ISODateTime'
+
     InternalNoteCreateRequest:
       type: object
-      required:
-      - actionType
-      - note
+      required: [actionType, note]
       properties:
         packageOrderId:
           $ref: '#/components/schemas/UUID'
@@ -4042,10 +4290,10 @@ components:
           $ref: '#/components/schemas/SupportActionType'
         note:
           type: string
+
     PaginatedInternalNotes:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
@@ -4053,16 +4301,12 @@ components:
             $ref: '#/components/schemas/InternalNote'
         nextCursor:
           type: string
+
+    # ── Inquiries ─────────────────────────────────────────────────────────────
+
     Inquiry:
       type: object
-      required:
-      - inquiryId
-      - createdByUserId
-      - createdByRole
-      - message
-      - status
-      - createdAt
-      - updatedAt
+      required: [inquiryId, createdByUserId, createdByRole, message, status, createdAt, updatedAt]
       properties:
         inquiryId:
           $ref: '#/components/schemas/UUID'
@@ -4086,15 +4330,16 @@ components:
           $ref: '#/components/schemas/ISODateTime'
         resolvedAt:
           $ref: '#/components/schemas/ISODateTime'
+
     InquiryCreateRequest:
       type: object
-      required:
-      - message
+      required: [message]
       properties:
         subject:
           type: string
         message:
           type: string
+
     InquiryUpdateRequest:
       type: object
       properties:
@@ -4102,10 +4347,10 @@ components:
           $ref: '#/components/schemas/InquiryStatus'
         adminReply:
           type: string
+
     PaginatedInquiries:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
@@ -4113,19 +4358,16 @@ components:
             $ref: '#/components/schemas/Inquiry'
         nextCursor:
           type: string
+
+    # ── Admin task support ────────────────────────────────────────────────────
+
     AdminTaskSupportActionRequest:
       type: object
-      required:
-      - action
+      required: [action]
       properties:
         action:
           type: string
-          enum:
-          - UNASSIGN_VENDOR
-          - EXTEND_EXPIRY
-          - OVERRIDE_STATUS
-          - UNLOCK_EDITING
-          - REASSIGN_VENDOR
+          enum: [UNASSIGN_VENDOR, EXTEND_EXPIRY, OVERRIDE_STATUS, UNLOCK_EDITING, REASSIGN_VENDOR]
         assignedVendorId:
           $ref: '#/components/schemas/UUID'
         expiresAt:
@@ -4134,6 +4376,7 @@ components:
           $ref: '#/components/schemas/TaskStatus'
         note:
           type: string
+
     AdminDashboardResponse:
       type: object
       properties:
@@ -4147,55 +4390,23 @@ components:
           type: integer
         activePackageOrders:
           type: integer
+
+    # ── Misc ──────────────────────────────────────────────────────────────────
+
     StringListResponse:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
           items:
             type: string
-    PasswordChangeRequest:
-      type: object
-      required:
-      - currentPassword
-      - newPassword
-      properties:
-        currentPassword:
-          type: string
-          minLength: 8
-        newPassword:
-          type: string
-          minLength: 8
-    ReminderChannel:
-      type: string
-      enum:
-      - PUSH
-      - EMAIL
-      - IN_APP
-    CalendarProviderType:
-      type: string
-      enum:
-      - GOOGLE
-      - MICROSOFT
-    CalendarSyncState:
-      type: string
-      enum:
-      - DISABLED
-      - ENABLED
-    CalendarSyncLastStatus:
-      type: string
-      enum:
-      - SUCCESS
-      - FAILED
-      - PENDING
+
+    # ── Schedule / Reminders / Calendar ──────────────────────────────────────
+
     EventSchedule:
       type: object
-      required:
-      - startAt
-      - timezone
-      - isAllDay
+      required: [startAt, timezone, isAllDay]
       properties:
         startAt:
           $ref: '#/components/schemas/ISODateTime'
@@ -4214,10 +4425,10 @@ components:
         recurrenceCount:
           type: integer
           minimum: 1
+
     EventOccurrence:
       type: object
-      required:
-      - startAt
+      required: [startAt]
       properties:
         occurrenceId:
           type: string
@@ -4225,10 +4436,10 @@ components:
           $ref: '#/components/schemas/ISODateTime'
         endAt:
           $ref: '#/components/schemas/ISODateTime'
+
     PaginatedEventOccurrences:
       type: object
-      required:
-      - items
+      required: [items]
       properties:
         items:
           type: array
@@ -4236,12 +4447,10 @@ components:
             $ref: '#/components/schemas/EventOccurrence'
         nextCursor:
           type: string
+
     EventScheduleUpsertRequest:
       type: object
-      required:
-      - startAt
-      - timezone
-      - isAllDay
+      required: [startAt, timezone, isAllDay]
       properties:
         startAt:
           $ref: '#/components/schemas/ISODateTime'
@@ -4258,21 +4467,19 @@ components:
         recurrenceCount:
           type: integer
           minimum: 1
+
     EventScheduleResponse:
       type: object
-      required:
-      - schedule
+      required: [schedule]
       properties:
         schedule:
           $ref: '#/components/schemas/EventSchedule'
         nextOccurrence:
           $ref: '#/components/schemas/EventOccurrence'
+
     EventReminders:
       type: object
-      required:
-      - enabled
-      - channels
-      - offsets
+      required: [enabled, channels, offsets]
       properties:
         enabled:
           type: boolean
@@ -4285,12 +4492,10 @@ components:
           items:
             type: string
             description: ISO-8601 duration, e.g., P7D, P1D, PT0M
+
     EventRemindersUpsertRequest:
       type: object
-      required:
-      - enabled
-      - channels
-      - offsets
+      required: [enabled, channels, offsets]
       properties:
         enabled:
           type: boolean
@@ -4302,18 +4507,17 @@ components:
           type: array
           items:
             type: string
+
     EventRemindersResponse:
       type: object
-      required:
-      - reminders
+      required: [reminders]
       properties:
         reminders:
           $ref: '#/components/schemas/EventReminders'
+
     CalendarProvider:
       type: object
-      required:
-      - type
-      - displayName
+      required: [type, displayName]
       properties:
         type:
           $ref: '#/components/schemas/CalendarProviderType'
@@ -4326,20 +4530,19 @@ components:
               type: boolean
             reminders:
               type: boolean
+
     CalendarProviderListResponse:
       type: object
-      required:
-      - providers
+      required: [providers]
       properties:
         providers:
           type: array
           items:
             $ref: '#/components/schemas/CalendarProvider'
+
     CalendarConnectRequest:
       type: object
-      required:
-      - provider
-      - redirectUri
+      required: [provider, redirectUri]
       properties:
         provider:
           $ref: '#/components/schemas/CalendarProviderType'
@@ -4350,12 +4553,10 @@ components:
           type: array
           items:
             type: string
+
     CalendarConnectResponse:
       type: object
-      required:
-      - provider
-      - authorizationUrl
-      - state
+      required: [provider, authorizationUrl, state]
       properties:
         provider:
           $ref: '#/components/schemas/CalendarProviderType'
@@ -4364,12 +4565,10 @@ components:
           format: uri
         state:
           type: string
+
     CalendarExchangeCodeRequest:
       type: object
-      required:
-      - provider
-      - code
-      - redirectUri
+      required: [provider, code, redirectUri]
       properties:
         provider:
           $ref: '#/components/schemas/CalendarProviderType'
@@ -4380,10 +4579,10 @@ components:
         redirectUri:
           type: string
           format: uri
+
     CalendarConnectionStatus:
       type: object
-      required:
-      - connected
+      required: [connected]
       properties:
         connected:
           type: boolean
@@ -4395,10 +4594,10 @@ components:
           $ref: '#/components/schemas/ISODateTime'
         lastSyncAt:
           $ref: '#/components/schemas/ISODateTime'
+
     EventCalendarSyncStatus:
       type: object
-      required:
-      - state
+      required: [state]
       properties:
         state:
           $ref: '#/components/schemas/CalendarSyncState'
@@ -4412,10 +4611,10 @@ components:
           $ref: '#/components/schemas/ISODateTime'
         lastSyncStatus:
           $ref: '#/components/schemas/CalendarSyncLastStatus'
+
     EventCalendarSyncUpsertRequest:
       type: object
-      required:
-      - state
+      required: [state]
       properties:
         state:
           $ref: '#/components/schemas/CalendarSyncState'
@@ -4423,4 +4622,3 @@ components:
           $ref: '#/components/schemas/CalendarProviderType'
         calendarId:
           type: string
-```

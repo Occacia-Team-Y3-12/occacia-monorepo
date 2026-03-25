@@ -1,4 +1,4 @@
-# ruff: noqa: E402
+# ruff: noqa: E402addall
 
 import os
 import sys

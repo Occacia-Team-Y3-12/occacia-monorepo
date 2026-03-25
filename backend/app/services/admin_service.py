@@ -12,6 +12,7 @@ from typing import Optional
 import jwt
 from fastapi import HTTPException, status
 from sqlalchemy import and_, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.common.enums import TaskStatus
@@ -212,7 +213,8 @@ class AdminService:
             "user": {
                 "userId": admin.admin_id,
                 "email": admin.email,
-                "role": admin.staff_role or "staff",
+                "role": "ADMIN",
+                "status": getattr(admin, "status", "ACTIVE"),
             },
         }
 
@@ -223,6 +225,31 @@ class AdminService:
             token = authorization[7:]
             self._blacklist_token(token, role="ADMIN")
         return {"message": "Logged out successfully."}
+
+    def delete_admin_account(
+        self,
+        db: Session,
+        admin: Admin,
+        authorization: str | None = None,
+    ) -> dict[str, str]:
+        """Delete authenticated admin account."""
+        try:
+            db.delete(admin)
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="Admin account cannot be deleted because related records exist.",
+            )
+        except Exception:
+            db.rollback()
+            raise
+
+        if authorization and authorization.lower().startswith("bearer "):
+            token = authorization[7:]
+            self._blacklist_token(token, role="ADMIN")
+        return {"message": "Admin account deleted successfully."}
 
     def _blacklist_token(self, token: str, role: str) -> None:
         """Store token in Redis blacklist using remaining JWT lifetime as TTL."""

@@ -14,6 +14,7 @@ import jwt
 from fastapi import HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -94,7 +95,7 @@ class AuthService:
             Customer.email == str(payload.email)).first()
         if existing:
             raise HTTPException(
-                status_code=400, detail="This email is already registered.")
+                status_code=400, detail="Email already registered.")
 
         verification_token, expires_at = self._create_verification_token(
             str(payload.email), token_type="verify_customer_email",
@@ -326,6 +327,32 @@ class AuthService:
         logger.info("Customer password changed (authenticated): %s", customer.email)
         return {"message": "Password updated successfully."}
 
+    def change_customer_password(
+        self,
+        db: Session,
+        customer: Customer,
+        current_password: str,
+        new_password: str,
+        authorization: str | None = None,
+    ) -> dict[str, str]:
+        """Authenticated customer password change with access-token invalidation."""
+        if not customer.password_hash or not verify_password(current_password, customer.password_hash):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        if len(new_password) < 8:
+            raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+        if new_password == current_password:
+            raise HTTPException(status_code=400, detail="New password must be different from current password")
+
+        customer.password_hash = get_password_hash(new_password)
+        db.add(customer)
+        db.commit()
+
+        if authorization and authorization.lower().startswith("bearer "):
+            token = authorization[7:]
+            self._blacklist_token(token, role="CUSTOMER")
+        logger.info("Customer password changed (authenticated): %s", customer.email)
+        return {"message": "Password updated successfully"}
+
     # ── Vendor registration & login ───────────────────────────────────────────
 
     def register_vendor_verification(self, db: Session, vendor: Vendor) -> None:
@@ -504,6 +531,33 @@ class AuthService:
         logger.info("Vendor password changed (authenticated): %s", vendor.email)
         return {"message": "Password updated successfully."}
 
+    def change_vendor_password(
+        self,
+        db: Session,
+        vendor: Vendor,
+        current_password: str,
+        new_password: str,
+        authorization: str | None = None,
+    ) -> dict[str, str]:
+        """Authenticated vendor password change with access-token invalidation."""
+        vendor_password = getattr(vendor, "password_hash", None) or getattr(vendor, "hashed_password", None)
+        if not vendor_password or not verify_password(current_password, vendor_password):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        if len(new_password) < 8:
+            raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+        if new_password == current_password:
+            raise HTTPException(status_code=400, detail="New password must be different from current password")
+
+        vendor.password_hash = get_password_hash(new_password)
+        db.add(vendor)
+        db.commit()
+
+        if authorization and authorization.lower().startswith("bearer "):
+            token = authorization[7:]
+            self._blacklist_token(token, role="VENDOR")
+        logger.info("Vendor password changed (authenticated): %s", vendor.email)
+        return {"message": "Password updated successfully"}
+
     # ── Session Invalidation [E05] Customer / [E06] Vendor ───────────────────
 
     def logout_customer(self, db: Session, authorization: str | None) -> dict[str, str]:
@@ -527,6 +581,56 @@ class AuthService:
             token = authorization[7:]
             self._blacklist_token(token, role="VENDOR")
         return {"message": "Logged out successfully."}
+
+    def delete_customer_account(
+        self,
+        db: Session,
+        customer: Customer,
+        authorization: str | None = None,
+    ) -> dict[str, str]:
+        """Delete authenticated customer account."""
+        try:
+            db.delete(customer)
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="Customer account cannot be deleted because related records exist.",
+            )
+        except Exception:
+            db.rollback()
+            raise
+
+        if authorization and authorization.lower().startswith("bearer "):
+            token = authorization[7:]
+            self._blacklist_token(token, role="CUSTOMER")
+        return {"message": "Customer account deleted successfully."}
+
+    def delete_vendor_account(
+        self,
+        db: Session,
+        vendor: Vendor,
+        authorization: str | None = None,
+    ) -> dict[str, str]:
+        """Delete authenticated vendor account."""
+        try:
+            db.delete(vendor)
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="Vendor account cannot be deleted because related records exist.",
+            )
+        except Exception:
+            db.rollback()
+            raise
+
+        if authorization and authorization.lower().startswith("bearer "):
+            token = authorization[7:]
+            self._blacklist_token(token, role="VENDOR")
+        return {"message": "Vendor account deleted successfully."}
 
     def _blacklist_token(self, token: str, role: str) -> None:
         """Store the token in Redis with TTL matching its remaining lifetime."""
