@@ -152,7 +152,6 @@ jobs:
       - name: Deploy and migrate
         uses: appleboy/ssh-action@v1.0.3
         env:
-	  DISABLE_ADMIN_REGISTER: {{ secrets.DISABLE_ADMIN_REGISTER }}
           LANGFLOW_URL: ${{ secrets.LANGFLOW_URL }}
           LANGFLOW_ORG_ID: ${{ secrets.LANGFLOW_ORG_ID }}
           LANGFLOW_TOKEN: ${{ secrets.LANGFLOW_TOKEN }}
