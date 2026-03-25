@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 function getBackendApiBaseUrl() {
+  // Default to 'backend:8000' for Docker container networking
+  // Can be overridden with NEXT_PUBLIC_BACKEND_URL or NEXT_PUBLIC_API_URL
+  const defaultUrl = process.env.NODE_ENV === 'production' ? 'http://backend:8000' : 'http://localhost:8000';
+  
   const configuredBaseUrl =
     process.env.NEXT_PUBLIC_BACKEND_URL?.trim() ||
     process.env.NEXT_PUBLIC_API_URL?.trim() ||
-    'http://localhost:8000';
+    defaultUrl;
   const normalizedBaseUrl = configuredBaseUrl.replace(/\/+$/, '');
 
   return normalizedBaseUrl.endsWith('/api/v1')
