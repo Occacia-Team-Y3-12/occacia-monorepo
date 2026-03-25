@@ -39,7 +39,7 @@ const CustomerSidebar = ({ isOpen, isDesktopCollapsed, onToggleDesktopSidebar }:
       } ${isDesktopCollapsed ? 'lg:-translate-x-full' : 'lg:translate-x-0'}`}
     >
       <div className="mb-8 flex items-center gap-0">
-        <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="ml-[-8px] h-[59px] w-[59px] shrink-0" />
+        <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="ml-[-8px] h-[59px] w-[59px] shrink-0" priority />
         <span className="text-[26px] font-bold tracking-normal text-[#0D47A1]">Occacia</span>
         <div className="group relative ml-auto hidden lg:block">
           <button

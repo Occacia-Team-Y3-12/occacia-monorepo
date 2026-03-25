@@ -8,13 +8,15 @@ import { packageService } from '@/services/customer/packageService';
 
 const getPreferredPackageId = async (eventId: string) => {
   const existingPackages = await packageService.getPackages(eventId);
+  const normalizedExisting = Array.isArray(existingPackages) ? existingPackages : [];
   const packages =
-    existingPackages.length > 0
-      ? existingPackages
+    normalizedExisting.length > 0
+      ? normalizedExisting
       : await packageService.generatePackages(eventId);
+  const normalizedPackages = Array.isArray(packages) ? packages : [];
 
   const recommendedPackage =
-    packages.find((pkg) => pkg.type === 'RECOMMENDED') ?? packages[0];
+    normalizedPackages.find((pkg) => pkg.type === 'RECOMMENDED') ?? normalizedPackages[0];
 
   if (!recommendedPackage) {
     throw new Error('No packages available for this event.');

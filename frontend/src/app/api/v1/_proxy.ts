@@ -66,8 +66,23 @@ export async function proxyApiRequest(
     init.body = await request.arrayBuffer();
   }
 
+  const fetchWithRetry = async () => {
+    const attempts = 2;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        return await fetch(targetUrl, init);
+      } catch (error) {
+        if (attempt === attempts) {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error('Proxy fetch failed after retries.');
+  };
+
   try {
-    const response = await fetch(targetUrl, init);
+    const response = await fetchWithRetry();
     const responseHeaders = new Headers(response.headers);
     responseHeaders.delete('content-length');
     responseHeaders.delete('connection');

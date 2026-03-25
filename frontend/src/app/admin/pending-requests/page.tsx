@@ -35,6 +35,7 @@ import { toast } from 'react-hot-toast';
 
 type TabType = 'vendors' | 'organizations';
 type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
+const DEMO_VENDOR_LOGO = '/icons/vendor/dashboard/Spring%20%26%20Summer%20logo.svg';
 
 interface ApprovalModalProps {
   isOpen: boolean;
@@ -641,11 +642,23 @@ export default function PendingRequestsPage() {
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center text-blue-700 font-semibold">
-                            {activeTab === 'vendors'
-                              ? (item as Vendor).business_name.charAt(0).toUpperCase()
-                              : (item as Organization).name.charAt(0).toUpperCase()}
-                          </div>
+                          {activeTab === 'vendors' ? (
+                            <div className="h-10 w-10 overflow-hidden rounded-lg bg-gradient-to-br from-blue-100 to-blue-200">
+                              <img
+                                src={(item as Vendor).logo_url || DEMO_VENDOR_LOGO}
+                                alt={`${(item as Vendor).business_name} logo`}
+                                className="h-full w-full object-cover"
+                                onError={(event) => {
+                                  event.currentTarget.onerror = null;
+                                  event.currentTarget.src = DEMO_VENDOR_LOGO;
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center text-blue-700 font-semibold">
+                              {(item as Organization).name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
                           <div>
                             <p className="font-medium text-gray-900">
                               {activeTab === 'vendors'

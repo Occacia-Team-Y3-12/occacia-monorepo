@@ -148,23 +148,27 @@ export default function CustomerEventPackagesPage() {
   const eventSubtitle = eventId ? `Event ${eventId}` : 'Event';
   const confirmedTasks = packages[0]?.items ?? [];
 
+  const toPackageArray = (value: unknown): RecommendationPackage[] =>
+    Array.isArray(value) ? value : [];
+
   useEffect(() => {
     let active = true;
 
     const loadPackages = async () => {
       try {
         const existingPackages = await packageService.getPackages(eventId);
+        const normalizedPackages = toPackageArray(existingPackages);
 
-        if (!active || existingPackages.length === 0) {
+        if (!active || normalizedPackages.length === 0) {
           return;
         }
 
-        const stillValid = existingPackages.every(
+        const stillValid = normalizedPackages.every(
           (pkg) => new Date(pkg.expiresAt).getTime() > Date.now()
         );
 
         if (stillValid) {
-          setPackages(existingPackages);
+          setPackages(normalizedPackages);
           setPhase('packages');
           return;
         }
@@ -189,7 +193,7 @@ export default function CustomerEventPackagesPage() {
     setPhase('generating');
     try {
       const data = await packageService.generatePackages(eventId);
-      setPackages(data);
+      setPackages(toPackageArray(data));
       setPhase('packages');
       toast.success('Packages generated successfully!');
     } catch {

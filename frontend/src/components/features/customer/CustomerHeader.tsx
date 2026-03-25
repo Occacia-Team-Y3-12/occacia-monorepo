@@ -86,7 +86,7 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
               className="relative h-14 w-14 overflow-hidden rounded-xl"
               aria-label="Open sidebar"
             >
-              <Image src="/icons/logo.svg" alt="Occacia" width={56} height={56} className="h-14 w-14" />
+              <Image src="/icons/logo.svg" alt="Occacia" width={56} height={56} className="h-14 w-14" priority />
               <span className="absolute inset-0 inline-flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 group-active:opacity-100">
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#CCCCCC] bg-[#FFFFFF] text-[#666666]">
                   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -119,7 +119,7 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
           </button>
         ) : (
           <button onClick={onToggleSidebar} className="-ml-2 flex shrink-0 items-center gap-1 self-start lg:hidden" aria-label="Open sidebar">
-            <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="h-[59px] w-[59px]" />
+            <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="h-[59px] w-[59px]" priority />
             <span className="whitespace-nowrap text-[26px] font-bold tracking-normal text-[#0D47A1]">Occacia</span>
           </button>
         )}

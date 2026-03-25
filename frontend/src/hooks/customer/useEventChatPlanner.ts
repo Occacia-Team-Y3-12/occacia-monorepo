@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ROUTES } from '@/lib/routes';
+import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 import { customerEventChatService } from '@/services/customer/eventChatService';
 import {
   CalendarConnectionStatus,
@@ -89,6 +91,13 @@ export const useEventChatPlanner = (eventId: string) => {
   const activeTaskCount = useMemo(() => tasks.length, [tasks]);
 
   const fetchAll = useCallback(async () => {
+    const token = getStoredCustomerToken();
+    if (!token) {
+      setIsInitialLoading(false);
+      router.replace(ROUTES.CUSTOMER.LOGIN);
+      return;
+    }
+
     setIsInitialLoading(true);
     setError(null);
 
@@ -99,6 +108,20 @@ export const useEventChatPlanner = (eventId: string) => {
       customerEventChatService.getCalendarProviders(),
       customerEventChatService.getCalendarStatus(),
     ]);
+
+    const hasUnauthorized = [
+      eventResult,
+      messagesResult,
+      tasksResult,
+      providersResult,
+      calendarStatusResult,
+    ].some((result) => result.status === 401);
+
+    if (hasUnauthorized) {
+      setIsInitialLoading(false);
+      router.replace(ROUTES.CUSTOMER.LOGIN);
+      return;
+    }
 
     if (eventResult.ok && eventResult.data?.data?.event) {
       const event = eventResult.data.data.event;
@@ -150,7 +173,7 @@ export const useEventChatPlanner = (eventId: string) => {
     }
 
     setIsInitialLoading(false);
-  }, [eventId]);
+  }, [eventId, router]);
 
   useEffect(() => {
     void fetchAll();
@@ -191,8 +214,8 @@ export const useEventChatPlanner = (eventId: string) => {
     setMessages((prev) => [...prev, optimistic]);
     setChatInput('');
 
-    const result = await customerEventChatService.postChat(eventId, { message });
-    if (!result.ok || !result.data?.data?.message) {
+    const result = await customerEventChatService.postChat(eventId, { content: message });
+    if (!result.ok) {
       setError(result.error || result.data?.message || 'Failed to send message.');
       setMessages((prev) => prev.filter((item) => item.id !== optimistic.id));
       setIsBusy(false);
@@ -266,6 +289,12 @@ export const useEventChatPlanner = (eventId: string) => {
     setIsBusy(true);
     setError(null);
     setWarning(null);
+
+    if (dateTBD || !startDate) {
+      setWarning('Set an event date to save schedule to the backend.');
+      setIsBusy(false);
+      return true;
+    }
 
     const scheduleResult = await customerEventChatService.saveSchedule(eventId, {
       dateTBD,
@@ -341,14 +370,36 @@ export const useEventChatPlanner = (eventId: string) => {
     setWarning(null);
     setSuccess(null);
 
-    const result = await customerEventChatService.connectCalendar({ provider: selectedProvider });
-    if (!result.ok || !result.data?.data?.status) {
-      const message = result.error || result.data?.message || 'Failed to connect calendar provider.';
+    const result = await customerEventChatService.connectCalendar({
+      provider: selectedProvider,
+    });
+    if (!result.ok) {
+      const responseMessage = result.data && 'message' in result.data ? result.data.message : undefined;
+      const message = result.error || responseMessage || 'Failed to connect calendar provider.';
       if (message === GENERIC_ERROR_TEXT) {
         setWarning('Google Calendar service is temporarily unavailable. Continue with local reminders and try again later.');
       } else {
         setError(message);
       }
+      setIsBusy(false);
+      return false;
+    }
+
+    if (result.data && 'authorizationUrl' in result.data) {
+      setSuccess('Redirecting to calendar provider...');
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(
+          'customer:calendarReturnPath',
+          window.location.pathname + window.location.search
+        );
+        window.location.assign(result.data.authorizationUrl);
+      }
+      setIsBusy(false);
+      return true;
+    }
+
+    if (!result.data?.data?.status) {
+      setError('Failed to connect calendar provider.');
       setIsBusy(false);
       return false;
     }

@@ -350,7 +350,7 @@ def test_needs_persona_false_when_persona_exists(auth_client, active_customer):
     assert mocked.await_args.kwargs["needs_persona"] is False
 
 
-def test_groq_error_returns_500(auth_token, active_customer):
+def test_groq_error_returns_fallback_reply(auth_token, active_customer):
     event = _create_event(active_customer.customer_id)
     with TestClient(app, raise_server_exceptions=False) as client:
         client.headers.update({"Authorization": f"Bearer {auth_token}"})
@@ -360,7 +360,8 @@ def test_groq_error_returns_500(auth_token, active_customer):
         ):
             response = _post_chat(client, event.event_id)
 
-    assert response.status_code == 500
+    assert response.status_code == 200
+    assert "planning assistant" in response.json()["reply"]
 
 
 def test_response_has_no_gift_fields(auth_client, active_customer):

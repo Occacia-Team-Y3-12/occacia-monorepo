@@ -1,5 +1,6 @@
 import { featureFlags } from '@/config/featureFlags';
 import { mockCustomerPersonaService } from '@/mocks/customer/personaService';
+import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 import { ServiceResult } from '@/types/customer';
 import {
   CustomerPersona,
@@ -21,6 +22,17 @@ type CustomerPersonaService = {
 };
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+const withCustomerAuthHeaders = (headers?: HeadersInit) => {
+  const merged = new Headers(headers);
+  const token = getStoredCustomerToken();
+
+  if (token && !merged.has('Authorization')) {
+    merged.set('Authorization', `Bearer ${token}`);
+  }
+
+  return merged;
+};
 
 const toErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message) {
@@ -70,7 +82,10 @@ const extractMessage = (value: unknown): string | undefined => {
 
 const request = async (input: RequestInfo | URL, init?: RequestInit): Promise<ServiceResult<unknown>> => {
   try {
-    const response = await fetch(input, init);
+    const response = await fetch(input, {
+      ...init,
+      headers: withCustomerAuthHeaders(init?.headers),
+    });
     const raw = await response.text();
     const contentType = response.headers.get('content-type') || '';
     const data = parseBody(raw, contentType);
