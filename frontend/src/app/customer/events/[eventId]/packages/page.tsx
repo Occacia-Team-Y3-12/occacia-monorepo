@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Sparkles, CheckCircle2, Clock, RefreshCw } from 'lucide-react';
 import { ROUTES } from '@/lib/routes';
 import { packageService } from '@/services/customer/packageService';
+import { formatCurrency } from '@/lib/currency';
 import type { RecommendationPackage, PackageType } from '@/types/customer/package';
 
 // ─── Package Config ───────────────────────────────────────────────────────────
@@ -96,7 +97,7 @@ function PackageCard({ pkg, eventId, onExpire }: {
           )}
         </div>
         <p className={`text-4xl font-bold ${config.priceClass}`}>
-          ${pkg.packageTotalPrice.toLocaleString()}
+          {formatCurrency(pkg.packageTotalPrice)}
         </p>
         <p className="text-xs text-gray-400 mt-1">
           {pkg.currency} · {pkg.items.length} tasks included
@@ -113,7 +114,7 @@ function PackageCard({ pkg, eventId, onExpire }: {
                 <p className="text-sm font-semibold text-gray-800">{item.offeringTitle}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{item.vendorName}</p>
               </div>
-              <p className="text-sm font-bold text-gray-700 whitespace-nowrap">${item.taskPrice.toLocaleString()}</p>
+              <p className="text-sm font-bold text-gray-700 whitespace-nowrap">{formatCurrency(item.taskPrice)}</p>
             </div>
           </div>
         ))}

@@ -192,6 +192,17 @@ export const apiPackageService: CustomerPackageService = {
         return normalized;
       }),
 
+  createCustomPackage: (eventId, basePackageId, items) =>
+    api
+      .post(`/customers/events/${eventId}/packages`, { basePackageId, items })
+      .then((response) => {
+        const normalized = normalizePackage(response.data);
+        if (!normalized) {
+          throw new Error('Invalid package response');
+        }
+        return normalized;
+      }),
+
   confirmPackage: (eventId, packageId, idempotencyKey) =>
     api
       .post(

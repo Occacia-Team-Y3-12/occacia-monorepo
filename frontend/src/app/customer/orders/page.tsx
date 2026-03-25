@@ -6,6 +6,7 @@ import { Package, Clock, CheckCircle2, XCircle, ArrowRight } from 'lucide-react'
 import { ROUTES } from '@/lib/routes';
 import type { PackageOrder } from '@/types/customer/order';
 import { customerOrderService } from '@/services/customer/orderServices';
+import { formatCurrency } from '@/lib/currency';
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; className: string }> = {
   CREATED: {
@@ -90,7 +91,7 @@ export default function OrdersPage() {
                 </div>
                 <div className="flex items-center gap-4 shrink-0">
                   <div className="text-right">
-                    <p className="text-sm font-bold text-gray-900">${order.packageOrderTotalPrice.toLocaleString()}</p>
+                    <p className="text-sm font-bold text-gray-900">{formatCurrency(order.packageOrderTotalPrice)}</p>
                     <p className="text-xs text-gray-400">{order.currency}</p>
                   </div>
                   <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-semibold ${statusCfg.className}`}>

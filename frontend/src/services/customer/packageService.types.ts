@@ -20,6 +20,11 @@ export type CustomerPackageService = {
     packageId: string,
     items: { taskId: string; offeringId: string }[]
   ) => Promise<RecommendationPackage>;
+  createCustomPackage: (
+    eventId: string,
+    basePackageId: string,
+    items: { taskId: string; offeringId: string }[]
+  ) => Promise<RecommendationPackage>;
   confirmPackage: (
     eventId: string,
     packageId: string,

@@ -233,6 +233,40 @@ export const mockPackageService: CustomerPackageService = {
     return clonePackages(packages);
   },
 
+  async createCustomPackage(eventId, basePackageId, items) {
+    await sleep(400);
+
+    const storedPackages = loadStoredPackages(eventId);
+    const basePackage =
+      storedPackages.find((pkg) => pkg.packageId === basePackageId)
+      || storedPackages[0]
+      || MOCK_PACKAGE;
+
+    const customItems = basePackage.items.map((item) => {
+      const override = items.find((entry) => entry.taskId === item.taskId);
+      if (!override) {
+        return item;
+      }
+      return {
+        ...item,
+        offeringId: override.offeringId,
+        vendorName: `Vendor ${override.offeringId.slice(-4)}`,
+      };
+    });
+
+    const customPackage = {
+      ...basePackage,
+      packageId: getRandomId('pkg'),
+      type: basePackage.type,
+      packageTotalPrice: customItems.reduce((sum, item) => sum + item.taskPrice, 0),
+      items: customItems,
+    };
+
+    const nextPackages = [...storedPackages, customPackage];
+    persistPackages(eventId, nextPackages);
+    return { ...customPackage };
+  },
+
   async getTaskRecommendations(eventId, taskId) {
     await sleep(200);
 

@@ -7,6 +7,7 @@ import { ROUTES } from '@/lib/routes';
 import { packageService } from '@/services/customer/packageService';
 import type { RecommendationPackage, PackageType } from '@/types/customer/package';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/currency';
 
 const PACKAGE_CONFIG: Record<PackageType, {
   label: string; badgeClass: string; accentClass: string; buttonClass: string; borderClass: string; icon: React.ReactNode;
@@ -225,7 +226,7 @@ export default function PackageDetailPage() {
                 </div>
                 <div className="text-right shrink-0">
                   <p className={`text-sm font-bold ${unavailable ? 'text-red-400' : 'text-gray-900'}`}>
-                    ${item.taskPrice.toLocaleString()}
+                    {formatCurrency(item.taskPrice)}
                   </p>
                   {item.rating != null && (
                     <p className="text-xs text-amber-500 mt-0.5">★ {item.rating.toFixed(1)}</p>
@@ -241,9 +242,9 @@ export default function PackageDetailPage() {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm font-semibold text-gray-600">Package Total</span>
-          <span className={`text-3xl font-bold ${config.accentClass}`}>
-            ${pkg.packageTotalPrice.toLocaleString()}
-          </span>
+        <span className={`text-3xl font-bold ${config.accentClass}`}>
+          {formatCurrency(pkg.packageTotalPrice)}
+        </span>
         </div>
 
         <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 mb-4">

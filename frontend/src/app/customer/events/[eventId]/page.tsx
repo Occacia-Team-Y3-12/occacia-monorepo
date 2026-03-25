@@ -9,6 +9,7 @@ import { Task, TaskDetails, TaskStatus } from '@/types/customer/task';
 import ModifyTaskModal from '@/components/customer/ModifyTaskModal';
 import Button from '@/components/ui/Button';
 import { ROUTES } from '@/lib/routes';
+import { formatCurrency } from '@/lib/currency';
 
 const statusColors: Record<TaskStatus, string> = {
   Pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -121,7 +122,7 @@ export default function EventTrackingPage() {
                         <p className="text-sm text-[#5B6780] mt-1">
                           Vendor: <span className="text-[#0D47A1]">{task.vendorName}</span>
                         </p>
-                        <p className="text-sm text-[#7A87A3]">${task.price.toLocaleString()}</p>
+                        <p className="text-sm text-[#7A87A3]">{formatCurrency(task.price)}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <Button

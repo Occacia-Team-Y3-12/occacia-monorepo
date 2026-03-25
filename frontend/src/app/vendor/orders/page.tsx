@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import VendorPortalShell from '@/components/features/vendor/VendorPortalShell';
+import { formatCurrency } from '@/lib/currency';
 
 interface VendorOrder {
   id: string;
@@ -86,7 +87,7 @@ export default function VendorOrdersPage() {
                     <p className="text-gray-600 text-sm">Customer: John Doe | Date: N/A</p>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <span className="text-base md:text-lg font-semibold text-emerald-600">$0.00</span>
+                    <span className="text-base md:text-lg font-semibold text-emerald-600">{formatCurrency(0)}</span>
                     <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">Pending</span>
                   </div>
                 </div>
