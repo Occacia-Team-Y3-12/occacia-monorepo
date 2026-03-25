@@ -5,7 +5,7 @@ Global security dependencies and token validation.
 import os
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import PyJWTError as JWTError
 from sqlalchemy.orm import Session
@@ -34,6 +34,7 @@ oauth2_admin_scheme = OAuth2PasswordBearer(
 def get_current_customer(
     token: str = Depends(oauth2_customer_scheme),
     db: Session = Depends(get_db),
+    request: Request = None,
 ) -> Customer:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -64,6 +65,12 @@ def get_current_customer(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email not verified. Please verify your email first.",
         )
+    if request is not None:
+        request.state.actor = {
+            "type": "customer",
+            "id": customer.customer_id,
+            "email": customer.email,
+        }
     return customer
 
 
@@ -72,6 +79,7 @@ def get_current_customer(
 def get_current_vendor(
     token: str = Depends(oauth2_vendor_scheme),
     db: Session = Depends(get_db),
+    request: Request = None,
 ) -> Vendor:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -93,6 +101,12 @@ def get_current_vendor(
     vendor = db.query(Vendor).filter(Vendor.email == email).first()
     if vendor is None:
         raise credentials_exception
+    if request is not None:
+        request.state.actor = {
+            "type": "vendor",
+            "id": vendor.vendor_id,
+            "email": vendor.email,
+        }
     return vendor
 
 
@@ -101,6 +115,7 @@ def get_current_vendor(
 def get_current_admin(
     token: str = Depends(oauth2_admin_scheme),
     db: Session = Depends(get_db),
+    request: Request = None,
 ) -> Admin:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -124,4 +139,10 @@ def get_current_admin(
     admin = db.query(Admin).filter(Admin.admin_id == admin_id).first()
     if admin is None:
         raise credentials_exception
+    if request is not None:
+        request.state.actor = {
+            "type": "admin",
+            "id": admin.admin_id,
+            "email": admin.email,
+        }
     return admin

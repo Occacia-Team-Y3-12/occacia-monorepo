@@ -1,13 +1,20 @@
-import logging
+from asgi_correlation_id import correlation_id
 from fastapi import Request, FastAPI
 from fastapi.responses import JSONResponse
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 def add_exception_handlers(app: FastAPI):
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
-        logger.error(f"Global Exception: {exc}", exc_info=True)
+        logger.error(
+            "global.exception",
+            error=str(exc),
+            path=request.url.path,
+            request_id=correlation_id.get(),
+            exc_info=True,
+        )
         
         return JSONResponse(
             status_code=500,
