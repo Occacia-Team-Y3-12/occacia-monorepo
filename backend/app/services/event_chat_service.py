@@ -274,15 +274,12 @@ class EventChatService:
         date_str: str,
         timezone_str: str,
     ) -> None:
-        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
         try:
-            tz = ZoneInfo(timezone_str)
-        except (ZoneInfoNotFoundError, Exception):
-            tz = ZoneInfo("Asia/Colombo")
-
-        try:
+            # Parse the date string (expected format: %Y-%m-%d)
             naive_date = datetime.strptime(date_str, "%Y-%m-%d")
-            aware_dt   = naive_date.replace(tzinfo=tz)
+            # Since we don't have reliable timezone support, use naive datetime
+            # The timezone_str is stored separately for reference
+            aware_dt = naive_date
         except ValueError:
             logger.warning("Could not parse date string: %s", date_str)
             return
