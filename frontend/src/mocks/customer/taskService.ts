@@ -4,6 +4,8 @@ import type {
   ReassignTaskPayload,
   ReassignTaskResponse,
   RemoveTaskResponse,
+  UpdateTaskPayload,
+  UpdateTaskResponse,
   TaskDetails,
 } from '@/types/customer/task';
 
@@ -159,6 +161,38 @@ export const mockTaskService = {
       data: {
         status: 'success',
         message: 'Task removed successfully.',
+      },
+    };
+  },
+
+  async updateTask(
+    _eventId: string,
+    taskId: string,
+    payload: UpdateTaskPayload
+  ): Promise<ServiceResult<UpdateTaskResponse>> {
+    await new Promise((resolve) => setTimeout(resolve, 140));
+
+    const task = mockEventWithTasks.tasks.find((item) => item.id === taskId);
+    if (!task) {
+      return {
+        ok: false,
+        status: 404,
+        error: 'Task not found',
+      };
+    }
+
+    Object.assign(task, payload);
+    task.updatedAt = new Date().toISOString();
+
+    return {
+      ok: true,
+      status: 200,
+      data: {
+        status: 'success',
+        message: 'Task updated successfully.',
+        data: {
+          task,
+        },
       },
     };
   },

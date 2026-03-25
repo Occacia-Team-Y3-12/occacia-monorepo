@@ -53,6 +53,7 @@ export default function CustomerEventChatPage() {
   const [dateInputValue, setDateInputValue] = useState('');
   const [dateInputError, setDateInputError] = useState<string | null>(null);
   const datePickerRef = useRef<HTMLInputElement>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
   const {
     isInitialLoading,
@@ -72,6 +73,7 @@ export default function CustomerEventChatPage() {
     newTaskTitle,
     setNewTaskTitle,
     addTask,
+    updateTaskTitle,
     removeTask,
     startDate,
     setStartDate,
@@ -104,9 +106,18 @@ export default function CustomerEventChatPage() {
     void sendMessage();
   };
 
-  const onAddTask = (event: FormEvent) => {
+  const onAddTask = async (event: FormEvent) => {
     event.preventDefault();
-    void addTask();
+    if (editingTaskId) {
+      const updated = await updateTaskTitle(editingTaskId, newTaskTitle);
+      if (updated) {
+        setEditingTaskId(null);
+        setNewTaskTitle('');
+      }
+      return;
+    }
+
+    await addTask();
   };
 
   const onSaveDetails = async () => {
@@ -502,6 +513,7 @@ export default function CustomerEventChatPage() {
                             type="button"
                             onClick={() => {
                               setNewTaskTitle(task.title);
+                              setEditingTaskId(task.id);
                               setActiveTaskMenuId(null);
                             }}
                             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-[#666666] hover:bg-[#FAFAFA]"
@@ -551,7 +563,7 @@ export default function CustomerEventChatPage() {
                   className="h-12 flex-1 rounded-[16px] border-2 border-[#EAEAEA] bg-white px-4 text-sm text-[#666666]"
                 />
                 <button type="submit" className="h-12 rounded-[16px] border-2 border-[#EAEAEA] bg-white px-5 text-xl font-semibold text-[#666666]">
-                  +
+                  {editingTaskId ? 'Save' : '+'}
                 </button>
               </form>
             </section>

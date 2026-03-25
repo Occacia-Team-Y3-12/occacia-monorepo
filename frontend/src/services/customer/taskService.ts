@@ -10,6 +10,8 @@ import {
   ReassignTaskPayload,
   ReassignTaskResponse,
   RemoveTaskResponse,
+  UpdateTaskPayload,
+  UpdateTaskResponse,
 } from '@/types/customer/task';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -226,6 +228,18 @@ const apiTaskService = {
   removeTask(eventId: string, taskId: string): Promise<ServiceResult<RemoveTaskResponse>> {
     return request<RemoveTaskResponse>(`/api/v1/customers/events/${eventId}/tasks/${taskId}`, {
       method: 'DELETE',
+    });
+  },
+
+  updateTask(
+    eventId: string,
+    taskId: string,
+    payload: UpdateTaskPayload
+  ): Promise<ServiceResult<UpdateTaskResponse>> {
+    return request<UpdateTaskResponse>(`/api/v1/customers/events/${eventId}/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
     });
   },
 };

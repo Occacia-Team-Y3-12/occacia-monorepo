@@ -6,6 +6,7 @@ import { useEventTasks } from '@/hooks/customer/useEventTasks';
 import { Task, TaskDetails, TaskStatus } from '@/types/customer/task';
 import ModifyTaskModal from '@/components/customer/ModifyTaskModal';
 import Button from '@/components/ui/Button';
+import { ROUTES } from '@/lib/routes';
 
 const statusColors: Record<TaskStatus, string> = {
   Pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -107,13 +108,23 @@ export default function EventTrackingPage() {
                       : 'cursor-default'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{task.serviceType}</h3>
-                      <p className="text-sm text-gray-600 mt-1">Vendor: {task.vendorName}</p>
-                      <p className="text-sm text-gray-500">${task.price}</p>
-                    </div>
-                    <div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900">{task.serviceType}</h3>
+                        <p className="text-sm text-gray-600 mt-1">Vendor: {task.vendorName}</p>
+                        <p className="text-sm text-gray-500">${task.price}</p>
+                      </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          router.push(ROUTES.CUSTOMER.EVENT_CHAT(eventId));
+                        }}
+                      >
+                        Edit
+                      </Button>
                       <span
                         className={`px-3 py-1 rounded-full text-sm font-medium border ${
                           statusColors[task.status]
@@ -122,7 +133,7 @@ export default function EventTrackingPage() {
                         {task.status}
                       </span>
                     </div>
-                  </div>
+                    </div>
                   {task.status === 'Rejected' && task.rejectionReason && (
                     <p className="text-sm text-red-600 mt-2">
                       Reason: {task.rejectionReason}

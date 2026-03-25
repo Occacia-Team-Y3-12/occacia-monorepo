@@ -264,6 +264,23 @@ export const useEventChatPlanner = (eventId: string) => {
     setIsBusy(false);
   };
 
+  const updateTaskTitle = async (taskId: string, title: string): Promise<boolean> => {
+    const trimmed = title.trim();
+    if (!trimmed) {
+      return false;
+    }
+
+    const result = await customerEventChatService.updateTask(eventId, taskId, { title: trimmed });
+
+    if (!result.ok || !result.data?.data?.task) {
+      setError(result.error || result.data?.message || 'Failed to update task.');
+      return false;
+    }
+
+    setTasks((prev) => prev.map((task) => (task.id === taskId ? result.data!.data!.task : task)));
+    return true;
+  };
+
   const updateTaskCompletion = async (taskId: string, completed: boolean) => {
     const result = await customerEventChatService.updateTask(eventId, taskId, { completed });
 
@@ -517,6 +534,7 @@ export const useEventChatPlanner = (eventId: string) => {
     newTaskTitle,
     setNewTaskTitle,
     addTask,
+    updateTaskTitle,
     updateTaskCompletion,
     removeTask,
     dateTBD,
