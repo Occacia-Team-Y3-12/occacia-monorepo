@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/lib/routes';
 import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 import { customerEventChatService } from '@/services/customer/eventChatService';
+import { packageService } from '@/services/customer/packageService';
 import {
   CalendarConnectionStatus,
   CalendarProvider,
@@ -502,9 +503,18 @@ export const useEventChatPlanner = (eventId: string) => {
       return;
     }
 
+    if (eventId) {
+      try {
+        await packageService.generatePackages(eventId);
+      } catch (err) {
+        setWarning('Confirmed successfully but recommendations could not be generated automatically. You can try again from the next screen.');
+      }
+    }
+
     setEventState(result.data?.data?.eventState || 'active');
     setSuccess('Tasks confirmed and event activated. Redirecting to recommendations...');
-    router.push(`/customer/events/${eventId}/recommendations`);
+    setIsBusy(false);
+    router.push(ROUTES.CUSTOMER.EVENT_RECOMMENDATIONS(eventId || ''));
   };
 
   const toggleOffset = (value: number) => {

@@ -4,7 +4,10 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:800
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get('auth_token')?.value;
+    const token =
+      request.cookies.get('auth_token')?.value ||
+      request.cookies.get('customerToken')?.value ||
+      request.cookies.get('accessToken')?.value;
     
     const response = await fetch(`${BACKEND_URL}/api/v1/customers/personas/`, {
       headers: {
@@ -25,7 +28,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get('auth_token')?.value;
+    const token =
+      request.cookies.get('auth_token')?.value ||
+      request.cookies.get('customerToken')?.value ||
+      request.cookies.get('accessToken')?.value;
     const body = await request.json();
 
     const response = await fetch(`${BACKEND_URL}/api/v1/customers/personas/`, {

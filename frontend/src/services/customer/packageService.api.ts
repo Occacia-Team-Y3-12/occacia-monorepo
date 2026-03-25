@@ -105,29 +105,53 @@ const normalizePackageList = (raw: unknown): RecommendationPackage[] => {
 };
 
 const normalizeTaskRecommendations = (raw: unknown): ShortlistedOffering[] => {
-  if (Array.isArray(raw)) {
-    return raw as ShortlistedOffering[];
-  }
-
-  if (!isRecord(raw) || !Array.isArray(raw.items)) {
+  if (!Array.isArray(raw)) {
     return [];
   }
 
-  return raw.items
+  return raw
     .filter(isRecord)
-    .map((item, index) => {
-      const offeringId = typeof item.offeringId === 'string' ? item.offeringId : `offering-${index + 1}`;
-      const score = typeof item.score === 'number' ? item.score : 0;
+    .map((item) => {
+      const offeringId = typeof item.offeringId === 'string' ? item.offeringId : '';
+      const offeringTitle =
+        typeof item.name === 'string'
+          ? item.name
+          : typeof item.offeringTitle === 'string'
+            ? item.offeringTitle
+            : 'Offering';
+      const vendorName = typeof item.vendorName === 'string' && item.vendorName.trim()
+        ? item.vendorName
+        : 'Vendor';
+      const taskPrice =
+        typeof item.price === 'number'
+          ? item.price
+          : typeof item.taskPrice === 'number'
+            ? item.taskPrice
+            : 0;
+      const score = typeof item.score === 'number' ? item.score : undefined;
+      const rank = typeof item.rank === 'number' ? item.rank : undefined;
+
+      const normalizedRating =
+        typeof score === 'number' ? Math.min(5, Math.max(0, Number((score / 4).toFixed(1)))) : undefined;
 
       return {
         offeringId,
-        offeringTitle: `Offering ${index + 1}`,
-        vendorName: 'Recommended Vendor',
-        taskPrice: 0,
-        rating: Math.max(0, Math.min(5, score || 4.5)),
-        isBestMatch: typeof item.rank === 'number' ? item.rank === 1 : index === 0,
+        offeringTitle,
+        vendorName,
+        vendorId: typeof item.vendorId === 'string' ? item.vendorId : undefined,
+        taskPrice,
+        currency: typeof item.currency === 'string' ? item.currency : undefined,
+        qualityTier: typeof item.qualityTier === 'string' ? item.qualityTier : undefined,
+        score,
+        rank,
+        rating: normalizedRating,
+        isBestMatch: rank === 1,
+        isSelected: typeof item.isSelected === 'boolean' ? item.isSelected : undefined,
+        description: typeof item.description === 'string' ? item.description : undefined,
+        unit: typeof item.unit === 'string' ? item.unit : undefined,
       };
-    });
+    })
+    .filter((item) => !!item.offeringId);
 };
 
 export const apiPackageService: CustomerPackageService = {
@@ -154,8 +178,8 @@ export const apiPackageService: CustomerPackageService = {
 
   getTaskRecommendations: (eventId, taskId) =>
     api
-      .get(`/customers/events/${eventId}/tasks/${taskId}/recommendations`)
-      .then((response) => normalizeTaskRecommendations(response.data)),
+      .get(`/customers/events/${eventId}/tasks/${taskId}/offerings`)
+      .then((response) => normalizeTaskRecommendations(response.data.items ?? response.data)),
 
   updatePackage: (eventId, packageId, items) =>
     api

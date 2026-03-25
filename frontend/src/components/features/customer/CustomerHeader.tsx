@@ -69,7 +69,7 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
         isDesktopSidebarCollapsed ? 'lg:ml-0' : 'lg:ml-[240px]'
       } ${
         isEventFlow
-          ? 'min-h-[92px] flex-wrap items-center justify-between py-2 sm:py-0'
+          ? 'min-h-[72px] items-center justify-between py-2 sm:min-h-[92px] sm:py-0'
           : 'min-h-[88px] items-center justify-between py-3 sm:py-0'
       }`}
     >
@@ -120,7 +120,7 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
         ) : (
           <button onClick={onToggleSidebar} className="-ml-2 flex shrink-0 items-center gap-1 self-start lg:hidden" aria-label="Open sidebar">
             <Image src="/icons/logo.svg" alt="Occacia" width={59} height={59} className="h-[59px] w-[59px]" priority />
-            <span className="whitespace-nowrap text-[26px] font-bold tracking-normal text-[#0D47A1]">Occacia</span>
+            <span className="hidden whitespace-nowrap text-[26px] font-bold tracking-normal text-[#0D47A1] sm:inline">Occacia</span>
           </button>
         )}
 
@@ -140,13 +140,13 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
       <div className={`order-2 flex items-center justify-end ${isEventFlow ? 'w-auto gap-5' : 'w-auto gap-3 sm:gap-5'}`}>
         <button
           aria-label="Notifications"
-          className="relative flex h-14 w-14 items-center justify-center rounded-3xl bg-[#F4F8FA]"
+          className="relative flex h-10 w-10 items-center justify-center rounded-3xl bg-[#F4F8FA] sm:h-14 sm:w-14"
         >
-          <svg viewBox="0 0 24 24" className="h-7 w-7 text-[#666666]" fill="none" stroke="currentColor" strokeWidth={1.8}>
+          <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#666666] sm:h-7 sm:w-7" fill="none" stroke="currentColor" strokeWidth={1.8}>
             <path d="M14.857 17.082a2.857 2.857 0 0 1-5.714 0" />
             <path d="M6.286 8.51a5.714 5.714 0 1 1 11.428 0v4.248l1.143 2.286v1.143H5.143V15.04l1.143-2.286V8.51Z" />
           </svg>
-          <span className="absolute right-4 top-3.5 h-2.5 w-2.5 rounded-full bg-[#4285F4]" />
+          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#4285F4] sm:right-4 sm:top-3.5 sm:h-2.5 sm:w-2.5" />
         </button>
 
         {isEventFlow && <span className="h-10 w-px bg-[#EAEAEA]" aria-hidden="true" />}
@@ -160,7 +160,7 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
             aria-label="Open profile menu"
           >
             <span className={`${isEventFlow ? 'hidden md:inline' : 'hidden sm:inline'} whitespace-nowrap text-[17px] font-semibold text-[#0D47A1]`}>{user?.fullName || user?.username || 'Account'}</span>
-            <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-[3px] border-[#FFFFFF] bg-[#F4F8FA] shadow-[0_6px_18px_rgba(13,71,161,0.18)]">
+            <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-[3px] border-[#FFFFFF] bg-[#F4F8FA] shadow-[0_6px_18px_rgba(13,71,161,0.18)] sm:h-12 sm:w-12">
               <Image
                 src="/icons/customer/dashboard/profile.svg"
                 alt="Alex Rivers"
@@ -184,15 +184,7 @@ const CustomerHeader = ({ isSidebarOpen, isDesktopSidebarCollapsed, onToggleSide
         </div>
       </div>
 
-      {isEventFlow && (
-        <div className="order-3 w-full pb-1 pl-2 sm:hidden">
-          <p className="inline-flex min-w-0 items-center overflow-hidden whitespace-nowrap text-[14px] leading-[1] text-[#666666]">
-            <span className="font-medium text-[#0D47A1]">Events</span>
-            <span className="px-2 leading-[1] text-[#666666]">&gt;</span>
-            <span className="truncate font-semibold leading-[1] text-[#0D47A1]">{isEventsRootPage ? 'Create New Event' : savedEventTitle}</span>
-          </p>
-        </div>
-      )}
+      {isEventFlow && null}
     </header>
   );
 };

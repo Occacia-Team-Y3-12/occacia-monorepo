@@ -22,7 +22,13 @@ function TaskRow({
   onRemove: (taskId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const selected = shortlist.find(o => o.offeringId === item.offeringId) ?? shortlist[0];
+  const selected = shortlist.find((o) => o.offeringId === item.offeringId) ?? shortlist[0];
+  const ratingValue =
+    selected?.rating ??
+    (typeof selected?.score === 'number'
+      ? Number((selected.score / 2).toFixed(1))
+      : undefined);
+  const currencyLabel = selected?.currency || 'LKR';
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-4 relative">
@@ -37,7 +43,7 @@ function TaskRow({
       {/* Task name + current */}
       <p className="text-sm font-semibold text-gray-900 mb-0.5">{item.taskName}</p>
       <p className="text-xs text-gray-400 mb-3">
-        {item.vendorName} · ${item.taskPrice.toLocaleString()}
+        {item.vendorName} · {currencyLabel} {item.taskPrice.toLocaleString()}
       </p>
 
       {/* Dropdown trigger */}
@@ -46,21 +52,24 @@ function TaskRow({
           onClick={() => setOpen(v => !v)}
           className="w-full flex items-center justify-between gap-2 border border-gray-200 rounded-xl px-4 py-2.5 bg-white hover:bg-gray-50 transition text-sm"
         >
-          <div className="flex items-center gap-3">
-            <span className="font-medium text-gray-800">{selected?.vendorName}</span>
-            <span className="flex items-center gap-1 text-amber-400 text-xs font-semibold">
-              <Star size={11} fill="currentColor" />
-              {selected?.rating}
-            </span>
-            <span className="font-semibold text-gray-700">${selected?.taskPrice.toLocaleString()}</span>
-            {selected?.isBestMatch && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-600">
-                ✦ Best Match
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-medium text-gray-800">{selected?.vendorName}</span>
+              <span className="inline-flex items-center gap-1 text-amber-400 text-xs font-semibold">
+                <Star size={11} fill="currentColor" />
+                {ratingValue ?? '—'}
               </span>
-            )}
-          </div>
-          <ChevronDown size={15} className={`text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-        </button>
+              <span className="text-xs uppercase tracking-widest text-gray-500">Rank {selected?.rank ?? '-'}</span>
+              <span className="font-semibold text-gray-700">
+                {currencyLabel} {selected?.taskPrice.toLocaleString()}
+              </span>
+              {selected?.isBestMatch && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-600">
+                  ✦ Best Match
+                </span>
+              )}
+            </div>
+            <ChevronDown size={15} className={`text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+          </button>
 
         {/* Dropdown options */}
         {open && (
@@ -71,19 +80,22 @@ function TaskRow({
                 onClick={() => { onSelect(item.taskId, offering); setOpen(false); }}
                 className={`w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-gray-50 transition ${offering.offeringId === item.offeringId ? 'bg-indigo-50' : ''}`}
               >
-                <div className="flex items-center gap-3">
-                  <span className="font-medium text-gray-800">{offering.vendorName}</span>
-                  <span className="flex items-center gap-1 text-amber-400 text-xs font-semibold">
-                    <Star size={11} fill="currentColor" />
-                    {offering.rating}
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="font-medium text-gray-800">{offering.vendorName}</span>
+                <span className="inline-flex items-center gap-1 text-amber-400 text-xs font-semibold">
+                  <Star size={11} fill="currentColor" />
+                  {offering.rating ?? Number((offering.score ?? 0).toFixed(1))}
+                </span>
+                <span className="text-xs uppercase tracking-widest text-gray-500">Rank {offering.rank ?? '-'}</span>
+                {offering.isBestMatch && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-600">
+                    ✦ Best Match
                   </span>
-                  {offering.isBestMatch && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-600">
-                      ✦ Best Match
-                    </span>
-                  )}
-                </div>
-                <span className="font-semibold text-gray-700">${offering.taskPrice.toLocaleString()}</span>
+                )}
+              </div>
+              <span className="font-semibold text-gray-700">
+                {offering.currency || 'LKR'} {offering.taskPrice.toLocaleString()}
+              </span>
               </button>
             ))}
           </div>
