@@ -92,6 +92,11 @@ async def test_plan_event_chat_raises_on_missing_reply_field():
 
 @pytest.mark.anyio
 async def test_plan_event_chat_defaults_missing_optional_fields():
+    """
+    With an empty event_context, all 4 planning facts are unknown.
+    _compute_missing correctly returns all 4 items — the service always
+    computes missingInfo server-side rather than trusting the model.
+    """
     response = _mock_http_response('{"reply":"Hello"}')
     with patch("httpx.AsyncClient.post", new=AsyncMock(return_value=response)):
         result = await groq_ai_service.plan_event_chat(
@@ -105,10 +110,33 @@ async def test_plan_event_chat_defaults_missing_optional_fields():
     assert "personaDraft" in result
     assert "eventFacts" in result
     assert "calendarIntent" in result
-    assert result["missingInfo"] == []
+    # With empty context all 4 planning facts are missing — this is correct.
+    assert set(result["missingInfo"]) == {"guestCount", "budget", "date", "expectations"}
     assert result["suggestedTasks"] == []
     assert result["intent"] == "chat"
     assert result["save_persona"] is False
+
+
+@pytest.mark.anyio
+async def test_plan_event_chat_no_missing_when_all_facts_known():
+    """
+    When event_context already has all 4 facts, missingInfo should be empty.
+    """
+    response = _mock_http_response('{"reply":"Here is your summary!","intent":"confirm"}')
+    with patch("httpx.AsyncClient.post", new=AsyncMock(return_value=response)):
+        result = await groq_ai_service.plan_event_chat(
+            content="Looks good",
+            history=[],
+            personas=[],
+            event_context={
+                "guest_count":   "10",
+                "budget_total":  "50000",
+                "event_date":    "2026-12-25",
+                "expectations":  "fun birthday party",
+            },
+            needs_persona=False,
+        )
+    assert result["missingInfo"] == []
 
 
 @pytest.mark.anyio
@@ -174,7 +202,15 @@ def test_system_prompt_contains_planning_mode_when_needs_persona_false():
 
 
 def test_system_prompt_contains_persona_block_when_personas_provided():
-    persona = SimpleNamespace(name="Amara", food_preferences=["sushi"])
+    persona = SimpleNamespace(
+        name="Amara",
+        food_preferences=["sushi"],
+        music_preferences=[],
+        personality_tags=[],
+        color_preferences=[],
+        relationship=None,
+        birthday=None,
+    )
     prompt = _build_system_prompt(event_context={}, personas=[persona], needs_persona=False)
     assert "Amara" in prompt
     assert "sushi" in prompt
@@ -195,10 +231,17 @@ def test_system_prompt_contains_event_context():
 
 
 def test_build_messages_includes_history():
+    """
+    History messages use sender/content fields (matching EventChatMessage model).
+    3 CUSTOMER + 3 AI messages = 6 history messages + 1 system + 1 user = 8 total.
+    """
     history = [
-        SimpleNamespace(user_message="u1", ai_message="a1"),
-        SimpleNamespace(user_message="u2", ai_message="a2"),
-        SimpleNamespace(user_message="u3", ai_message="a3"),
+        SimpleNamespace(sender="CUSTOMER", content="u1"),
+        SimpleNamespace(sender="AI",       content="a1"),
+        SimpleNamespace(sender="CUSTOMER", content="u2"),
+        SimpleNamespace(sender="AI",       content="a2"),
+        SimpleNamespace(sender="CUSTOMER", content="u3"),
+        SimpleNamespace(sender="AI",       content="a3"),
     ]
     messages = _build_messages(content="new message", history=history, system_prompt="system")
     assert len(messages) == 8
@@ -208,10 +251,42 @@ def test_build_messages_includes_history():
 
 
 def test_build_messages_caps_history_at_10():
-    history = [SimpleNamespace(user_message=f"u{i}", ai_message=f"a{i}") for i in range(15)]
+    """History is capped at _MAX_HISTORY=10 entries before the current message."""
+    history = [
+        SimpleNamespace(sender="CUSTOMER" if i % 2 == 0 else "AI", content=f"msg{i}")
+        for i in range(30)
+    ]
     messages = _build_messages(content="new", history=history, system_prompt="system")
-    history_messages = messages[1:-1]
-    assert len(history_messages) <= 20
+    # system + up to 10 history messages + 1 current user message = at most 12
+    assert len(messages) <= 12
+    assert messages[0]["role"] == "system"
+    assert messages[-1]["content"] == "new"
+
+
+def test_build_messages_skips_empty_content():
+    history = [
+        SimpleNamespace(sender="CUSTOMER", content=""),
+        SimpleNamespace(sender="AI",       content="  "),
+        SimpleNamespace(sender="CUSTOMER", content="valid message"),
+    ]
+    messages = _build_messages(content="new", history=history, system_prompt="system")
+    contents = [m["content"] for m in messages]
+    assert "" not in contents
+    assert "valid message" in contents
+
+
+def test_build_messages_handles_dict_history():
+    """_get_msg_attr must support plain dicts (used in unit tests and fixtures)."""
+    history = [
+        {"sender": "CUSTOMER", "content": "hello"},
+        {"sender": "AI",       "content": "hi there"},
+    ]
+    messages = _build_messages(content="new", history=history, system_prompt="system")
+    assert len(messages) == 4
+    assert messages[1]["role"] == "user"
+    assert messages[1]["content"] == "hello"
+    assert messages[2]["role"] == "assistant"
+    assert messages[2]["content"] == "hi there"
 
 
 @pytest.mark.anyio
@@ -238,3 +313,43 @@ async def test_recommend_offerings_for_task_returns_none_when_no_offerings():
         offerings=[],
     )
     assert result is None
+
+
+@pytest.mark.anyio
+async def test_budget_per_head_auto_computed():
+    """budgetPerHead should be computed from budgetTotal / guestCount."""
+    response = _mock_http_response(
+        '{"reply":"Got it","intent":"planning",'
+        '"eventFacts":{"guestCount":10,"budgetTotal":50000,"budgetPerHead":null}}'
+    )
+    with patch("httpx.AsyncClient.post", new=AsyncMock(return_value=response)):
+        result = await groq_ai_service.plan_event_chat(
+            content="10 guests, 50k budget",
+            history=[],
+            personas=[],
+            event_context={},
+            needs_persona=False,
+        )
+    assert result["eventFacts"]["budgetPerHead"] == 5000.0
+
+
+@pytest.mark.anyio
+async def test_missing_info_only_unknown_facts():
+    """missingInfo should exclude facts already known from event_context."""
+    response = _mock_http_response('{"reply":"Great","intent":"planning"}')
+    with patch("httpx.AsyncClient.post", new=AsyncMock(return_value=response)):
+        result = await groq_ai_service.plan_event_chat(
+            content="anything",
+            history=[],
+            personas=[],
+            event_context={
+                "guest_count":  "5",
+                "budget_total": "20000",
+                # date and expectations still missing
+            },
+            needs_persona=False,
+        )
+    assert "guestCount" not in result["missingInfo"]
+    assert "budget"     not in result["missingInfo"]
+    assert "date"           in result["missingInfo"]
+    assert "expectations"   in result["missingInfo"]
