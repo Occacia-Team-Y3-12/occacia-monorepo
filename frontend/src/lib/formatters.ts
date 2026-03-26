@@ -20,8 +20,8 @@ export const formatDateTime = (dateString: string): string => {
   }).format(date);
 };
 
-export const formatCurrency = (amount: number, currency = 'USD'): string => {
-  return new Intl.NumberFormat('en-US', {
+export const formatCurrency = (amount: number, currency = 'LKR'): string => {
+  return new Intl.NumberFormat('en-LK', {
     style: 'currency',
     currency,
   }).format(amount);

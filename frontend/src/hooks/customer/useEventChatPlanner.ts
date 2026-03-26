@@ -493,7 +493,7 @@ export const useEventChatPlanner = (eventId: string) => {
     return true;
   };
 
-  const setCalendarSync = async (enabled: boolean) => {
+  const setCalendarSync = async (enabled: boolean): Promise<boolean> => {
     setIsBusy(true);
     setError(null);
     setWarning(null);
@@ -511,7 +511,7 @@ export const useEventChatPlanner = (eventId: string) => {
     if (enabled && !latestStatus.connected) {
       setWarning('Calendar not connected. Connect provider first or use local reminders only.');
       setIsBusy(false);
-      return;
+      return false;
     }
 
     const result = await customerEventChatService.setCalendarSync(eventId, {
@@ -528,12 +528,13 @@ export const useEventChatPlanner = (eventId: string) => {
         setError(message);
       }
       setIsBusy(false);
-      return;
+      return false;
     }
 
     setCalendarSyncEnabled(enabled);
     setSuccess(enabled ? 'Calendar sync enabled.' : 'Calendar sync disabled.');
     setIsBusy(false);
+    return true;
   };
 
   const summarize = async () => {

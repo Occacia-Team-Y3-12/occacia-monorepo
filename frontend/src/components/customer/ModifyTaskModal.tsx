@@ -104,7 +104,7 @@ const ModifyTaskModal: FC<ModifyTaskModalProps> = ({
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{vendor.vendorName}</p>
                     <p className="text-sm text-gray-600">
-                      Rating: {vendor.rating} ⭐ | ${vendor.price}
+                      Rating: {vendor.rating} ⭐ | LKR {vendor.price}
                     </p>
                   </div>
                 </label>
