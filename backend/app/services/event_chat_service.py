@@ -42,8 +42,8 @@ from app.services.persona_service import persona_service
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_TZ  = "Asia/Colombo"
-_MAX_HISTORY = 10   # messages loaded from DB AND passed to Groq — test asserts <= 10
+_DEFAULT_TZ = "Asia/Colombo"
+_MAX_HISTORY = 10   # messages loaded from DB for Groq context
 
 
 class EventChatService:
@@ -75,7 +75,6 @@ class EventChatService:
             .filter(EventPersona.event_id == event_id)
             .all()
         )
-
         # 3 ── Load chat history (oldest-first, capped at _MAX_HISTORY) ──────
         history: list[EventChatMessage] = (
             db.query(EventChatMessage)
@@ -110,9 +109,9 @@ class EventChatService:
         except Exception as exc:
             logger.exception("Groq call failed for event %s: %s", event_id, exc)
             fallback = (
-                "I'm having trouble reaching the planning assistant right now 😅 "
-                "You can keep adding tasks manually, and we'll pick up where we left off "
-                "once I'm back online!"
+                "Hmm, I'm having a bit of trouble connecting right now. "
+                "I'm your planning assistant, so please keep adding tasks manually, "
+                "and we'll pick up where we left off once I'm back online!"
             )
             self._save_message(db, event_id=event_id, sender="AI", content=fallback)
             return ChatSendResponse(
@@ -446,3 +445,6 @@ class EventChatService:
 
 
 event_chat_service = EventChatService()
+
+
+
