@@ -2,22 +2,6 @@
 app/services/event_chat_service.py
 
 Single orchestrator for the Occi event chat flow (UC-13).
-
-What this file owns:
-  - Loading event, personas, history from DB
-  - Building event_context (DB is the source of truth, not AI output)
-  - Calling GroqAIService
-  - Persisting AI-extracted facts back to the Event model
-  - Saving persona drafts and linking them to the event
-  - Persisting suggested tasks (dedup by name)
-  - Pre-computing offering shortlists for newly created tasks
-  - Returning a fully-typed ChatSendResponse
-
-Key design guarantees:
-  - event_context is built from DB columns every turn → Occi always sees full state.
-  - AI-extracted facts are written back to DB so the NEXT turn's context is current.
-  - missingInfo is authoritative (computed in groq_ai_service, not trusted from model).
-  - Fallback reply is used when Groq is unreachable — no crash.
 """
 from __future__ import annotations
 
@@ -43,14 +27,10 @@ from app.services.persona_service import persona_service
 logger = logging.getLogger(__name__)
 
 _DEFAULT_TZ = "Asia/Colombo"
-_MAX_HISTORY = 10   # messages loaded from DB for Groq context
+_MAX_HISTORY = 10   
 
 
 class EventChatService:
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # Public entry point
-    # ─────────────────────────────────────────────────────────────────────────
 
     async def send_message(
         self,
@@ -61,21 +41,21 @@ class EventChatService:
     ) -> ChatSendResponse:
         customer_id = str(customer.customer_id)
 
-        # 1 ── Load & validate event ──────────────────────────────────────────
+        # 1 ── Load & validate event 
         event: Event = db.query(Event).filter(Event.event_id == event_id).first()
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
         if str(event.customer_id) != customer_id:
             raise HTTPException(status_code=403, detail="Not your event")
 
-        # 2 ── Load linked personas ───────────────────────────────────────────
+        # 2 ── Load linked personas 
         personas: list[Persona] = (
             db.query(Persona)
             .join(EventPersona, EventPersona.persona_id == Persona.persona_id)
             .filter(EventPersona.event_id == event_id)
             .all()
         )
-        # 3 ── Load chat history (oldest-first, capped at _MAX_HISTORY) ──────
+        # 3 ── Load chat history 
         history: list[EventChatMessage] = (
             db.query(EventChatMessage)
             .filter(EventChatMessage.event_id == event_id)
@@ -84,20 +64,20 @@ class EventChatService:
             .all()
         )
 
-        # 4 ── Determine needs_persona ────────────────────────────────────────
+        # 4 ── Determine needs_persona 
         event_type_upper = (event.event_type or "").upper()
         needs_persona    = event_type_upper != "GROUP" and not personas
 
-        # 5 ── Build event_context from DB (source of truth every turn) ───────
+        # 5 ── Build event_context 
         existing_tasks: list[Task] = (
             db.query(Task).filter(Task.event_id == event_id).all()
         )
         event_context = self._build_event_context(event, existing_tasks)
 
-        # 6 ── Persist the customer message ───────────────────────────────────
+        # 6 ── Persist the customer message 
         self._save_message(db, event_id=event_id, sender="CUSTOMER", content=content)
 
-        # 7 ── Call Groq ───────────────────────────────────────────────────────
+        # 7 ── Call Groq 
         try:
             ai_output = await groq_ai_service.plan_event_chat(
                 content=content,
@@ -126,13 +106,13 @@ class EventChatService:
 
         reply: str = ai_output.get("reply", "")
 
-        # 8 ── Persist AI reply ────────────────────────────────────────────────
+        # 8 ── Persist AI reply 
         self._save_message(db, event_id=event_id, sender="AI", content=reply)
 
-        # 9 ── Write AI-extracted facts back to the Event model ────────────────
+        # 9 ── Write AI-extracted facts back to Event model 
         self._persist_extracted_facts(db, event=event, ai_output=ai_output)
 
-        # 10 ── Save persona draft if flagged ──────────────────────────────────
+        # 10 ── Save persona draft if flagged 
         persona_saved     = False
         persona_confirmed = False
 
@@ -170,6 +150,9 @@ class EventChatService:
             if not task_name:
                 continue
 
+            # NEW: Extract vendor category from the AI output
+            vendor_category = t.get("vendor_category")
+
             suggested_out.append(
                 SuggestedTaskDraftResponse(
                     name=task_name,
@@ -190,6 +173,8 @@ class EventChatService:
                             "description": t.get("description"),
                             "quantity":    int(t.get("quantity") or 1),
                             "currency":    t.get("currency", "LKR"),
+                            "vendor_category": vendor_category, # NEW: Pass the category!
+                            "needs_vendor": True # NEW: Force the system to look for a vendor
                         },
                     )
                     new_task_ids.append(task_obj.task_id)
@@ -197,7 +182,7 @@ class EventChatService:
                 except Exception as exc:
                     logger.warning("Task persist failed '%s': %s", task_name, exc)
 
-        # 12 ── Pre-compute offering shortlists for new tasks ──────────────────
+        # 12 ── Pre-compute offering shortlists for new tasks 
         for task_id in new_task_ids:
             try:
                 task_obj = db.query(Task).filter(Task.task_id == task_id).first()
@@ -213,7 +198,6 @@ class EventChatService:
             except Exception as exc:
                 logger.warning("Shortlist failed for task %s: %s", task_id, exc)
 
-        # 13 ── Return response ────────────────────────────────────────────────
         return ChatSendResponse(
             reply=reply,
             suggestedTasks=suggested_out,
@@ -224,22 +208,11 @@ class EventChatService:
             personaConfirmed=persona_confirmed,
         )
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Context builder  DB → prompt dict
-    # ─────────────────────────────────────────────────────────────────────────
-
     def _build_event_context(
         self,
         event: Event,
         existing_tasks: list[Task],
     ) -> dict:
-        """
-        Build the canonical event_context dict from DB columns.
-        This dict is passed to Groq every turn — it is the single source of truth.
-
-        Soft facts (guest_count, budget, expectations) are encoded in
-        event.description as a [FACTS:...] prefix until dedicated columns exist.
-        """
         ctx: dict = {
             "title":           event.title,
             "event_type":      event.event_type,
@@ -252,20 +225,17 @@ class EventChatService:
             "existing_tasks":  [t.name for t in existing_tasks],
         }
 
-        # Native date column
         if event.start_at:
             try:
                 ctx["event_date"] = event.start_at.date().isoformat()
             except Exception:
                 pass
 
-        # Soft facts from description prefix
         soft = self._parse_facts(event.description or "")
         for key in ("guest_count", "budget_total", "budget_per_head", "expectations"):
             if soft.get(key):
                 ctx[key] = soft[key]
 
-        # Auto-compute budget_per_head if we have both
         if ctx["budget_total"] and ctx["guest_count"] and not ctx["budget_per_head"]:
             try:
                 ctx["budget_per_head"] = round(
@@ -276,31 +246,15 @@ class EventChatService:
 
         return ctx
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Fact persistence  AI output → DB
-    # ─────────────────────────────────────────────────────────────────────────
-
     def _persist_extracted_facts(
         self,
         db: Session,
         event: Event,
         ai_output: dict,
     ) -> None:
-        """
-        Write AI-extracted eventFacts back to the Event model so the next turn
-        picks them up from the DB via _build_event_context.
-
-        Strategy:
-          • Native columns (start_at, timezone, location_text) — set directly.
-          • Soft facts (guest_count, budget, expectations) — stored as a
-            structured prefix in event.description.
-          • Never overwrite an already-set native column with a new value
-            unless the column was null — this prevents drift from corrections.
-        """
         ef      = ai_output.get("eventFacts") or {}
         changed = False
 
-        # ── Native: date ──────────────────────────────────────────────────────
         if ef.get("date") and not event.start_at:
             tz_str = ef.get("timezone") or _DEFAULT_TZ
             aware  = self._parse_date(ef["date"], tz_str)
@@ -309,17 +263,14 @@ class EventChatService:
                 event.timezone = tz_str
                 changed = True
 
-        # ── Native: timezone only (no date change) ───────────────────────────
         if ef.get("timezone") and not event.timezone:
             event.timezone = ef["timezone"]
             changed = True
 
-        # ── Native: location ─────────────────────────────────────────────────
         if ef.get("location") and not event.location_text:
             event.location_text = ef["location"]
             changed = True
 
-        # ── Soft facts → description prefix ──────────────────────────────────
         current = self._parse_facts(event.description or "")
         soft_changed = False
 
@@ -354,15 +305,10 @@ class EventChatService:
                 ef.get("budgetTotal"),
             )
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Description fact serialisation helpers
-    # ─────────────────────────────────────────────────────────────────────────
-
     _PREFIX_START = "[FACTS:"
     _PREFIX_END   = "]\n"
 
     def _parse_facts(self, description: str) -> dict[str, str]:
-        """Extract {key: value} from the [FACTS:k=v,k=v] prefix."""
         if not description.startswith(self._PREFIX_START):
             return {}
         end = description.find(self._PREFIX_END)
@@ -379,7 +325,6 @@ class EventChatService:
         return result
 
     def _write_facts(self, facts: dict[str, str], existing: str) -> str:
-        """Overwrite the [FACTS:...] prefix; keep the human-text body below."""
         if existing.startswith(self._PREFIX_START):
             end = existing.find(self._PREFIX_END)
             if end != -1:
@@ -388,13 +333,8 @@ class EventChatService:
         prefix = f"{self._PREFIX_START}{pairs}{self._PREFIX_END}"
         return prefix + existing
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Date / timezone helpers
-    # ─────────────────────────────────────────────────────────────────────────
-
     @staticmethod
     def _parse_date(date_str: str, tz_str: str) -> datetime | None:
-        """Parse YYYY-MM-DD → aware datetime at 09:00 local time."""
         try:
             naive = datetime.strptime(date_str.strip(), "%Y-%m-%d")
         except ValueError:
@@ -405,10 +345,6 @@ class EventChatService:
         except (ZoneInfoNotFoundError, Exception):
             tz = ZoneInfo("UTC")
         return datetime(naive.year, naive.month, naive.day, 9, 0, 0, tzinfo=tz)
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # DB helpers
-    # ─────────────────────────────────────────────────────────────────────────
 
     @staticmethod
     def _save_message(
@@ -443,8 +379,4 @@ class EventChatService:
             db.add(EventPersona(event_id=event_id, persona_id=persona_id))
             db.commit()
 
-
 event_chat_service = EventChatService()
-
-
-

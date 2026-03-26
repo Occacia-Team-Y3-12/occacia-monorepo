@@ -9,16 +9,19 @@ import logging
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Query, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Response, status, HTTPException
 from sqlalchemy.orm import Session
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.database import get_db
 from app.models.customer import Customer
 from app.models.task import Task
 from app.models.package_execution_request import PackageExecutionRequest
 from app.models.task_request import TaskRequest
+from app.models.vendor import Vendor
 from app.core.dependencies import get_current_customer
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from app.core.security import decode_token
+
 from app.schemas.customer_schema import (
     CustomerProfileResponse,
     CustomerProfileUpdateRequest,
@@ -79,6 +82,7 @@ from app.schemas.package_schema import (
     ReassignTaskRequest,
     ReassignTaskResponse,
 )
+
 from app.services.customer_service import customer_service
 from app.services.event_planning_service import event_planning_service
 from app.services.package_order_service import package_order_service
@@ -88,43 +92,38 @@ from app.services.offering_service import offering_service
 from app.services.inquiry_service import inquiry_service
 
 _bearer = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
+router = APIRouter(tags=["Customer"])
 
 
 def get_authenticated_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
 ):
-    from fastapi import HTTPException as _HTTPEx
-    from app.core.security import decode_token as _decode
-    from app.models.vendor import Vendor as _Vendor
-
+    """Dependency to get authenticated user (Customer or Vendor)."""
     if credentials is None:
-        raise _HTTPEx(status_code=401, detail="Not authenticated")
+        raise HTTPException(status_code=401, detail="Not authenticated")
 
     token = credentials.credentials
 
     try:
-        payload = _decode(token)
+        payload = decode_token(token)
         email: str | None = payload.get("sub")
     except Exception:
-        raise _HTTPEx(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     if not email:
-        raise _HTTPEx(status_code=401, detail="Invalid token payload")
+        raise HTTPException(status_code=401, detail="Invalid token payload")
 
     customer = db.query(Customer).filter(Customer.email == email).first()
     if customer:
         return customer
 
-    vendor = db.query(_Vendor).filter(_Vendor.email == email).first()
+    vendor = db.query(Vendor).filter(Vendor.email == email).first()
     if vendor:
         return vendor
 
-    raise _HTTPEx(status_code=401, detail="User not found")
-
-
-logger = logging.getLogger(__name__)
-router = APIRouter(tags=["Customer"])
+    raise HTTPException(status_code=401, detail="User not found")
 
 
 # ── Response Builders ─────────────────────────────────────────────────────────
@@ -628,8 +627,8 @@ def get_task_offerings(
     )
     task = db.query(Task).filter(Task.task_id == task_id, Task.event_id == event_id).first()
     if not task:
-        from fastapi import HTTPException as _HTTPEx
-        raise _HTTPEx(status_code=404, detail="Task not found")
+        raise HTTPException(status_code=404, detail="Task not found")
+        
     task_offerings = offering_service.get_task_offerings(db, task_id=task_id)
     items = []
     for task_offering in task_offerings:
@@ -679,8 +678,8 @@ def select_task_offering(
     )
     task = db.query(Task).filter(Task.task_id == task_id, Task.event_id == event_id).first()
     if not task:
-        from fastapi import HTTPException as _HTTPEx
-        raise _HTTPEx(status_code=404, detail="Task not found")
+        raise HTTPException(status_code=404, detail="Task not found")
+        
     task_offering = offering_service.select_offering(
         db,
         task_id=task_id,
