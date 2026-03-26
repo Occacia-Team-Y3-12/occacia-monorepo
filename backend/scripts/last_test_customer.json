@@ -1,0 +1,7 @@
+{
+    "email":  "test+f1c97dfd@example.com",
+    "password":  "Test1234!",
+    "register":  {
+                     "message":  "Registration successful. Please verify your email."
+                 }
+}
