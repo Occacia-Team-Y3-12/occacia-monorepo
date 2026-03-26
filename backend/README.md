@@ -121,35 +121,14 @@ poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Open Windows PowerShell after Python 3.11 is installed, then continue here.
 
-1. Install Poetry.
-
-```powershell
-(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
-```
-
-Use Poetry directly from its installed location in the current PowerShell session:
-
-```powershell
-$Poetry = "$env:APPDATA\Python\Scripts\poetry.exe"
-& $Poetry --version
-```
-
-Optional: add Poetry to your user `PATH` for future terminals:
-
-```powershell
-[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:APPDATA\Python\Scripts", "User")
-```
-
-Then restart PowerShell. In the steps below, you can keep using `& $Poetry ...` even if you do not update `PATH`.
-
-2. Create the virtual environment.
+1. Create and activate the virtual environment.
 
 ```powershell
 cd backend
 py -3.11 -m venv .venv
 ```
 
-3. Activate it.
+2. Activate it.
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -171,18 +150,23 @@ Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 .\.venv\Scripts\Activate.ps1
 ```
 
-No activation:
+No activation (use full paths to the virtual environment):
 
 ```powershell
 .\.venv\Scripts\python -m pip install --upgrade pip
-& $Poetry sync --no-root
 ```
 
-4. If activation worked, install dependencies.
+3. Upgrade pip and install Poetry using pip (recommended for Windows).
 
 ```powershell
 python -m pip install --upgrade pip
-& $Poetry sync --no-root
+python -m pip install poetry
+```
+
+4. Install dependencies.
+
+```powershell
+poetry sync --no-root
 ```
 
 5. Create the local env file.
@@ -210,30 +194,22 @@ docker compose -f docker-compose-local.yml up -d
 
 8. Run migrations.
 
-Activated venv:
-
 ```powershell
-& $Poetry run alembic upgrade head
-```
-
-No activation:
-
-```powershell
-& $Poetry run alembic upgrade head
+poetry run alembic upgrade head
 ```
 
 9. Start the API.
 
-Activated venv:
-
 ```powershell
-& $Poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-No activation:
+**Note:** If you prefer not to activate the virtual environment, you can use full paths to the virtual environment Python executable:
 
 ```powershell
-& $Poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+.\.venv\Scripts\poetry sync --no-root
+.\.venv\Scripts\poetry run alembic upgrade head
+.\.venv\Scripts\poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Configuration
