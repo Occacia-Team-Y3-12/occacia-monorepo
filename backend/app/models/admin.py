@@ -1,5 +1,5 @@
 from __future__ import annotations
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from app.common.utils import generate_prefixed_id
 from app.core.database import Base
 
@@ -11,3 +11,7 @@ class Admin(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     staff_role = Column(String, nullable=True, default="staff")
+    email_verified = Column(Boolean, default=False, nullable=False)
+    status = Column(String, default="PENDING", nullable=False)
+    verification_token = Column(String, nullable=True)
+    verification_token_expires_at = Column(DateTime(timezone=True), nullable=True)

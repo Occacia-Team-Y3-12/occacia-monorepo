@@ -520,6 +520,26 @@ def refresh_vendor_token(payload: RefreshTokenRequest, db: Session = Depends(get
 # ADMIN routes
 # ═══════════════════════════════════════════════════════════════════════════════
 
+@router.get("/admin/verify-email")
+def verify_admin_email(token: str = Query(...), db: Session = Depends(get_db)):
+    """
+    Verify admin email via the link sent in the registration email.
+    Frontend should redirect here with the token as a query param.
+    """
+    from app.services.admin_service import admin_service
+    return admin_service.verify_admin_email(db, token)
+
+
+@router.post("/admin/email-verification/resend", response_model=AuthMessageResponse)
+def resend_admin_verification_email(
+    payload: ResendVerificationRequest,
+    db: Session = Depends(get_db),
+):
+    """Resend admin verification email (link-based)."""
+    from app.services.admin_service import admin_service
+    return admin_service.resend_admin_verification_email(db, str(payload.email))
+
+
 @router.post("/admin/login", tags=["Authentication"])
 def admin_login(payload: AdminLoginRequest, db: Session = Depends(get_db)):
     """

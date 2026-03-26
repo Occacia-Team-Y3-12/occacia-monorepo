@@ -46,6 +46,9 @@ export const ROUTES = {
   ADMIN: {
     HOME: '/admin',
     LOGIN: '/admin/login',
+    SIGNUP: '/admin/signup',
+    FORGOT_PASSWORD: '/admin/forgot-password',
+    VERIFY_EMAIL: '/admin/verify-email',
     DASHBOARD: '/admin/dashboard',
     APPROVALS: '/admin/approvals',
     USERS: '/admin/users',

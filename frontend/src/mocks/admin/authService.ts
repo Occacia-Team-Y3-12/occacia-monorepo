@@ -1,4 +1,13 @@
-import type { AdminLoginRequest, AdminLoginResponse } from '@/types/admin/auth';
+import type {
+  AdminForgotPasswordResponse,
+  AdminLoginRequest,
+  AdminLoginResponse,
+  AdminRegisterRequest,
+  AdminRegisterResponse,
+  AdminResetPasswordResponse,
+  AdminVerifyEmailResponse,
+  AdminVerifyOtpResponse,
+} from '@/types/admin/auth';
 
 const ADMIN_TOKEN_KEY = 'admin_token';
 const ADMIN_ROLE_KEY = 'admin_role';
@@ -34,6 +43,46 @@ function createMockAdminToken() {
 }
 
 export const adminAuthServiceMock = {
+  async register(payload: AdminRegisterRequest): Promise<AdminRegisterResponse> {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    if (!payload.email.trim() || !payload.password.trim()) {
+      throw new Error('Email and password are required.');
+    }
+    return {
+      message: 'Registration successful. Please verify your email.',
+      email: payload.email,
+      staff_role: payload.staffRole ?? 'staff',
+    };
+  },
+
+  async verifyEmail(): Promise<AdminVerifyEmailResponse> {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    return { message: 'Email verified successfully.' };
+  },
+
+  async resendVerification(): Promise<AdminVerifyEmailResponse> {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    return { message: 'Verification email resent successfully.' };
+  },
+
+  async forgotPassword(): Promise<AdminForgotPasswordResponse> {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    return { message: 'If this email is registered, a reset code has been sent.' };
+  },
+
+  async verifyPasswordOtp(): Promise<AdminVerifyOtpResponse> {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    return {
+      resetToken: 'mock-reset-token',
+      message: 'OTP verified. You may now reset your password.',
+    };
+  },
+
+  async resetPassword(): Promise<AdminResetPasswordResponse> {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    return { message: 'Password updated successfully.' };
+  },
+
   async login(payload: AdminLoginRequest): Promise<AdminLoginResponse> {
     await new Promise((resolve) => setTimeout(resolve, 250));
 
