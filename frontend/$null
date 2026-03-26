@@ -1,8 +1,0 @@
-Invoke-WebRequest : The remote name could not be resolved: 'placeholder-url'
-At line:1 char:1
-+ Invoke-WebRequest -Uri 'https://placeholder-url/profit-icon.png' -Out ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-WebRequest], WebExc 
-   eption
-    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeWebRequestCommand
- 
