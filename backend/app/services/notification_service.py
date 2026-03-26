@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 TASK_CONFIRMED_NOTIFICATION             = "TASK_CONFIRMED"
 CUSTOMER_VERIFICATION_NOTIFICATION     = "CUSTOMER_VERIFICATION"
 VENDOR_VERIFICATION_NOTIFICATION       = "VENDOR_VERIFICATION"
+ADMIN_VERIFICATION_NOTIFICATION        = "ADMIN_VERIFICATION"
 CUSTOMER_PASSWORD_RESET_LINK           = "CUSTOMER_PASSWORD_RESET_LINK"
 VENDOR_PASSWORD_RESET_LINK             = "VENDOR_PASSWORD_RESET_LINK"
 ADMIN_LOGIN_OTP_NOTIFICATION           = "ADMIN_LOGIN_OTP"
@@ -133,6 +134,32 @@ _TEMPLATES: dict[str, NotificationTemplate] = {
             "<p>After verification, your account will be reviewed by our team. "
             "You will receive an email once approved.</p>"
             "<p style='color:#888;font-size:13px;'>This link expires in 24 hours.</p>"
+            "</div></body></html>"
+        ),
+    ),
+
+    ADMIN_VERIFICATION_NOTIFICATION: NotificationTemplate(
+        subject="Verify your Occacia admin account",
+        text_body=(
+            "Welcome to Occacia Admin, {userName}!\n\n"
+            "Please verify your admin email address to activate your account:\n\n"
+            "{verificationLink}\n\n"
+            "This link expires in 24 hours.\n"
+            "If you did not create an admin account, contact your system administrator."
+        ),
+        html_body=(
+            "<html><body style='font-family:Arial,sans-serif;color:#333;max-width:600px;margin:auto;'>"
+            "<div style='background:#1a1a2e;padding:24px;text-align:center;'>"
+            "<h1 style='color:#fff;margin:0;font-size:24px;'>Occacia Admin</h1></div>"
+            "<div style='padding:32px;'>"
+            "<h2 style='color:#6C3FC5;'>Welcome, {userName}!</h2>"
+            "<p>Please verify your admin email address to activate your account.</p>"
+            "<div style='text-align:center;margin:32px 0;'>"
+            "<a href='{verificationLink}' style='background:#6C3FC5;color:#fff;"
+            "padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:bold;"
+            "font-size:16px;'>Verify Admin Account</a></div>"
+            "<p style='color:#888;font-size:13px;'>This link expires in 24 hours.<br>"
+            "If you did not create an admin account, contact your system administrator.</p>"
             "</div></body></html>"
         ),
     ),
@@ -496,6 +523,25 @@ class NotificationService:
                 "userName": admin.email,
                 "userEmail": admin.email,
                 "otpCode": otp_code,
+            },
+        )
+
+    def queue_admin_verification(
+        self, db: Session, *, admin: Admin, verification_token: str,
+    ) -> Notification | None:
+        return self.enqueue_notification(
+            db,
+            notification_type=ADMIN_VERIFICATION_NOTIFICATION,
+            recipient_id=admin.admin_id,
+            context_data={
+                "userId": admin.admin_id,
+                "userName": admin.email,
+                "userEmail": admin.email,
+                "verificationToken": verification_token,
+                "verificationLink": (
+                    f"https://app.occacia.com/admin/verify-email"
+                    f"?token={verification_token}"
+                ),
             },
         )
 

@@ -1,7 +1,16 @@
 import { featureFlags } from '@/config/featureFlags';
 import { adminAuthServiceMock } from '@/mocks/admin/authService';
 import { api } from '@/services/api';
-import type { AdminLoginRequest, AdminLoginResponse } from '@/types/admin/auth';
+import type {
+  AdminForgotPasswordResponse,
+  AdminLoginRequest,
+  AdminLoginResponse,
+  AdminRegisterRequest,
+  AdminRegisterResponse,
+  AdminResetPasswordResponse,
+  AdminVerifyEmailResponse,
+  AdminVerifyOtpResponse,
+} from '@/types/admin/auth';
 
 const ADMIN_TOKEN_KEY = 'admin_token';
 const ADMIN_ROLE_KEY = 'admin_role';
@@ -66,6 +75,52 @@ const sharedAdminAuthMethods = {
 };
 
 const apiAdminAuthService = {
+  async register(payload: AdminRegisterRequest): Promise<AdminRegisterResponse> {
+    const { data } = await api.post<AdminRegisterResponse>('/auth/admin/register', {
+      email: payload.email,
+      password: payload.password,
+      staff_role: payload.staffRole ?? 'staff',
+    });
+    return data;
+  },
+
+  async verifyEmail(token: string): Promise<AdminVerifyEmailResponse> {
+    const { data } = await api.get<AdminVerifyEmailResponse>('/auth/admin/verify-email', {
+      params: { token },
+    });
+    return data;
+  },
+
+  async resendVerification(email: string): Promise<AdminVerifyEmailResponse> {
+    const { data } = await api.post<AdminVerifyEmailResponse>('/auth/admin/email-verification/resend', {
+      email,
+    });
+    return data;
+  },
+
+  async forgotPassword(email: string): Promise<AdminForgotPasswordResponse> {
+    const { data } = await api.post<AdminForgotPasswordResponse>('/auth/admin/password/forgot', {
+      email,
+    });
+    return data;
+  },
+
+  async verifyPasswordOtp(email: string, otp: string): Promise<AdminVerifyOtpResponse> {
+    const { data } = await api.post<AdminVerifyOtpResponse>('/auth/admin/password/verify-otp', {
+      email,
+      otp,
+    });
+    return data;
+  },
+
+  async resetPassword(resetToken: string, newPassword: string): Promise<AdminResetPasswordResponse> {
+    const { data } = await api.post<AdminResetPasswordResponse>('/auth/admin/password/reset', {
+      reset_token: resetToken,
+      new_password: newPassword,
+    });
+    return data;
+  },
+
   async login(payload: AdminLoginRequest): Promise<AdminLoginResponse> {
     const formData = new URLSearchParams();
     formData.set('username', payload.email);

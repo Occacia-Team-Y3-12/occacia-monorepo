@@ -4,6 +4,7 @@ app/services/admin_service.py
 from __future__ import annotations
 
 import logging
+import os
 import random
 import string
 from datetime import UTC, datetime, timedelta, timezone
@@ -40,6 +41,7 @@ ADMIN_TOKEN_EXPIRE_MINUTES = 120
 OTP_TTL_SECONDS            = 300   # 5 minutes
 OTP_LENGTH                 = 6
 RESET_TOKEN_TTL_MINUTES    = 10
+EMAIL_VERIFICATION_TTL_HOURS = 24
 
 _TERMINAL_TASK_STATUSES    = {"DONE"}
 _ACTIVE_TASK_STATUSES      = {"PENDING", "ASSIGNED", "IN_PROGRESS"}
@@ -96,6 +98,25 @@ class AdminService:
             raise HTTPException(status_code=400, detail="Invalid reset token.")
         return claims
 
+    def _create_verification_token(self, email: str) -> tuple[str, datetime]:
+        expires_at = datetime.now(UTC) + timedelta(hours=EMAIL_VERIFICATION_TTL_HOURS)
+        token = jwt.encode(
+            {"sub": email, "type": "verify_admin_email", "exp": expires_at},
+            SECRET_KEY, algorithm=ALGORITHM,
+        )
+        return token, expires_at
+
+    def _decode_verification_token(self, token: str) -> dict:
+        try:
+            claims = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        except jwt.ExpiredSignatureError as exc:
+            raise HTTPException(status_code=400, detail="Verification token has expired.") from exc
+        except jwt.PyJWTError as exc:
+            raise HTTPException(status_code=400, detail="Invalid verification token.") from exc
+        if claims.get("type") != "verify_admin_email":
+            raise HTTPException(status_code=400, detail="Invalid verification token.")
+        return claims
+
     # ── Registration ──────────────────────────────────────────────────────────
 
     def register_admin(
@@ -103,16 +124,68 @@ class AdminService:
     ) -> Admin:
         if db.query(Admin).filter(Admin.email == email).first():
             raise HTTPException(status_code=400, detail="Email already registered.")
+        verification_token, expires_at = self._create_verification_token(email)
         admin = Admin(
             email=email,
             password_hash=get_password_hash(password),
             staff_role=staff_role or "staff",
+            email_verified=False,
+            status="PENDING",
+            verification_token=verification_token,
+            verification_token_expires_at=expires_at,
         )
         db.add(admin)
         db.commit()
         db.refresh(admin)
+        try:
+            from app.services.notification_service import notification_service
+            notification_service.queue_admin_verification(
+                db, admin=admin, verification_token=verification_token,
+            )
+        except Exception as exc:
+            logger.error("Failed to queue admin verification email: %s", exc)
         logger.info("New admin created: %s (%s)", admin.email, admin.staff_role)
         return admin
+
+    def verify_admin_email(self, db: Session, token: str) -> dict[str, str]:
+        claims = self._decode_verification_token(token)
+        email = claims.get("sub")
+        admin = db.query(Admin).filter(Admin.email == email).first()
+        if not admin:
+            raise HTTPException(status_code=400, detail="Invalid verification token.")
+        if admin.email_verified:
+            return {"message": "Email already verified"}
+        if admin.verification_token != token:
+            raise HTTPException(status_code=400, detail="Invalid verification token.")
+        admin.email_verified = True
+        admin.status = "ACTIVE"
+        admin.verification_token = None
+        admin.verification_token_expires_at = None
+        db.add(admin)
+        db.commit()
+        return {"message": "Email verified successfully"}
+
+    def resend_admin_verification_email(self, db: Session, email: str) -> dict[str, str]:
+        admin = db.query(Admin).filter(Admin.email == email).first()
+        if not admin:
+            raise HTTPException(status_code=400, detail="Admin account not found.")
+        if admin.email_verified or getattr(admin, "status", None) == "ACTIVE":
+            raise HTTPException(status_code=400, detail="Email already verified.")
+        verification_token, expires_at = self._create_verification_token(email)
+        admin.verification_token = verification_token
+        admin.verification_token_expires_at = expires_at
+        db.add(admin)
+        db.commit()
+        db.refresh(admin)
+        try:
+            from app.services.notification_service import notification_service
+            notification_service.queue_admin_verification(
+                db, admin=admin, verification_token=verification_token,
+            )
+        except Exception as exc:
+            logger.error("Failed to queue admin verification email: %s", exc)
+            raise HTTPException(status_code=500, detail="Failed to send verification email.")
+        return {"message": "Verification email resent successfully."}
 
     # ── Login — Step 1: validate password → send OTP ──────────────────────────
 
@@ -120,6 +193,11 @@ class AdminService:
         admin = db.query(Admin).filter(Admin.email == email).first()
         if not admin or not verify_password(password, admin.password_hash):
             raise HTTPException(status_code=401, detail="Incorrect email or password.")
+        if os.getenv("SKIP_EMAIL_VERIFICATION") != "true" and not admin.email_verified:
+            raise HTTPException(status_code=403, detail="Email not verified.")
+        status_value = getattr(admin, "status", "ACTIVE")
+        if status_value and status_value != "ACTIVE":
+            raise HTTPException(status_code=403, detail="Admin account is not active.")
 
         otp_code  = _generate_otp()
         redis     = _get_redis()

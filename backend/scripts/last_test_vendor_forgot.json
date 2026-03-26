@@ -1,0 +1,6 @@
+{
+    "forgot":  {
+                   "message":  "If this email is registered, a password reset link has been sent."
+               },
+    "email":  "vendor+e0235244@example.com"
+}
