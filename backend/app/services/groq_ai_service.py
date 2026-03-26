@@ -19,12 +19,22 @@ import logging
 import re
 from typing import Any, Optional
 
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+_DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+
 class GroqAIService:
     def __init__(self):
-        self.groq_api_key = None  # Should be set from config or env
+        self.groq_api_key = settings.GROQ_API_KEY
 
     async def plan_event_chat(self, content, history, personas, event_context, needs_persona):
         import httpx
+
+        api_key = self.groq_api_key or settings.GROQ_API_KEY
+        if not api_key:
+            logger.warning("GROQ_API_KEY is not configured; Groq calls will fail.")
 
         system_prompt = _build_system_prompt(event_context or {}, personas or [], needs_persona)
         messages = _build_messages(content=content, history=history or [], system_prompt=system_prompt)
@@ -34,11 +44,11 @@ class GroqAIService:
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={
-                        "Authorization": f"Bearer {self.groq_api_key}" if self.groq_api_key else "",
+                        "Authorization": f"Bearer {api_key}" if api_key else "",
                         "Content-Type": "application/json",
                     },
                     json={
-                        "model": "llama-3.1-70b-versatile",
+                        "model": _DEFAULT_GROQ_MODEL,
                         "temperature": 0.72,
                         "messages": messages,
                     },
