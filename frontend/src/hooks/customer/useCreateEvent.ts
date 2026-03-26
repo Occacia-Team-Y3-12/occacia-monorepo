@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { customerEventService } from '@/services/customer/eventServices';
 import { customerPersonaService } from '@/services/customer/personaService';
 import { ROUTES } from '@/lib/routes';
-import { CreateCustomerEventPayload, CustomerPersonaOption, CustomerPersona, CustomerEventType, EventTypeOption } from '@/types/customer';
+import { CreateCustomerEventPayload, CustomerPersonaOption, CustomerEventType, EventTypeOption } from '@/types/customer';
+import type { CustomerPersona } from '@/types/customer/persona';
 import { featureFlags } from '@/config/featureFlags';
 import {
   getEventTypeKey,

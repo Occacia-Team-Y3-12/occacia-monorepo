@@ -148,7 +148,7 @@ const buildShortlistForItem = (
     rank: index + 3,
     rating: 4.2 - index * 0.2,
     isBestMatch: false,
-    description: offering.offeringCategory,
+    description: offering.description ?? offering.offeringTitle,
     unit: 'unit',
   })),
 ];

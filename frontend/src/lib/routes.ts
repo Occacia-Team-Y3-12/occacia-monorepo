@@ -24,6 +24,7 @@ export const ROUTES = {
     PERSONA: '/customer/persona',
     PERSONA_NEW: '/customer/persona/new',
     PERSONA_DETAIL: (personaId: string) => `/customer/persona/${personaId}`,
+    SETTINGS: '/customer/settings',
   },
   VENDOR: {
     LOGIN: '/vendor/auth/login',

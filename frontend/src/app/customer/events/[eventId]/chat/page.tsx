@@ -135,18 +135,36 @@ export default function CustomerEventChatPage() {
     }
   };
 
-  const onSaveDraft = async () => {
+  const persistScheduleAndReminders = async () => {
     const scheduleSaved = await saveSchedule();
     if (!scheduleSaved) {
-      return;
+      return false;
     }
 
     const remindersSaved = await saveReminders();
     if (!remindersSaved) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const onSaveDraft = async () => {
+    const persisted = await persistScheduleAndReminders();
+    if (!persisted) {
       return;
     }
 
     router.replace(ROUTES.CUSTOMER.EVENTS);
+  };
+
+  const goToDraftPage = async () => {
+    const persisted = await persistScheduleAndReminders();
+    if (!persisted) {
+      return;
+    }
+
+    router.push(ROUTES.CUSTOMER.EVENT_DRAFT_REVIEW(eventId || ''));
   };
 
   const handleCalendarSyncToggle = async (nextEnabled: boolean) => {
@@ -587,7 +605,7 @@ export default function CustomerEventChatPage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push(ROUTES.CUSTOMER.EVENT_DRAFT_REVIEW(eventId || ''))}
+              onClick={() => void goToDraftPage()}
               className="h-14 w-full rounded-[18px] bg-[#0D47A1] px-6 text-[13px] font-semibold uppercase tracking-[0.08em] text-white disabled:opacity-60"
             >
               Confirm Tasks & View Recommendations
