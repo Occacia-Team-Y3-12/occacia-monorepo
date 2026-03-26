@@ -1,0 +1,63 @@
+{
+    "reply":  "Please find the suggested tasks for Amara\u0027s birthday party below.",
+    "suggestedTasks":  [
+                           {
+                               "name":  "Cake",
+                               "description":  "Order cake",
+                               "quantity":  1,
+                               "needsVendor":  false,
+                               "vendorCategory":  null,
+                               "budgetMin":  null,
+                               "budgetMax":  null,
+                               "currency":  "LKR"
+                           },
+                           {
+                               "name":  "Venue",
+                               "description":  "Book a venue",
+                               "quantity":  1,
+                               "needsVendor":  false,
+                               "vendorCategory":  null,
+                               "budgetMin":  null,
+                               "budgetMax":  null,
+                               "currency":  "LKR"
+                           },
+                           {
+                               "name":  "DJ",
+                               "description":  "Hire a DJ",
+                               "quantity":  1,
+                               "needsVendor":  false,
+                               "vendorCategory":  null,
+                               "budgetMin":  null,
+                               "budgetMax":  null,
+                               "currency":  "LKR"
+                           }
+                       ],
+    "intent":  "chat",
+    "reasoning":  null,
+    "personalityProfile":  null,
+    "eventType":  null,
+    "eventDate":  null,
+    "location":  null,
+    "budgetPerHead":  null,
+    "guestCount":  null,
+    "venueTags":  [
+
+                  ],
+    "missingInfo":  [
+                        "budget",
+                        "expectations"
+                    ],
+    "matchedVenues":  [
+
+                      ],
+    "matchedPackages":  [
+
+                        ],
+    "venueMatchTier":  null,
+    "askSavePersona":  false,
+    "personaSaved":  true,
+    "personaConfirmed":  false,
+    "bookingCreated":  false,
+    "bookingId":  null,
+    "redirectUrl":  null
+}
