@@ -7,6 +7,7 @@ import { ROUTES } from '@/lib/routes';
 import { packageService } from '@/services/customer/packageService';
 import type { RecommendationPackage, PackageType } from '@/types/customer/package';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/currency';
 
 const PACKAGE_CONFIG: Record<PackageType, { label: string; accentClass: string; borderClass: string; badgeClass: string; buttonClass: string; icon: React.ReactNode }> = {
   BUDGET: {
@@ -156,7 +157,7 @@ export default function ConfirmPackagePage() {
           </div>
           <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Total Package Price</p>
           <p className={`text-4xl font-bold ${config.accentClass}`}>
-            ${pkg.packageTotalPrice.toLocaleString()}
+            {formatCurrency(pkg.packageTotalPrice)}
             <span className="text-sm font-normal text-gray-400 ml-2">{pkg.currency}</span>
           </p>
         </div>
@@ -186,7 +187,7 @@ export default function ConfirmPackagePage() {
                     </span>
                   </div>
                   <p className={`text-sm font-bold shrink-0 ${unavailable ? 'text-red-400' : 'text-gray-800'}`}>
-                    ${item.taskPrice.toLocaleString()}
+                    {formatCurrency(item.taskPrice)}
                   </p>
                 </div>
               </div>
@@ -204,7 +205,7 @@ export default function ConfirmPackagePage() {
                     {item.taskName.toLowerCase()}
                   </span>
                   <span className={`font-medium ${item.isAvailable === false ? 'text-red-400' : 'text-gray-700'}`}>
-                    ${item.taskPrice.toLocaleString()}
+                    {formatCurrency(item.taskPrice)}
                   </span>
                 </div>
               ))}
@@ -212,7 +213,7 @@ export default function ConfirmPackagePage() {
             <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between">
               <span className="font-semibold text-gray-900">Total</span>
               <span className={`font-bold text-lg ${config.accentClass}`}>
-                ${pkg.packageTotalPrice.toLocaleString()}
+                {formatCurrency(pkg.packageTotalPrice)}
                 <span className="text-xs font-normal text-gray-400 ml-1">{pkg.currency}</span>
               </span>
             </div>

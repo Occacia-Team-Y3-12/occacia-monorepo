@@ -10,6 +10,7 @@ export const ROUTES = {
     EVENTS: '/customer/events',
     EVENTS_NEW: '/customer/events/new',
     EVENT_CHAT: (eventId: string) => `/customer/events/${eventId}/chat`,
+    EVENT_TRACKING: (eventId: string) => `/customer/events/${eventId}`,
     EVENT_DRAFT_REVIEW: (eventId: string) => `/customer/events/${eventId}/draft`,
     EVENT_RECOMMENDATIONS: (eventId: string) => `/customer/events/${eventId}/recommendations`,
     EVENT_PACKAGES: (eventId: string) => `/customer/events/${eventId}/packages`,
@@ -23,6 +24,7 @@ export const ROUTES = {
     PERSONA: '/customer/persona',
     PERSONA_NEW: '/customer/persona/new',
     PERSONA_DETAIL: (personaId: string) => `/customer/persona/${personaId}`,
+    SETTINGS: '/customer/settings',
   },
   VENDOR: {
     LOGIN: '/vendor/auth/login',

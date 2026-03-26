@@ -181,6 +181,20 @@ function PersonaEditContent({ mode = 'edit', personaId }: PersonaEditPageProps) 
   });
 
   useEffect(() => {
+    const error = personasQuery.error;
+    if (!error) return;
+    const message = error instanceof Error ? error.message : 'Unable to load personas';
+    setErrorMessage(message);
+  }, [personasQuery.error]);
+
+  useEffect(() => {
+    const error = personaQuery.error;
+    if (!error) return;
+    const message = error instanceof Error ? error.message : 'Unable to load persona';
+    setErrorMessage(message);
+  }, [personaQuery.error]);
+
+  useEffect(() => {
     if (isCreateMode) {
       setDraft(EMPTY_DRAFT);
       setValidationErrors({});

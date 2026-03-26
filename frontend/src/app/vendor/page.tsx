@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { ROUTES } from '@/lib/routes';
+import { formatCurrency } from '@/lib/currency';
 
 const stats = [
   { label: 'Total Products', value: '45', color: 'bg-blue-100', textColor: 'text-blue-700', icon: '📐' },
   { label: 'Total Orders', value: '234', color: 'bg-green-100', textColor: 'text-green-700', icon: '📦' },
-  { label: 'Revenue', value: '$12,450', color: 'bg-purple-100', textColor: 'text-purple-700', icon: '💰' },
+  { label: 'Revenue', value: 12450, color: 'bg-purple-100', textColor: 'text-purple-700', icon: '💰' },
   { label: 'Pending Orders', value: '8', color: 'bg-orange-100', textColor: 'text-orange-700', icon: '⏳' },
 ];
 
@@ -37,7 +38,9 @@ export default function VendorPage() {
                 {stat.icon}
               </div>
               <p className="text-gray-600 text-sm mb-2">{stat.label}</p>
-              <p className={`text-2xl md:text-3xl font-bold ${stat.textColor}`}>{stat.value}</p>
+              <p className={`text-2xl md:text-3xl font-bold ${stat.textColor}`}>
+                {typeof stat.value === 'number' ? formatCurrency(stat.value) : stat.value}
+              </p>
             </div>
           ))}
         </div>

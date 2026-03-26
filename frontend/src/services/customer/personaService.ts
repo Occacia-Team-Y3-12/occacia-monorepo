@@ -186,13 +186,20 @@ const extractPersona = (value: unknown): CustomerPersona | null | undefined => {
   return undefined;
 };
 
+const throwServiceError = (result: ServiceResult<unknown>, fallback: string) => {
+  const message = normalizeErrorText(fallback) || result.error;
+  const error = new Error(message || 'Request failed');
+  (error as Error & { status?: number }).status = result.status;
+  throw error;
+};
+
 const apiCustomerPersonaService: CustomerPersonaService = {
   async listPersonas(): Promise<ServiceResult<CustomerPersona[]>> {
     const result = await request('/api/v1/customers/personas/');
+    if (!result.ok) throwServiceError(result, 'Failed to load personas');
     return {
       ...result,
       data: extractPersonaList(result.data) ?? [],
-      error: result.ok ? undefined : result.error,
     };
   },
 
@@ -211,19 +218,21 @@ const apiCustomerPersonaService: CustomerPersonaService = {
 
   async getPersona(personaId: string): Promise<ServiceResult<CustomerPersona>> {
     const result = await request(`/api/v1/customers/personas/${personaId}`);
-    const persona = extractPersona(result.data);
+    if (!result.ok) throwServiceError(result, 'Failed to load persona');
 
-    if (result.ok && !persona) {
+    const persona = extractPersona(result.data);
+    if (!persona) {
       return {
+        ...result,
         ok: false,
-        status: result.status,
+        data: undefined,
         error: 'Persona details were unavailable.',
       };
     }
 
     return {
       ...result,
-      data: persona ?? undefined,
+      data: persona,
     };
   },
 

@@ -94,5 +94,10 @@ class Settings(BaseSettings):
     SKIP_DB_STARTUP: bool = False
     DISABLE_ADMIN_REGISTER: bool = True
 
+    # ── Logging ───────────────────────────────────────────────────────────────
+    LOG_LEVEL: str = "INFO"
+    LOG_JSON: bool | None = None
+    LOG_PRETTY: bool = True
+
 
 settings = Settings()

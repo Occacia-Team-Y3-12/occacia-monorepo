@@ -6,6 +6,7 @@ import { CheckCircle2, Clock, ArrowLeft, Bell } from 'lucide-react';
 import { ROUTES } from '@/lib/routes';
 import type { ConfirmPackageOrderResponse } from '@/types/customer/order';
 import type { RecommendationPackage } from '@/types/customer/package';
+import { formatCurrency } from '@/lib/currency';
 
 export default function OrderConfirmationPage() {
   const params = useParams<{ eventId: string; packageOrderId: string }>();
@@ -68,7 +69,7 @@ export default function OrderConfirmationPage() {
           </div>
           <div>
             <p className="text-xs text-gray-400 mb-1">Total Price</p>
-            <p className="text-sm font-bold text-gray-900">${packageOrder.packageOrderTotalPrice.toLocaleString()}</p>
+            <p className="text-sm font-bold text-gray-900">{formatCurrency(packageOrder.packageOrderTotalPrice)}</p>
           </div>
           <div>
             <p className="text-xs text-gray-400 mb-1">Event Date</p>

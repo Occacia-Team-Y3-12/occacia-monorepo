@@ -45,6 +45,19 @@ export interface RemoveTaskResponse {
   message: string;
 }
 
+export type UpdateTaskPayload = Partial<Pick<
+  Task,
+  'vendorId' | 'vendorName' | 'serviceType' | 'description' | 'status' | 'price' | 'rejectionReason'
+>>;
+
+export interface UpdateTaskResponse {
+  status: 'success' | 'error';
+  message: string;
+  data?: {
+    task: Task;
+  };
+}
+
 export interface EventWithTasks {
   id: string;
   title: string;

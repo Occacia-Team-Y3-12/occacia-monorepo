@@ -1,26 +1,23 @@
 import asyncio
-import logging
 import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from asgi_correlation_id import CorrelationIdMiddleware
 from sqlalchemy import inspect
 from sqlalchemy.exc import OperationalError
 
+from app.core.access_logging import AccessLogMiddleware
 from app.core.database import engine
 from app.core.config import settings
 from app.core.exceptions import add_exception_handlers
+from app.core.logging import configure_logging
 from app.routers import api_router
 from app.scripts.seed import seed_data
 
 
-# Module-level application logging.
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+logger = configure_logging(settings)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -117,6 +114,9 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json",
         lifespan=lifespan,
     )
+
+    application.add_middleware(CorrelationIdMiddleware, header_name="X-Request-ID")
+    application.add_middleware(AccessLogMiddleware)
     
     # Allow local frontend development and the deployed web app.
     application.add_middleware(

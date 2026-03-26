@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/lib/routes';
 import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 import { customerEventChatService } from '@/services/customer/eventChatService';
+import { packageService } from '@/services/customer/packageService';
 import {
   CalendarConnectionStatus,
   CalendarProvider,
@@ -20,6 +21,8 @@ import {
 const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const DEFAULT_OFFSETS = [10080, 1440, 60];
 const GENERIC_ERROR_TEXT = 'Something went wrong. Please try again.';
+const CALENDAR_RETURN_PATH_KEY = 'customer:calendarReturnPath';
+const CALENDAR_SCHEDULE_BACKUP_KEY = 'customer:calendarScheduleBackup';
 
 const toLocalDate = (iso?: string): string => {
   if (!iso) {
@@ -149,8 +152,8 @@ export const useEventChatPlanner = (eventId: string) => {
       setChannels(event.reminders.channels.length ? event.reminders.channels : ['in-app']);
       setPermissionStatus(event.reminders.permissionStatus || 'default');
 
-      setCalendarSyncEnabled(event.calendarSync.enabled);
-      setSelectedProvider(event.calendarSync.provider || 'google');
+    setCalendarSyncEnabled(event.calendarSync.enabled);
+    setSelectedProvider(event.calendarSync.provider || 'google');
     }
 
     if (messagesResult.ok && messagesResult.data?.data?.messages) {
@@ -172,8 +175,73 @@ export const useEventChatPlanner = (eventId: string) => {
       }
     }
 
+    restoreScheduleFromBackup();
+
     setIsInitialLoading(false);
   }, [eventId, router]);
+
+  const restoreScheduleFromBackup = () => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    const raw = window.localStorage.getItem(CALENDAR_SCHEDULE_BACKUP_KEY);
+    if (!raw) {
+      return false;
+    }
+
+    try {
+      const backup = JSON.parse(raw);
+      if (backup.startDate) setStartDate(backup.startDate);
+      if (backup.startTime) setStartTime(backup.startTime);
+      if (backup.endDate) setEndDate(backup.endDate);
+      if (backup.endTime) setEndTime(backup.endTime);
+      if (typeof backup.dateTBD === 'boolean') setDateTBD(backup.dateTBD);
+      if (backup.timezone) setTimezone(backup.timezone);
+      if (typeof backup.isAllDay === 'boolean') setIsAllDay(backup.isAllDay);
+      if (typeof backup.isRecurring === 'boolean') setIsRecurring(backup.isRecurring);
+      if (backup.frequency) setFrequency(backup.frequency);
+      if (backup.endType) setEndType(backup.endType);
+      if (backup.recurrenceUntil) setRecurrenceUntil(backup.recurrenceUntil);
+      if (typeof backup.recurrenceCount === 'number') setRecurrenceCount(backup.recurrenceCount);
+    } catch (error) {
+      console.error('Failed to apply calendar schedule backup', error);
+    } finally {
+      window.localStorage.removeItem(CALENDAR_SCHEDULE_BACKUP_KEY);
+    }
+
+    return true;
+  };
+
+  const preserveRedirectState = () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const path = window.location.pathname + window.location.search;
+    window.sessionStorage.setItem(CALENDAR_RETURN_PATH_KEY, path);
+    window.localStorage.setItem(CALENDAR_RETURN_PATH_KEY, path);
+  };
+
+  const preserveScheduleBackup = () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const payload = {
+      startDate,
+      startTime,
+      endDate,
+      endTime,
+      dateTBD,
+      timezone,
+      isAllDay,
+      isRecurring,
+      frequency,
+      endType,
+      recurrenceUntil,
+      recurrenceCount,
+    };
+    window.localStorage.setItem(CALENDAR_SCHEDULE_BACKUP_KEY, JSON.stringify(payload));
+  };
 
   useEffect(() => {
     void fetchAll();
@@ -262,6 +330,23 @@ export const useEventChatPlanner = (eventId: string) => {
     setTasks((prev) => [result.data!.data!.task, ...prev]);
     setNewTaskTitle('');
     setIsBusy(false);
+  };
+
+  const updateTaskTitle = async (taskId: string, title: string): Promise<boolean> => {
+    const trimmed = title.trim();
+    if (!trimmed) {
+      return false;
+    }
+
+    const result = await customerEventChatService.updateTask(eventId, taskId, { title: trimmed });
+
+    if (!result.ok || !result.data?.data?.task) {
+      setError(result.error || result.data?.message || 'Failed to update task.');
+      return false;
+    }
+
+    setTasks((prev) => prev.map((task) => (task.id === taskId ? result.data!.data!.task : task)));
+    return true;
   };
 
   const updateTaskCompletion = async (taskId: string, completed: boolean) => {
@@ -388,10 +473,8 @@ export const useEventChatPlanner = (eventId: string) => {
     if (result.data && 'authorizationUrl' in result.data) {
       setSuccess('Redirecting to calendar provider...');
       if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem(
-          'customer:calendarReturnPath',
-          window.location.pathname + window.location.search
-        );
+        preserveRedirectState();
+        preserveScheduleBackup();
         window.location.assign(result.data.authorizationUrl);
       }
       setIsBusy(false);
@@ -485,9 +568,18 @@ export const useEventChatPlanner = (eventId: string) => {
       return;
     }
 
+    if (eventId) {
+      try {
+        await packageService.generatePackages(eventId);
+      } catch (err) {
+        setWarning('Confirmed successfully but recommendations could not be generated automatically. You can try again from the next screen.');
+      }
+    }
+
     setEventState(result.data?.data?.eventState || 'active');
     setSuccess('Tasks confirmed and event activated. Redirecting to recommendations...');
-    router.push(`/customer/events/${eventId}/recommendations`);
+    setIsBusy(false);
+    router.push(ROUTES.CUSTOMER.EVENT_RECOMMENDATIONS(eventId || ''));
   };
 
   const toggleOffset = (value: number) => {
@@ -517,6 +609,7 @@ export const useEventChatPlanner = (eventId: string) => {
     newTaskTitle,
     setNewTaskTitle,
     addTask,
+    updateTaskTitle,
     updateTaskCompletion,
     removeTask,
     dateTBD,

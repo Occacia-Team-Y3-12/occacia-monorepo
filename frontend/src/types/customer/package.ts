@@ -4,9 +4,17 @@ export interface ShortlistedOffering {
   offeringId: string;
   offeringTitle: string;
   vendorName: string;
+  vendorId?: string;
   taskPrice: number;
-  rating: number;
+  currency?: string;
+  qualityTier?: string;
+  score?: number;
+  rank?: number;
+  rating?: number;
   isBestMatch?: boolean;
+  isSelected?: boolean;
+  description?: string;
+  unit?: string;
 }
 
 export interface PackageItem {

@@ -107,9 +107,31 @@ const buildShortlistForItem = (
     offeringId: item.offeringId,
     offeringTitle: item.offeringTitle,
     vendorName: item.vendorName,
+    vendorId: `mock-vendor-${item.taskId}`,
     taskPrice: item.taskPrice,
-    rating: item.rating ?? 4.8,
+    currency: 'LKR',
+    qualityTier: 'STANDARD',
+    score: 8,
+    rank: 1,
+    rating: 4.8,
     isBestMatch: true,
+    isSelected: true,
+    description: `Mock shortlist for ${item.taskName}`,
+    unit: 'package',
+  },
+  {
+    offeringId: `${item.taskId}-alt-2`,
+    offeringTitle: `${item.offeringCategory} Premium Match`,
+    vendorName: 'Pioneer Caterers',
+    vendorId: `mock-vendor-${item.taskId}-2`,
+    taskPrice: item.taskPrice + 500,
+    currency: 'LKR',
+    qualityTier: 'PREMIUM',
+    score: 7,
+    rank: 2,
+    rating: 4.6,
+    description: `${item.offeringCategory} premium shortlist`,
+    unit: 'set',
   },
   ...MOCK_SHORTLIST.map((offering, index) => ({
     ...offering,
@@ -118,7 +140,16 @@ const buildShortlistForItem = (
       index === 0
         ? `${item.offeringCategory} Premium Match`
         : offering.offeringTitle,
+    vendorId: `mock-vendor-${item.taskId}-${index + 3}`,
+    taskPrice: offering.taskPrice,
+    currency: 'LKR',
+    qualityTier: 'STANDARD',
+    score: 6 - index,
+    rank: index + 3,
+    rating: 4.2 - index * 0.2,
     isBestMatch: false,
+    description: offering.description ?? offering.offeringTitle,
+    unit: 'unit',
   })),
 ];
 
@@ -200,6 +231,40 @@ export const mockPackageService: CustomerPackageService = {
     persistPackages(eventId, packages);
 
     return clonePackages(packages);
+  },
+
+  async createCustomPackage(eventId, basePackageId, items) {
+    await sleep(400);
+
+    const storedPackages = loadStoredPackages(eventId);
+    const basePackage =
+      storedPackages.find((pkg) => pkg.packageId === basePackageId)
+      || storedPackages[0]
+      || MOCK_PACKAGE;
+
+    const customItems = basePackage.items.map((item) => {
+      const override = items.find((entry) => entry.taskId === item.taskId);
+      if (!override) {
+        return item;
+      }
+      return {
+        ...item,
+        offeringId: override.offeringId,
+        vendorName: `Vendor ${override.offeringId.slice(-4)}`,
+      };
+    });
+
+    const customPackage = {
+      ...basePackage,
+      packageId: getRandomId('pkg'),
+      type: basePackage.type,
+      packageTotalPrice: customItems.reduce((sum, item) => sum + item.taskPrice, 0),
+      items: customItems,
+    };
+
+    const nextPackages = [...storedPackages, customPackage];
+    persistPackages(eventId, nextPackages);
+    return { ...customPackage };
   },
 
   async getTaskRecommendations(eventId, taskId) {

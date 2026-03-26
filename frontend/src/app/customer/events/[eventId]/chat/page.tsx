@@ -53,6 +53,7 @@ export default function CustomerEventChatPage() {
   const [dateInputValue, setDateInputValue] = useState('');
   const [dateInputError, setDateInputError] = useState<string | null>(null);
   const datePickerRef = useRef<HTMLInputElement>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
   const {
     isInitialLoading,
@@ -72,6 +73,7 @@ export default function CustomerEventChatPage() {
     newTaskTitle,
     setNewTaskTitle,
     addTask,
+    updateTaskTitle,
     removeTask,
     startDate,
     setStartDate,
@@ -87,7 +89,6 @@ export default function CustomerEventChatPage() {
     calendarSyncEnabled,
     connectCalendar,
     setCalendarSync,
-    confirmTasks,
   } = useEventChatPlanner(eventId || '');
 
   useEffect(() => {
@@ -104,9 +105,18 @@ export default function CustomerEventChatPage() {
     void sendMessage();
   };
 
-  const onAddTask = (event: FormEvent) => {
+  const onAddTask = async (event: FormEvent) => {
     event.preventDefault();
-    void addTask();
+    if (editingTaskId) {
+      const updated = await updateTaskTitle(editingTaskId, newTaskTitle);
+      if (updated) {
+        setEditingTaskId(null);
+        setNewTaskTitle('');
+      }
+      return;
+    }
+
+    await addTask();
   };
 
   const onSaveDetails = async () => {
@@ -123,6 +133,38 @@ export default function CustomerEventChatPage() {
     if (calendarSyncEnabled) {
       await setCalendarSync(true);
     }
+  };
+
+  const persistScheduleAndReminders = async () => {
+    const scheduleSaved = await saveSchedule();
+    if (!scheduleSaved) {
+      return false;
+    }
+
+    const remindersSaved = await saveReminders();
+    if (!remindersSaved) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const onSaveDraft = async () => {
+    const persisted = await persistScheduleAndReminders();
+    if (!persisted) {
+      return;
+    }
+
+    router.replace(ROUTES.CUSTOMER.EVENTS);
+  };
+
+  const goToDraftPage = async () => {
+    const persisted = await persistScheduleAndReminders();
+    if (!persisted) {
+      return;
+    }
+
+    router.push(ROUTES.CUSTOMER.EVENT_DRAFT_REVIEW(eventId || ''));
   };
 
   const handleCalendarSyncToggle = async (nextEnabled: boolean) => {
@@ -332,19 +374,12 @@ export default function CustomerEventChatPage() {
                             </label>
                           </div>
 
-                          <div className="mt-3 rounded-xl border border-[#EAEAEA] bg-white px-3 py-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <label className="flex items-center gap-2 text-sm font-semibold text-[#666666]">
-                                <input
-                                  type="checkbox"
-                                  checked={calendarSyncEnabled}
-                                  onChange={async (event) => {
-                                    const enabled = event.target.checked;
-                                    await handleCalendarSyncToggle(enabled);
-                                  }}
-                                />
-                                Sync to Google Calendar
-                              </label>
+                          <div className="mt-3 rounded-xl border border-[#EAEAEA] bg-white px-3 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-[#666666]">Google Calendar synchronization</p>
+                                <p className="text-xs text-[#9AA6BF]">Keep this event synced with your calendar while editing.</p>
+                              </div>
                               <button
                                 type="button"
                                 onClick={async () => {
@@ -392,7 +427,7 @@ export default function CustomerEventChatPage() {
                             disabled={isBusy}
                             className="mt-4 h-10 w-full rounded-lg bg-[#0D47A1] text-sm font-semibold text-white disabled:opacity-60"
                           >
-                            Confirm & Save Details
+                            Save schedule changes
                           </button>
                         </div>
                       )}
@@ -502,6 +537,7 @@ export default function CustomerEventChatPage() {
                             type="button"
                             onClick={() => {
                               setNewTaskTitle(task.title);
+                              setEditingTaskId(task.id);
                               setActiveTaskMenuId(null);
                             }}
                             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-[#666666] hover:bg-[#FAFAFA]"
@@ -551,7 +587,7 @@ export default function CustomerEventChatPage() {
                   className="h-12 flex-1 rounded-[16px] border-2 border-[#EAEAEA] bg-white px-4 text-sm text-[#666666]"
                 />
                 <button type="submit" className="h-12 rounded-[16px] border-2 border-[#EAEAEA] bg-white px-5 text-xl font-semibold text-[#666666]">
-                  +
+                  {editingTaskId ? 'Save' : '+'}
                 </button>
               </form>
             </section>
@@ -561,15 +597,15 @@ export default function CustomerEventChatPage() {
           <div className="mt-auto border-t border-[#EAEAEA] bg-[#F4F8FA] px-6 py-6">
             <button
               type="button"
-              onClick={() => router.push(ROUTES.CUSTOMER.EVENT_DRAFT_REVIEW(eventId || ''))}
+              onClick={() => void onSaveDraft()}
+              disabled={isBusy}
               className="mb-3 h-10 w-full rounded-[12px] border border-[#EAEAEA] bg-white text-[12px] font-semibold uppercase tracking-[0.08em] text-[#666666]"
             >
               Save As Draft
             </button>
             <button
               type="button"
-              onClick={() => void confirmTasks()}
-              disabled={isBusy}
+              onClick={() => void goToDraftPage()}
               className="h-14 w-full rounded-[18px] bg-[#0D47A1] px-6 text-[13px] font-semibold uppercase tracking-[0.08em] text-white disabled:opacity-60"
             >
               Confirm Tasks & View Recommendations
