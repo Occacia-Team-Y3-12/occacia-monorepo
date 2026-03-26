@@ -37,6 +37,7 @@ export const ROUTES = {
     PRODUCTS: '/vendor/products',
     ORDERS: '/vendor/orders',
     OFFERINGS: '/vendor/offerings',
+    OFFERINGS_NEW: '/vendor/offerings/new',
     TASKS: '/vendors/tasks',
   },
   VENDORS: {

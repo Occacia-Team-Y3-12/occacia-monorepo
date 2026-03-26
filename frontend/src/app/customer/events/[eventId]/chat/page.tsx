@@ -69,6 +69,8 @@ const isPastIsoDate = (isoDate: string): boolean => {
   return selectedDate < today;
 };
 
+const getCalendarCardSavedKey = (eventId: string): string => `customer:eventChat:calendarCardSaved:${eventId}`;
+
 export default function CustomerEventChatPage() {
   const params = useParams<{ eventId: string }>();
   const router = useRouter();
@@ -79,6 +81,7 @@ export default function CustomerEventChatPage() {
   const [dateInputError, setDateInputError] = useState<string | null>(null);
   const datePickerRef = useRef<HTMLInputElement>(null);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [isCalendarCardSaved, setIsCalendarCardSaved] = useState(false);
 
   const {
     isInitialLoading,
@@ -121,6 +124,16 @@ export default function CustomerEventChatPage() {
     setDateInputError(null);
   }, [startDate]);
 
+  useEffect(() => {
+    if (!eventId || typeof window === 'undefined') {
+      setIsCalendarCardSaved(false);
+      return;
+    }
+
+    const stored = window.localStorage.getItem(getCalendarCardSavedKey(eventId));
+    setIsCalendarCardSaved(stored === '1');
+  }, [eventId]);
+
   if (!eventId) {
     return <section className="rounded-2xl border border-[#EAEAEA] bg-white p-6 text-sm text-[#EA4335]">Invalid event id.</section>;
   }
@@ -145,8 +158,10 @@ export default function CustomerEventChatPage() {
   };
 
   const onSaveDetails = async () => {
-    await saveSchedule();
-    await saveReminders();
+    const persisted = await persistScheduleAndReminders();
+    if (!persisted) {
+      return;
+    }
 
     if (calendarSyncEnabled && !calendarStatus.connected) {
       const connected = await connectCalendar();
@@ -156,8 +171,16 @@ export default function CustomerEventChatPage() {
     }
 
     if (calendarSyncEnabled) {
-      await setCalendarSync(true);
+      const synced = await setCalendarSync(true);
+      if (!synced) {
+        return;
+      }
     }
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(getCalendarCardSavedKey(eventId), '1');
+    }
+    setIsCalendarCardSaved(true);
   };
 
   const persistScheduleAndReminders = async () => {
@@ -283,7 +306,7 @@ export default function CustomerEventChatPage() {
           <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5 sm:space-y-8 sm:px-6 sm:py-6">
             {visibleMessages.map((message, index) => {
               const isAssistant = message.role === 'assistant' || message.role === 'system';
-              const showControls = isAssistant && index === visibleMessages.length - 1;
+              const showControls = isAssistant && index === visibleMessages.length - 1 && !isCalendarCardSaved;
 
               return (
                 <div

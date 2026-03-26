@@ -1,36 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { Plus, PackageOpen } from 'lucide-react';
+
 import OfferingCard from '@/components/vendor/offerings/OfferingCard';
-import OfferingForm from '@/components/vendor/offerings/OfferingForm';
 import VendorPortalShell from '@/components/features/vendor/VendorPortalShell';
-import { Offering, CreateOfferingData } from '@/types/vendor/offering';
+import { Offering } from '@/types/vendor/offering';
 import { offeringService } from '@/services/vendor/offeringService';
 import { ROUTES } from '@/lib/routes';
 
 export default function OfferingsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [offerings, setOfferings] = useState<Offering[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [editingOffering, setEditingOffering] = useState<Offering | null>(null);
 
   useEffect(() => {
     fetchOfferings();
   }, []);
-
-  useEffect(() => {
-    if (searchParams.get('new') === '1') {
-      setEditingOffering(null);
-      setShowForm(true);
-      router.replace(ROUTES.VENDOR.OFFERINGS, { scroll: false });
-    }
-  }, [searchParams, router]);
 
   const fetchOfferings = async () => {
     setIsLoading(true);
@@ -49,48 +38,8 @@ export default function OfferingsPage() {
     }
   };
 
-  const handleCreate = async (data: CreateOfferingData) => {
-    setIsSaving(true);
-    try {
-      const newOffering = await offeringService.create(data);
-      setOfferings(prev => [newOffering, ...prev]);
-      setShowForm(false);
-      toast.success('Offering created successfully!');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to create offering. Please try again.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleUpdate = async (data: CreateOfferingData) => {
-    if (!editingOffering) return;
-    setIsSaving(true);
-    try {
-      const updated = await offeringService.update(editingOffering.id, data);
-      setOfferings(prev => prev.map(o => o.id === updated.id ? updated : o));
-      setEditingOffering(null);
-      toast.success('Offering updated successfully!');
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        toast.error('Offering not found or you are not authorized to edit it.');
-      } else {
-        toast.error(error.response?.data?.message || 'Failed to update offering. Please try again.');
-      }
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleEdit = (offering: Offering) => {
-    setEditingOffering(offering);
-    setShowForm(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleCancel = () => {
-    setShowForm(false);
-    setEditingOffering(null);
+    router.push(`${ROUTES.VENDOR.OFFERINGS}/${offering.id}`);
   };
 
   return (
@@ -101,33 +50,15 @@ export default function OfferingsPage() {
             <h1 className="text-2xl font-bold text-[#1F293F]">Manage Offerings</h1>
             <p className="mt-1 text-sm text-[#5B6478]">Create and manage your offerings for AI-based recommendations</p>
           </div>
-          {!showForm && !editingOffering && (
-            <button
-              onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#1565c0] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0d47a1]"
-            >
-              <Plus size={18} />
-              Add New Offering
-            </button>
-          )}
+          <Link
+            href={ROUTES.VENDOR.OFFERINGS_NEW}
+            className="inline-flex items-center gap-2 rounded-xl bg-[#1565c0] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0d47a1]"
+          >
+            <Plus size={18} />
+            Add New Offering
+          </Link>
         </div>
 
-        {/* Form Panel */}
-        {(showForm || editingOffering) && (
-          <div className="mb-8 rounded-2xl border border-[#E2E5EC] bg-white p-6 shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
-            <h2 className="mb-5 text-lg font-semibold text-[#1F293F]">
-              {editingOffering ? `Edit: ${editingOffering.title}` : 'New Offering'}
-            </h2>
-            <OfferingForm
-              initialData={editingOffering || undefined}
-              onSubmit={editingOffering ? handleUpdate : handleCreate}
-              isLoading={isSaving}
-              onCancel={handleCancel}
-            />
-          </div>
-        )}
-
-        {/* Offerings List */}
         {isLoading ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {[...Array(4)].map((_, i) => (
@@ -147,19 +78,19 @@ export default function OfferingsPage() {
             <PackageOpen className="mx-auto mb-4 h-14 w-14 text-[#9BA4B5]" />
             <h3 className="mb-2 text-lg font-semibold text-[#1F293F]">No offerings yet</h3>
             <p className="mb-6 text-sm text-[#5B6478]">Create your first offering to get started with AI-based recommendations</p>
-            <button
-              onClick={() => setShowForm(true)}
+            <Link
+              href={ROUTES.VENDOR.OFFERINGS_NEW}
               className="inline-flex items-center gap-2 rounded-xl bg-[#1565c0] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0d47a1]"
             >
               <Plus size={18} />
               Add New Offering
-            </button>
+            </Link>
           </div>
         ) : (
           <>
             <p className="mb-4 text-sm text-[#5B6478]">{offerings.length} offering{offerings.length !== 1 ? 's' : ''} total</p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {offerings.map(offering => (
+              {offerings.map((offering) => (
                 <OfferingCard key={offering.id} offering={offering} onEdit={handleEdit} />
               ))}
             </div>
