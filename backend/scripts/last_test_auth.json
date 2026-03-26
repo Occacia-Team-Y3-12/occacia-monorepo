@@ -1,0 +1,12 @@
+{
+    "access_token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0K2YxYzk3ZGZkQGV4YW1wbGUuY29tIiwicm9sZSI6IkNVU1RPTUVSIiwiZXhwIjoxNzc0NTI1NjQ5fQ.mybxFldhRTuKsivFMTNvYO6mycyAiuPOwfhSRoh4CPs",
+    "token_type":  "bearer",
+    "accessToken":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0K2YxYzk3ZGZkQGV4YW1wbGUuY29tIiwicm9sZSI6IkNVU1RPTUVSIiwiZXhwIjoxNzc0NTI1NjQ5fQ.mybxFldhRTuKsivFMTNvYO6mycyAiuPOwfhSRoh4CPs",
+    "refreshToken":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0K2YxYzk3ZGZkQGV4YW1wbGUuY29tIiwicm9sZSI6IkNVU1RPTUVSIiwiZXhwIjoxNzc1MTI2ODQ5LCJ0eXBlIjoicmVmcmVzaCJ9.dKxFmKZz5spjrIhv0z7X0v5jCvNjStchm6dmuNJ5dRM",
+    "user":  {
+                 "userId":  "CUS-2d680f09bb7640b9a32032209999c911",
+                 "email":  "test+f1c97dfd@example.com",
+                 "role":  "CUSTOMER",
+                 "status":  "ACTIVE"
+             }
+}
