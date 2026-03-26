@@ -356,19 +356,12 @@ export default function CustomerEventChatPage() {
                             </label>
                           </div>
 
-                          <div className="mt-3 rounded-xl border border-[#EAEAEA] bg-white px-3 py-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <label className="flex items-center gap-2 text-sm font-semibold text-[#666666]">
-                                <input
-                                  type="checkbox"
-                                  checked={calendarSyncEnabled}
-                                  onChange={async (event) => {
-                                    const enabled = event.target.checked;
-                                    await handleCalendarSyncToggle(enabled);
-                                  }}
-                                />
-                                Sync to Google Calendar
-                              </label>
+                          <div className="mt-3 rounded-xl border border-[#EAEAEA] bg-white px-3 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-[#666666]">Google Calendar synchronization</p>
+                                <p className="text-xs text-[#9AA6BF]">Keep this event synced with your calendar while editing.</p>
+                              </div>
                               <button
                                 type="button"
                                 onClick={async () => {
@@ -416,7 +409,7 @@ export default function CustomerEventChatPage() {
                             disabled={isBusy}
                             className="mt-4 h-10 w-full rounded-lg bg-[#0D47A1] text-sm font-semibold text-white disabled:opacity-60"
                           >
-                            Confirm & Save Details
+                            Save schedule changes
                           </button>
                         </div>
                       )}

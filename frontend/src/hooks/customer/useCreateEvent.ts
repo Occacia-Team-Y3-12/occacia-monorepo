@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { customerEventService } from '@/services/customer/eventServices';
+import { customerPersonaService } from '@/services/customer/personaService';
 import { ROUTES } from '@/lib/routes';
-import { CreateCustomerEventPayload, CustomerPersonaOption, CustomerEventType, EventTypeOption } from '@/types/customer';
+import { CreateCustomerEventPayload, CustomerPersonaOption, CustomerPersona, CustomerEventType, EventTypeOption } from '@/types/customer';
+import { featureFlags } from '@/config/featureFlags';
 import {
   getEventTypeKey,
   getFallbackEventTypes,
@@ -27,7 +29,9 @@ export const useCreateEvent = (initialTemplate?: string) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [eventTypes, setEventTypes] = useState<EventTypeOption[]>(getFallbackEventTypes());
-  const [personas, setPersonas] = useState<CustomerPersonaOption[]>(PERSONA_OPTIONS);
+  const [personas, setPersonas] = useState<CustomerPersonaOption[]>(
+    featureFlags.useCustomerPersonaMock ? PERSONA_OPTIONS : []
+  );
   const [selectedPersonaIds, setSelectedPersonaIds] = useState<string[]>([]);
   const [errors, setErrors] = useState<{ eventType?: string; title?: string; form?: string }>({});
   const [isLoadingEventTypes, setIsLoadingEventTypes] = useState(true);
@@ -77,6 +81,49 @@ export const useCreateEvent = (initialTemplate?: string) => {
 
     void loadEventTypes();
   }, [requestedTemplate]);
+
+  useEffect(() => {
+    let active = true;
+
+    const normalizePersonas = (items: CustomerPersona[]): CustomerPersonaOption[] =>
+      items.map((item) => ({
+        id: item.persona_id,
+        name: item.name,
+        role: item.relationship || 'Relationship not added',
+      }));
+
+    const loadPersonas = async () => {
+      try {
+        const response = await customerPersonaService.listPersonas();
+        if (!active) {
+          return;
+        }
+
+        if (response.ok && response.data?.length) {
+          setPersonas(normalizePersonas(response.data));
+        } else if (featureFlags.useCustomerPersonaMock) {
+          setPersonas(PERSONA_OPTIONS);
+        } else {
+          setPersonas([]);
+        }
+      } catch {
+        if (!active) {
+          return;
+        }
+        if (featureFlags.useCustomerPersonaMock) {
+          setPersonas(PERSONA_OPTIONS);
+        } else {
+          setPersonas([]);
+        }
+      }
+    };
+
+    void loadPersonas();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const togglePersona = (personaId: string) => {
     setSelectedPersonaIds((prev) =>

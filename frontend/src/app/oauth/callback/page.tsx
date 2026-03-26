@@ -26,9 +26,9 @@ function OAuthCallbackContent() {
 
   useEffect(() => {
     const run = async () => {
-      const returnPath =
-        (typeof window !== 'undefined' && window.sessionStorage.getItem('customer:calendarReturnPath'))
-        || ROUTES.CUSTOMER.EVENTS;
+      const sessionPath = typeof window !== 'undefined' ? window.sessionStorage.getItem('customer:calendarReturnPath') : null;
+      const localPath = typeof window !== 'undefined' ? window.localStorage.getItem('customer:calendarReturnPath') : null;
+      const returnPath = sessionPath || localPath || ROUTES.CUSTOMER.EVENTS;
 
       const token = getStoredCustomerToken();
       if (!token) {
@@ -72,6 +72,7 @@ function OAuthCallbackContent() {
       } finally {
         if (typeof window !== 'undefined') {
           window.sessionStorage.removeItem('customer:calendarReturnPath');
+          window.localStorage.removeItem('customer:calendarReturnPath');
         }
       }
     };
