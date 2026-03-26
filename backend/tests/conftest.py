@@ -251,3 +251,188 @@ def vendor_with_packages():
     db.commit()
     db.close()
     return vendor
+
+
+@pytest.fixture()
+def admin_user():
+    db = SessionLocal()
+    email = f"admin-{uuid4().hex[:8]}@test.com"
+    admin = Admin(
+        email=email,
+        password_hash=get_password_hash("Admin1234!"),
+        staff_role="admin",
+    )
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+    db.close()
+    return admin
+
+
+@pytest.fixture()
+def admin_client(client, admin_user):
+    token = create_access_token(data={"sub": admin_user.admin_id, "type": "admin"})
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    return client
+
+
+@pytest.fixture()
+def pending_vendor():
+    db = SessionLocal()
+    email = f"vendor-{uuid4().hex[:8]}@test.com"
+    vendor = Vendor(
+        business_name="Pending Vendor Business",
+        display_name="Pending Vendor Display",
+        email=email,
+        is_verified=False,
+        location_base="Colombo",
+        approval_status="PENDING",
+        password_hash=get_password_hash("Vendor1234!"),
+    )
+    db.add(vendor)
+    db.commit()
+    db.refresh(vendor)
+    db.close()
+    return vendor
+
+
+@pytest.fixture()
+def active_vendor():
+    db = SessionLocal()
+    email = f"vendor-{uuid4().hex[:8]}@test.com"
+    vendor = Vendor(
+        business_name="Active Vendor Business",
+        display_name="Active Vendor Display",
+        email=email,
+        is_verified=True,
+        location_base="Colombo",
+        approval_status="ACTIVE",
+        password_hash=get_password_hash("Vendor1234!"),
+    )
+    db.add(vendor)
+    db.commit()
+    db.refresh(vendor)
+    db.close()
+    return vendor
+
+
+@pytest.fixture()
+def organization():
+    db = SessionLocal()
+    org = Organization(
+        name="Test Organization",
+        legal_name="Test Organization Legal Name",
+        registration_number=f"REG-{uuid4().hex[:8]}",
+        email=f"org-{uuid4().hex[:8]}@test.com",
+        phone="+94771234567",
+        address="123 Test Street, Colombo",
+        website="https://test-org.com",
+        status="active",
+    )
+    db.add(org)
+    db.commit()
+    db.refresh(org)
+    db.close()
+    return org
+
+
+@pytest.fixture()
+def organization_with_vendors(organization):
+    db = SessionLocal()
+    vendors = [
+        Vendor(
+            business_name="Organization Vendor 1",
+            display_name="OrgVendor 1",
+            email=f"orgvendor1-{uuid4().hex[:8]}@test.com",
+            is_verified=True,
+            location_base="Colombo",
+            organization_id=organization.id,
+            approval_status="ACTIVE",
+        ),
+        Vendor(
+            business_name="Organization Vendor 2",
+            display_name="OrgVendor 2",
+            email=f"orgvendor2-{uuid4().hex[:8]}@test.com",
+            is_verified=True,
+            location_base="Kandy",
+            organization_id=organization.id,
+            approval_status="ACTIVE",
+        ),
+    ]
+    for v in vendors:
+        db.add(v)
+    db.commit()
+    db.close()
+    return organization
+
+
+@pytest.fixture()
+def multiple_organizations():
+    db = SessionLocal()
+    orgs = [
+        Organization(
+            name="Active Organization",
+            legal_name="Active Organization Legal",
+            registration_number=f"REG-ACTIVE-{uuid4().hex[:8]}",
+            email=f"active-org-{uuid4().hex[:8]}@test.com",
+            status="active",
+        ),
+        Organization(
+            name="Inactive Organization",
+            legal_name="Inactive Organization Legal",
+            registration_number=f"REG-INACTIVE-{uuid4().hex[:8]}",
+            email=f"inactive-org-{uuid4().hex[:8]}@test.com",
+            status="inactive",
+        ),
+        Organization(
+            name="Pending Organization",
+            legal_name="Pending Organization Legal",
+            registration_number=f"REG-PENDING-{uuid4().hex[:8]}",
+            email=f"pending-org-{uuid4().hex[:8]}@test.com",
+            status="pending",
+        ),
+    ]
+    for o in orgs:
+        db.add(o)
+    db.commit()
+    db.close()
+    return orgs
+
+
+@pytest.fixture()
+def multiple_customers():
+    db = SessionLocal()
+    customers = [
+        Customer(
+            full_name="Active Customer",
+            email=f"active-cus-{uuid4().hex[:8]}@test.com",
+            password_hash=get_password_hash("CustPass1!"),
+            phone="+94771111111",
+            email_verified=True,
+            status="ACTIVE",
+            customer_id=f"CUS-ACTIVE-{uuid4().hex[:8]}",
+        ),
+        Customer(
+            full_name="Inactive Customer",
+            email=f"inactive-cus-{uuid4().hex[:8]}@test.com",
+            password_hash=get_password_hash("CustPass2!"),
+            phone="+94772222222",
+            email_verified=True,
+            status="INACTIVE",
+            customer_id=f"CUS-INACTIVE-{uuid4().hex[:8]}",
+        ),
+        Customer(
+            full_name="Pending Customer",
+            email=f"pending-cus-{uuid4().hex[:8]}@test.com",
+            password_hash=get_password_hash("CustPass3!"),
+            phone="+94773333333",
+            email_verified=False,
+            status="PENDING",
+            customer_id=f"CUS-PENDING-{uuid4().hex[:8]}",
+        ),
+    ]
+    for c in customers:
+        db.add(c)
+    db.commit()
+    db.close()
+    return customers
