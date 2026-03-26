@@ -58,12 +58,12 @@ export default function VendorOrdersPage() {
               onClick={() => setStatusFilter(status.value)}
               className={`p-3 md:p-4 rounded-lg font-semibold transition-all text-sm md:text-base ${
                 statusFilter === status.value
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-white text-gray-900 border border-gray-200 hover:border-emerald-500'
+                  ? 'bg-[#1565c0] text-white'
+                  : 'bg-white text-[#1F293F] border border-[#E2E5EC] hover:border-[#4285F4]'
               }`}
             >
               <div className="text-base md:text-lg">{status.label}</div>
-              <div className={statusFilter === status.value ? 'text-emerald-100 text-xs md:text-sm' : 'text-gray-500 text-xs md:text-sm'}>
+              <div className={statusFilter === status.value ? 'text-[#D7E6FF] text-xs md:text-sm' : 'text-[#5B6478] text-xs md:text-sm'}>
                 {status.count}
               </div>
             </button>
@@ -87,7 +87,7 @@ export default function VendorOrdersPage() {
                     <p className="text-gray-600 text-sm">Customer: John Doe | Date: N/A</p>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <span className="text-base md:text-lg font-semibold text-emerald-600">{formatCurrency(0)}</span>
+                    <span className="text-base md:text-lg font-semibold text-[#1565c0]">{formatCurrency(0)}</span>
                     <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">Pending</span>
                   </div>
                 </div>

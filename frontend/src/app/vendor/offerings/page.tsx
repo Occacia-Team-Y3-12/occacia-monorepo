@@ -95,72 +95,76 @@ export default function OfferingsPage() {
 
   return (
     <VendorPortalShell>
-      <div className="mx-auto max-w-5xl">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Manage Offerings</h1>
-              <p className="text-slate-500 text-sm mt-1">Create and manage your offerings for AI-based recommendations</p>
-            </div>
-            {!showForm && !editingOffering && (
-              <button onClick={() => setShowForm(true)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700 transition shadow-sm">
-                <Plus size={18} />
-                Add New Offering
-              </button>
-            )}
+      <div className="w-full">
+        <div className="mb-8 flex items-center justify-between rounded-2xl border border-[#E2E5EC] bg-white px-4 py-5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:px-6">
+          <div>
+            <h1 className="text-2xl font-bold text-[#1F293F]">Manage Offerings</h1>
+            <p className="mt-1 text-sm text-[#5B6478]">Create and manage your offerings for AI-based recommendations</p>
           </div>
-
-          {/* Form Panel */}
-          {(showForm || editingOffering) && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-8 shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
-              <h2 className="text-lg font-semibold text-slate-900 mb-5">
-                {editingOffering ? `Edit: ${editingOffering.title}` : 'New Offering'}
-              </h2>
-              <OfferingForm
-                initialData={editingOffering || undefined}
-                onSubmit={editingOffering ? handleUpdate : handleCreate}
-                isLoading={isSaving}
-                onCancel={handleCancel}
-              />
-            </div>
+          {!showForm && !editingOffering && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1565c0] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0d47a1]"
+            >
+              <Plus size={18} />
+              Add New Offering
+            </button>
           )}
+        </div>
 
-          {/* Offerings List */}
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-white border border-slate-200 rounded-2xl p-5 animate-pulse">
-                  <div className="h-4 bg-slate-200 rounded w-3/4 mb-3"></div>
-                  <div className="h-3 bg-slate-200 rounded w-full mb-2"></div>
-                  <div className="h-3 bg-slate-200 rounded w-2/3 mb-4"></div>
-                  <div className="flex gap-2">
-                    <div className="h-6 bg-slate-200 rounded-full w-20"></div>
-                    <div className="h-6 bg-slate-200 rounded-full w-20"></div>
-                  </div>
+        {/* Form Panel */}
+        {(showForm || editingOffering) && (
+          <div className="mb-8 rounded-2xl border border-[#E2E5EC] bg-white p-6 shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
+            <h2 className="mb-5 text-lg font-semibold text-[#1F293F]">
+              {editingOffering ? `Edit: ${editingOffering.title}` : 'New Offering'}
+            </h2>
+            <OfferingForm
+              initialData={editingOffering || undefined}
+              onSubmit={editingOffering ? handleUpdate : handleCreate}
+              isLoading={isSaving}
+              onCancel={handleCancel}
+            />
+          </div>
+        )}
+
+        {/* Offerings List */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="animate-pulse rounded-2xl border border-[#E2E5EC] bg-white p-5">
+                <div className="mb-3 h-4 w-3/4 rounded bg-slate-200"></div>
+                <div className="mb-2 h-3 w-full rounded bg-slate-200"></div>
+                <div className="mb-4 h-3 w-2/3 rounded bg-slate-200"></div>
+                <div className="flex gap-2">
+                  <div className="h-6 w-20 rounded-full bg-slate-200"></div>
+                  <div className="h-6 w-20 rounded-full bg-slate-200"></div>
                 </div>
+              </div>
+            ))}
+          </div>
+        ) : offerings.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#D7DEEA] bg-[#F8FAFD] py-20 text-center">
+            <PackageOpen className="mx-auto mb-4 h-14 w-14 text-[#9BA4B5]" />
+            <h3 className="mb-2 text-lg font-semibold text-[#1F293F]">No offerings yet</h3>
+            <p className="mb-6 text-sm text-[#5B6478]">Create your first offering to get started with AI-based recommendations</p>
+            <button
+              onClick={() => setShowForm(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1565c0] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0d47a1]"
+            >
+              <Plus size={18} />
+              Add New Offering
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="mb-4 text-sm text-[#5B6478]">{offerings.length} offering{offerings.length !== 1 ? 's' : ''} total</p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {offerings.map(offering => (
+                <OfferingCard key={offering.id} offering={offering} onEdit={handleEdit} />
               ))}
             </div>
-          ) : offerings.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-2xl border border-slate-200 shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
-              <PackageOpen className="w-14 h-14 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">No offerings yet</h3>
-              <p className="text-slate-500 text-sm mb-6">Create your first offering to get started with AI-based recommendations</p>
-              <button onClick={() => setShowForm(true)}
-                className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
-                <Plus size={18} />
-                Add New Offering
-              </button>
-            </div>
-          ) : (
-            <>
-              <p className="text-sm text-slate-500 mb-4">{offerings.length} offering{offerings.length !== 1 ? 's' : ''} total</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {offerings.map(offering => (
-                  <OfferingCard key={offering.id} offering={offering} onEdit={handleEdit} />
-                ))}
-              </div>
-            </>
-          )}
+          </>
+        )}
       </div>
     </VendorPortalShell>
   );
