@@ -44,6 +44,31 @@ const toIsoDate = (displayDate: string): string | null => {
   return `${yearStr}-${monthStr}-${dayStr}`;
 };
 
+const todayIso = (): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const isPastIsoDate = (isoDate: string): boolean => {
+  const [yearStr, monthStr, dayStr] = isoDate.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+
+  if (!year || !month || !day) {
+    return false;
+  }
+
+  const selectedDate = new Date(year, month - 1, day);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return selectedDate < today;
+};
+
 export default function CustomerEventChatPage() {
   const params = useParams<{ eventId: string }>();
   const router = useRouter();
@@ -195,6 +220,11 @@ export default function CustomerEventChatPage() {
       return;
     }
 
+    if (isoDate && isPastIsoDate(isoDate)) {
+      setDateInputError('Please select today or a future date');
+      return;
+    }
+
     setDateInputError(null);
     setStartDate(isoDate);
   };
@@ -215,6 +245,7 @@ export default function CustomerEventChatPage() {
         },
       ];
   const sidebarTasks = showAllTasks ? tasks : tasks.slice(0, 3);
+  const minSelectableDate = todayIso();
 
   return (
     <section className="overflow-hidden rounded-2xl border border-[#EAEAEA] bg-white">
@@ -322,8 +353,15 @@ export default function CustomerEventChatPage() {
                                   ref={datePickerRef}
                                   type="date"
                                   value={startDate}
+                                  min={minSelectableDate}
                                   onChange={(event) => {
-                                    setStartDate(event.target.value);
+                                    const selectedDate = event.target.value;
+                                    if (selectedDate && isPastIsoDate(selectedDate)) {
+                                      setDateInputError('Please select today or a future date');
+                                      return;
+                                    }
+
+                                    setStartDate(selectedDate);
                                     setDateInputError(null);
                                   }}
                                   className="pointer-events-none absolute right-2 top-2 h-6 w-6 opacity-0"

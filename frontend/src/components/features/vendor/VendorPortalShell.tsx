@@ -220,11 +220,11 @@ export default function VendorPortalShell({ children }: VendorPortalShellProps) 
                     <span className="hidden text-[16px] font-semibold text-[#182039] sm:inline">Spring & Summer</span>
                     <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-white shadow-[0_6px_18px_rgba(25,35,72,0.18)]">
                       <Image
-                        src="/icons/vendor/dashboard/Spring & Summer logo.svg"
+                        src="/images/vendor/vendor_profile.png"
                         alt="Spring & Summer"
                         width={40}
                         height={40}
-                        className="h-10 w-10 object-contain"
+                        className="h-10 w-10 object-cover"
                       />
                     </span>
                   </button>
