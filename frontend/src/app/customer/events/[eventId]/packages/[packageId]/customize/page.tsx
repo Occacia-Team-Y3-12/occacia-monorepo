@@ -204,7 +204,7 @@ export default function CustomizePackagePage() {
           </div>
           <button
             onClick={() => router.push(ROUTES.CUSTOMER.EVENT_PACKAGE_DETAIL(eventId, packageId))}
-            className="inline-flex items-center gap-2 rounded-full border border-white/50 bg-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-white/30"
+            className="inline-flex items-center gap-2 rounded-full border border-[#0D47A1] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#0D47A1] shadow-sm transition hover:bg-[#0D47A1] hover:text-white"
           >
             <ArrowLeft size={14} />
             Back to Package

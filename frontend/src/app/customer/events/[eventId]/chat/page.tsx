@@ -89,7 +89,6 @@ export default function CustomerEventChatPage() {
     calendarSyncEnabled,
     connectCalendar,
     setCalendarSync,
-    confirmTasks,
   } = useEventChatPlanner(eventId || '');
 
   useEffect(() => {
