@@ -27,6 +27,7 @@ dependencies = [
   "tenacity>=9.1.2,<10.0.0",
   "passlib[bcrypt]>=1.7.4,<2.0.0",
   "tzdata",
+  "faker (>=40.11.1,<41.0.0)",
 ]
 
 [tool.poetry]
