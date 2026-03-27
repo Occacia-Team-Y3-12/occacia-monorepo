@@ -72,19 +72,6 @@ def _generate_otp() -> str:
 # ── Legacy direct-send wrapper (used by admin approval/rejection emails) ──────
 
 def _send_email(to: str, subject: str, text_body: str) -> bool:
-    allowed_types = {
-        item.strip().upper()
-        for item in (getattr(settings, "NOTIFICATION_ALLOWED_TYPES", "") or "").split(",")
-        if item.strip()
-    }
-    if allowed_types:
-        if "DIRECT_EMAIL" not in allowed_types:
-            logger.info("Direct email disabled by feature flag")
-            return False
-    elif getattr(settings, "NOTIFICATION_AUTH_EMAILS_ONLY", False):
-        logger.info("Direct email disabled by auth-only notifications flag")
-        return False
-
     result = notification_service._send_email(
         to=to, subject=subject, text_body=text_body, html_body=None,
     )
