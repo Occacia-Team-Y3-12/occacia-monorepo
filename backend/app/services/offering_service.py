@@ -95,7 +95,19 @@ class OfferingService:
         offering.is_active = False
         db.commit()
 
-    def infer_category(self, task_name: str) -> str:
+    def infer_category(self, task_name: str, vendor_category: str | None = None) -> str:
+        """
+        Infer the offering category for a task.
+        If vendor_category is explicitly provided (set by AI), use it directly.
+        Otherwise fall back to keyword matching on the task name.
+        """
+        # Prefer AI-provided vendor_category
+        if vendor_category:
+            for canonical in OFFERING_CATEGORIES:
+                if canonical.lower() == vendor_category.lower():
+                    return canonical
+
+        # Keyword fallback
         lowered = (task_name or "").lower()
         for category, keywords in _CATEGORY_MAP.items():
             if any(keyword in lowered for keyword in keywords):
@@ -104,8 +116,15 @@ class OfferingService:
                         return canonical
         return "Other"
 
-    def find_offerings_for_task(self, db: Session, task: Task, limit: int = 5) -> list[dict]:
-        inferred_category = self.infer_category(task.name)
+    def find_offerings_for_task(
+        self,
+        db: Session,
+        task: Task,
+        limit: int = 1,  # Default to 1 — one offering per task
+    ) -> list[dict]:
+        vendor_category = getattr(task, "vendor_category", None)
+        inferred_category = self.infer_category(task.name, vendor_category)
+
         query = (
             db.query(Offering)
             .join(Vendor, Vendor.vendor_id == Offering.vendor_id)
