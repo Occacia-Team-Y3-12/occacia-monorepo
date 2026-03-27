@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { featureFlags } from '@/config/featureFlags';
 import { mockVendorTaskApi } from '@/mocks/vendor/vendorTaskApi';
 import { TaskListResponse, TaskListItem } from '@/types/vendorTasks';
+import { attachVendor401Interceptor } from '@/services/http';
 
 type VendorTaskStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'DONE' | string;
 type FulfillmentDecision = 'ACCEPT' | 'REJECT';
@@ -186,6 +187,7 @@ vendorApi.interceptors.request.use((config) => {
   }
   return config;
 });
+attachVendor401Interceptor(vendorApi);
 
 const apiVendorTaskApi = {
   async getFulfillmentRequests(params?: {

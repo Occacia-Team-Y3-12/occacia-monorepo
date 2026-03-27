@@ -1,6 +1,7 @@
 import { featureFlags } from '@/config/featureFlags';
 import { mockCustomerEventService } from '@/mocks/customer/eventService';
 import { getStoredCustomerToken } from '@/services/customer/authService.shared';
+import { handleCustomerFetchUnauthorized } from '@/services/http';
 import {
   CreateCustomerEventPayload,
   CreateCustomerEventResponse,
@@ -68,6 +69,13 @@ const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise
       ...init,
       headers: withCustomerAuthHeaders(init?.headers),
     });
+    if (handleCustomerFetchUnauthorized(response)) {
+      return {
+        ok: false,
+        status: response.status,
+        error: 'Unauthorized',
+      };
+    }
     const raw = await response.text();
     const contentType = response.headers.get('content-type') || '';
     const data = parseBody<T>(raw, contentType);

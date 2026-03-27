@@ -3,6 +3,7 @@ import { featureFlags } from '@/config/featureFlags';
 import { mockOfferingService } from '@/mocks/vendor/offeringService';
 import { API_BASE_URL } from '@/services/api';
 import { Offering, CreateOfferingData, UpdateOfferingData } from '@/types/vendor/offering';
+import { attachVendor401Interceptor } from '@/services/http';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -16,6 +17,7 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+attachVendor401Interceptor(api);
 
 const extractPayload = <T>(raw: unknown): T => {
   if (raw && typeof raw === 'object') {

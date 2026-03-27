@@ -4,6 +4,7 @@ import { featureFlags } from '@/config/featureFlags';
 import { mockCustomerOrderService } from '@/mocks/customer/orderService';
 import { API_BASE_URL } from '@/services/api';
 import type { PackageOrder } from '@/types/customer/order';
+import { attachCustomer401Interceptor } from '@/services/http';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -16,6 +17,7 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+attachCustomer401Interceptor(api);
 
 const apiCustomerOrderService = {
   async listOrders(): Promise<PackageOrder[]> {

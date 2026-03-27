@@ -2,6 +2,7 @@ import { featureFlags } from '@/config/featureFlags';
 import { mockCustomerPersonaService } from '@/mocks/customer/personaService';
 import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 import { ServiceResult } from '@/types/customer';
+import { handleCustomerFetchUnauthorized } from '@/services/http';
 import {
   CustomerPersona,
   CustomerPersonaCreatePayload,
@@ -86,6 +87,13 @@ const request = async (input: RequestInfo | URL, init?: RequestInit): Promise<Se
       ...init,
       headers: withCustomerAuthHeaders(init?.headers),
     });
+    if (handleCustomerFetchUnauthorized(response)) {
+      return {
+        ok: false,
+        status: response.status,
+        error: 'Unauthorized',
+      };
+    }
     const raw = await response.text();
     const contentType = response.headers.get('content-type') || '';
     const data = parseBody(raw, contentType);

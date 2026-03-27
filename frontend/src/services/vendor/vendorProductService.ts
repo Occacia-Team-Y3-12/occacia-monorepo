@@ -8,6 +8,7 @@ import type {
   UpdateVendorProductData,
   VendorProduct,
 } from '@/types/vendor/product';
+import { attachVendor401Interceptor } from '@/services/http';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -24,6 +25,7 @@ api.interceptors.request.use((config) => {
 
   return config;
 });
+attachVendor401Interceptor(api);
 
 const extractPayload = <T>(raw: unknown): T => {
   if (raw && typeof raw === 'object') {

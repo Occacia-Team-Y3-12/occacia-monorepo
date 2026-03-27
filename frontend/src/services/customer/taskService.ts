@@ -2,6 +2,7 @@ import { featureFlags } from '@/config/featureFlags';
 import { mockTaskService } from '@/mocks/customer/taskService';
 import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 import { ServiceResult } from '@/types/customer';
+import { handleCustomerFetchUnauthorized } from '@/services/http';
 import {
   EventWithTasks,
   Task,
@@ -33,6 +34,13 @@ const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise
       ...init,
       headers: withCustomerAuthHeaders(init?.headers),
     });
+    if (handleCustomerFetchUnauthorized(response)) {
+      return {
+        ok: false,
+        status: response.status,
+        error: 'Unauthorized',
+      };
+    }
     const data = response.ok ? await response.json() : undefined;
 
     if (!response.ok) {

@@ -13,6 +13,7 @@ const offeringSchema = z.object({
   price: z.preprocess((val) => parseFloat(val as string), z.number().min(1, 'Price must be at least LKR 1').max(1000000, 'Price must not exceed LKR 1,000,000')),
   qualityTier: z.enum(['BUDGET', 'STANDARD', 'PREMIUM', 'LUXURY']),
   isActive: z.boolean(),
+  isAvailable: z.boolean(),
 });
 
 type OfferingFormErrors = Partial<Record<keyof CreateOfferingData, string>>;
@@ -51,6 +52,7 @@ export default function OfferingForm({ initialData, onSubmit, isLoading, onCance
     price: initialData?.price || 0,
     qualityTier: initialData?.qualityTier || 'STANDARD',
     isActive: initialData?.isActive ?? true,
+    isAvailable: initialData?.isAvailable ?? true,
   });
   const [errors, setErrors] = useState<OfferingFormErrors>({});
 
@@ -193,6 +195,22 @@ export default function OfferingForm({ initialData, onSubmit, isLoading, onCance
         <div>
           <label htmlFor="isActive" className="cursor-pointer text-sm font-medium text-[#3D475C]">Active Offering</label>
           <p className="text-xs text-[#5B6478]">Active offerings are available for AI-based recommendation shortlisting</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 rounded-lg border border-[#D7DEEA] bg-[#F5F8FE] p-3">
+        <input
+          type="checkbox"
+          id="isAvailable"
+          name="isAvailable"
+          checked={formData.isAvailable}
+          onChange={handleChange}
+          className="h-4 w-4 cursor-pointer rounded border-[#BCC8DD] text-[#1565c0] focus:ring-[#4285F4]/40"
+          disabled={isLoading}
+        />
+        <div>
+          <label htmlFor="isAvailable" className="cursor-pointer text-sm font-medium text-[#3D475C]">Available for Customers</label>
+          <p className="text-xs text-[#5B6478]">Turn off to hide this offering from customer packages</p>
         </div>
       </div>
 
