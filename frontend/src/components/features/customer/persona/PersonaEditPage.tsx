@@ -149,10 +149,15 @@ function PersonaEditContent({ mode = 'edit', personaId }: PersonaEditPageProps) 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   const personasQuery = useQuery({
     queryKey: ['customer-personas'],
-    enabled: !isCreateMode,
+    enabled: hasHydrated && !isCreateMode,
     queryFn: async () => {
       const response = await customerPersonaService.listPersonas();
       if (!response.ok) throw new Error(response.error || 'Failed to load personas');
@@ -171,7 +176,7 @@ function PersonaEditContent({ mode = 'edit', personaId }: PersonaEditPageProps) 
 
   const personaQuery = useQuery({
     queryKey: ['customer-persona', selectedPersonaId],
-    enabled: !isCreateMode && Boolean(selectedPersonaId),
+    enabled: hasHydrated && !isCreateMode && Boolean(selectedPersonaId),
     queryFn: async () => {
       const response = await customerPersonaService.getPersona(selectedPersonaId as string);
       if (!response.ok || !response.data) throw new Error(response.error || 'Failed to load persona');

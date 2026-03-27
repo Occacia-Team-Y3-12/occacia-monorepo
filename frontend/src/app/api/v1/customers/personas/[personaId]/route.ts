@@ -8,7 +8,10 @@ export async function GET(
 ) {
   try {
     const { personaId } = await params;
-    const token = request.cookies.get('auth_token')?.value;
+    const token =
+      request.cookies.get('auth_token')?.value ||
+      request.cookies.get('customerToken')?.value ||
+      request.cookies.get('accessToken')?.value;
     
     const response = await fetch(`${BACKEND_URL}/api/v1/customers/personas/${personaId}`, {
       headers: {
@@ -33,7 +36,10 @@ export async function PUT(
 ) {
   try {
     const { personaId } = await params;
-    const token = request.cookies.get('auth_token')?.value;
+    const token =
+      request.cookies.get('auth_token')?.value ||
+      request.cookies.get('customerToken')?.value ||
+      request.cookies.get('accessToken')?.value;
     const body = await request.json();
     
     const response = await fetch(`${BACKEND_URL}/api/v1/customers/personas/${personaId}`, {
