@@ -249,7 +249,7 @@ export default function EventsPage() {
                   </span>
                 </div>
 
-                <p className="mt-4 flex-1 text-sm leading-7 text-[#5B6780]">
+                <p className="mt-4 flex-1 break-words text-sm leading-7 text-[#5B6780] line-clamp-3">
                   {event.description?.trim() || 'No description added yet.'}
                 </p>
 
