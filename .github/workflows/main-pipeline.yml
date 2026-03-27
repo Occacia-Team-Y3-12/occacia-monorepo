@@ -103,13 +103,15 @@ jobs:
         run: docker build -t occacia-scan ./backend
 
       - name: Container vulnerability scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: occacia-scan
-          format: table
-          exit-code: '1'
-          ignore-unfixed: true
-          severity: CRITICAL,HIGH
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            ghcr.io/aquasecurity/trivy:latest image \
+            --format table \
+            --exit-code 1 \
+            --ignore-unfixed \
+            --severity CRITICAL,HIGH \
+            occacia-scan
 
   # --- Deploy to Production ---
   deploy:
