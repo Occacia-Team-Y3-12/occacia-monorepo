@@ -32,7 +32,11 @@ const toLocalDate = (iso?: string): string => {
   if (Number.isNaN(dt.getTime())) {
     return '';
   }
-  return dt.toISOString().slice(0, 10);
+  // Use local calendar date parts to avoid UTC date shifts (e.g. +05:30 showing previous day).
+  const year = dt.getFullYear();
+  const month = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const toLocalTime = (iso?: string): string => {
