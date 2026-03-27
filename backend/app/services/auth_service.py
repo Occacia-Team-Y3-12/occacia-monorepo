@@ -315,6 +315,18 @@ class AuthService:
         logger.info("Customer password reset: %s", email)
         return {"message": "Password updated successfully."}
 
+    def change_customer_password_authenticated(
+        self, db: Session, customer: Customer, current_password: str, new_password: str,
+    ) -> dict[str, str]:
+        """Change customer password for an authenticated session."""
+        if not customer.password_hash or not verify_password(current_password, customer.password_hash):
+            raise HTTPException(status_code=400, detail="Current password is incorrect.")
+        customer.password_hash = get_password_hash(new_password)
+        db.add(customer)
+        db.commit()
+        logger.info("Customer password changed (authenticated): %s", customer.email)
+        return {"message": "Password updated successfully."}
+
     def change_customer_password(
         self,
         db: Session,
@@ -382,45 +394,6 @@ class AuthService:
             }.get(approval_status, "Vendor account is not active.")
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
-        access_token  = create_access_token(
-            data={"sub": vendor.email, "role": "VENDOR"}, expires_delta=timedelta(minutes=60),
-        )
-        refresh_token = create_refresh_token(
-            data={"sub": vendor.email, "role": "VENDOR"}, expires_delta=timedelta(days=7),
-        )
-        return {
-            "access_token":  access_token,
-            "token_type":    "bearer",
-            "accessToken":   access_token,
-            "refreshToken":  refresh_token,
-            "user": {
-                "userId": getattr(vendor, "vendor_id", str(getattr(vendor, "id", ""))),
-                "email":  vendor.email,
-                "role":   "VENDOR",
-                "status": getattr(vendor, "approval_status", getattr(vendor, "status", "ACTIVE")),
-            },
-        }
-
-    def refresh_vendor_token(self, db: Session, payload: RefreshTokenRequest) -> dict:
-        """Refresh vendor access token using a valid vendor refresh token."""
-        exc = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token.",
-        )
-        try:
-            claims = decode_token(payload.refresh_token)
-        except PyJWTError:
-            raise exc
-        if claims.get("type") != "refresh" or claims.get("role") != "VENDOR":
-            raise exc
-        email = claims.get("sub")
-        if not email:
-            raise exc
-        vendor = vendor_service.get_vendor_by_email(db, email=email)
-        if not vendor:
-            raise exc
-        if getattr(vendor, "approval_status", None) != "APPROVED":
-            raise exc
         access_token  = create_access_token(
             data={"sub": vendor.email, "role": "VENDOR"}, expires_delta=timedelta(minutes=60),
         )
@@ -543,6 +516,19 @@ class AuthService:
         db.add(vendor)
         db.commit()
         logger.info("Vendor password reset: %s", email)
+        return {"message": "Password updated successfully."}
+
+    def change_vendor_password_authenticated(
+        self, db: Session, vendor: Vendor, current_password: str, new_password: str,
+    ) -> dict[str, str]:
+        """Change vendor password for an authenticated session."""
+        vendor_password = getattr(vendor, "password_hash", None) or getattr(vendor, "hashed_password", None)
+        if not vendor_password or not verify_password(current_password, vendor_password):
+            raise HTTPException(status_code=400, detail="Current password is incorrect.")
+        vendor.password_hash = get_password_hash(new_password)
+        db.add(vendor)
+        db.commit()
+        logger.info("Vendor password changed (authenticated): %s", vendor.email)
         return {"message": "Password updated successfully."}
 
     def change_vendor_password(

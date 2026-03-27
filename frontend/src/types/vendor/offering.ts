@@ -10,6 +10,7 @@ export interface Offering {
   price: number;
   qualityTier: QualityTier;
   isActive: boolean;
+  isAvailable: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +22,7 @@ export interface CreateOfferingData {
   price: number;
   qualityTier: QualityTier;
   isActive: boolean;
+  isAvailable: boolean;
 }
 
 export type UpdateOfferingData = Partial<CreateOfferingData>;

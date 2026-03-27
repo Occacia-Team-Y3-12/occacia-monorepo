@@ -26,6 +26,13 @@ from .inquiry_schema import (
 )
 from .vendor_schema import VendorLoginRequest, VendorRegisterRequest, VendorResponse
 
+from .vendor_task_schema import (
+    TaskListItem,
+    TaskDetail,
+    TaskListResponse,
+    TaskFilterParams,
+)
+
 __all__ = [
     "AuthMessageResponse",
     "CustomerRegister",
@@ -52,11 +59,8 @@ __all__ = [
     "VendorRegisterRequest",
     "VendorResponse",
     "VerifyEmailResponse",
+    "TaskListItem",
+    "TaskDetail",
+    "TaskListResponse",
+    "TaskFilterParams",
 ]
-# Add to existing imports
-from .vendor_task_schema import (
-    TaskListItem, 
-    TaskDetail, 
-    TaskListResponse,
-    TaskFilterParams
-)

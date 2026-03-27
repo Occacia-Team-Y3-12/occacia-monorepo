@@ -7,16 +7,15 @@ import type {
   ShortlistedOffering,
 } from '@/types/customer/package';
 import type { CustomerPackageService } from './packageService.types';
+import { attachAuthHeaderInterceptor, attachCustomer401Interceptor } from '@/services/http';
+import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('customerToken');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+attachAuthHeaderInterceptor(api, () => getStoredCustomerToken());
+attachCustomer401Interceptor(api);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -47,6 +46,7 @@ const normalizePackageItem = (raw: unknown): PackageItem | null => {
     offeringCategory: typeof raw.offeringCategory === 'string' ? raw.offeringCategory : 'General',
     vendorName: typeof raw.vendorName === 'string' && raw.vendorName.trim() ? raw.vendorName : 'Vendor',
     taskPrice: typeof raw.taskPrice === 'number' ? raw.taskPrice : 0,
+    isAvailable: typeof raw.isAvailable === 'boolean' ? raw.isAvailable : true,
   };
 };
 

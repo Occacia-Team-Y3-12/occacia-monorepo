@@ -34,6 +34,16 @@ VENDOR_PASSWORD_RESET_LINK             = "VENDOR_PASSWORD_RESET_LINK"
 ADMIN_LOGIN_OTP_NOTIFICATION           = "ADMIN_LOGIN_OTP"
 ADMIN_PASSWORD_RESET_OTP               = "ADMIN_PASSWORD_RESET_OTP"
 
+AUTH_NOTIFICATION_TYPES = {
+    CUSTOMER_VERIFICATION_NOTIFICATION,
+    CUSTOMER_PASSWORD_RESET_LINK,
+    VENDOR_VERIFICATION_NOTIFICATION,
+    VENDOR_PASSWORD_RESET_LINK,
+    ADMIN_VERIFICATION_NOTIFICATION,
+    ADMIN_LOGIN_OTP_NOTIFICATION,
+    ADMIN_PASSWORD_RESET_OTP,
+}
+
 # ── Statuses / channels ───────────────────────────────────────────────────────
 NOTIFICATION_CHANNEL_EMAIL             = "EMAIL"
 NOTIFICATION_STATUS_QUEUED             = "QUEUED"
@@ -60,6 +70,8 @@ class ProviderResult:
     provider: str
     provider_message_id: str | None = None
     error_message: str | None = None
+    # When true, the failure should not be retried (e.g., auth/recipient issues).
+    is_permanent_failure: bool = False
 
 
 # ── Shared OTP block helpers ──────────────────────────────────────────────────
@@ -311,6 +323,19 @@ class _SafeDict(dict):
 
 
 class NotificationService:
+    def _enabled_notification_types(self) -> set[str] | None:
+        raw = getattr(settings, "NOTIFICATION_ALLOWED_TYPES", None)
+        if raw:
+            return {item.strip().upper() for item in raw.split(",") if item.strip()}
+        if getattr(settings, "NOTIFICATION_AUTH_EMAILS_ONLY", False):
+            return set(AUTH_NOTIFICATION_TYPES)
+        return None
+
+    def _is_notification_type_enabled(self, notification_type: str) -> bool:
+        allowed = self._enabled_notification_types()
+        if allowed is None:
+            return True
+        return notification_type.upper() in allowed
 
     # ── Core enqueue ──────────────────────────────────────────────────────────
 
@@ -323,6 +348,9 @@ class NotificationService:
         context_data: dict[str, object],
         dedupe_window: timedelta | None = None,
     ) -> Notification | None:
+        if not self._is_notification_type_enabled(notification_type):
+            logger.info("Notification %s disabled by feature flag", notification_type)
+            return None
         recipient  = self._resolve_recipient(db, recipient_id=recipient_id)
         dedupe_key = self._build_dedupe_key(
             notification_type=notification_type,
@@ -630,6 +658,17 @@ class NotificationService:
     # ── Delivery ──────────────────────────────────────────────────────────────
 
     def _deliver_notification(self, db: Session, *, notification: Notification) -> Notification:
+        if not self._is_notification_type_enabled(notification.type):
+            notification.status          = NOTIFICATION_STATUS_PERMANENT_FAILURE
+            notification.last_attempt_at = now_utc()
+            notification.next_attempt_at = None
+            notification.attempt_count   = (notification.attempt_count or 0) + 1
+            notification.error_message   = "Disabled by feature flag"
+            db.add(notification)
+            db.commit()
+            db.refresh(notification)
+            return notification
+
         notification.status         = NOTIFICATION_STATUS_PROCESSING
         notification.last_attempt_at = now_utc()
         db.add(notification)
@@ -653,7 +692,10 @@ class NotificationService:
             notification.sent_at          = now_utc()
             notification.next_attempt_at  = None
         else:
-            if notification.attempt_count >= (notification.max_attempts or DEFAULT_MAX_ATTEMPTS):
+            if result.is_permanent_failure:
+                notification.status          = NOTIFICATION_STATUS_PERMANENT_FAILURE
+                notification.next_attempt_at = None
+            elif notification.attempt_count >= (notification.max_attempts or DEFAULT_MAX_ATTEMPTS):
                 notification.status          = NOTIFICATION_STATUS_PERMANENT_FAILURE
                 notification.next_attempt_at = None
             else:
@@ -683,7 +725,21 @@ class NotificationService:
         if not smtp_host:
             logger.warning("SMTP_HOST not set — email not sent (dev mode)")
             logger.info("DEV EMAIL\n  To: %s\n  Subject: %s\n  Body:\n%s", to, subject, text_body)
-            return ProviderResult(success=False, provider="SMTP", error_message="SMTP_HOST not configured")
+            return ProviderResult(
+                success=False,
+                provider="SMTP",
+                error_message="SMTP_HOST not configured",
+                is_permanent_failure=True,
+            )
+
+        if (smtp_user and not smtp_password) or (smtp_password and not smtp_user):
+            logger.error("SMTP credentials misconfigured — set both SMTP_USER and SMTP_PASSWORD")
+            return ProviderResult(
+                success=False,
+                provider="SMTP",
+                error_message="SMTP_USER/SMTP_PASSWORD must both be set",
+                is_permanent_failure=True,
+            )
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
@@ -714,10 +770,20 @@ class NotificationService:
 
         except smtplib.SMTPAuthenticationError as exc:
             logger.error("SMTP auth failed: %s", exc)
-            return ProviderResult(success=False, provider="SMTP", error_message=f"Auth failed: {exc}")
+            return ProviderResult(
+                success=False,
+                provider="SMTP",
+                error_message=f"Auth failed: {exc}",
+                is_permanent_failure=True,
+            )
         except smtplib.SMTPRecipientsRefused as exc:
             logger.error("SMTP recipient refused %s: %s", to, exc)
-            return ProviderResult(success=False, provider="SMTP", error_message=f"Recipient refused: {exc}")
+            return ProviderResult(
+                success=False,
+                provider="SMTP",
+                error_message=f"Recipient refused: {exc}",
+                is_permanent_failure=True,
+            )
         except Exception as exc:
             logger.error("Failed to send email to %s: %s", to, exc)
             return ProviderResult(success=False, provider="SMTP", error_message=str(exc))

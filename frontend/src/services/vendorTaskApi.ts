@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { featureFlags } from '@/config/featureFlags';
 import { mockVendorTaskApi } from '@/mocks/vendor/vendorTaskApi';
 import { TaskListResponse, TaskListItem } from '@/types/vendorTasks';
+import { attachAuthHeaderInterceptor, attachVendor401Interceptor } from '@/services/http';
 
 type VendorTaskStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'DONE' | string;
 type FulfillmentDecision = 'ACCEPT' | 'REJECT';
@@ -179,13 +180,8 @@ const vendorApi = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-vendorApi.interceptors.request.use((config) => {
-  const token = getAuthToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+attachAuthHeaderInterceptor(vendorApi, () => getAuthToken());
+attachVendor401Interceptor(vendorApi);
 
 const apiVendorTaskApi = {
   async getFulfillmentRequests(params?: {
