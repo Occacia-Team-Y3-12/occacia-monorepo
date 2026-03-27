@@ -48,6 +48,10 @@ export const featureFlags = {
     process.env.NEXT_PUBLIC_USE_VENDOR_OFFERINGS_MOCK,
     enableFrontendMocks
   ),
+  useVendorProductsMock: envFlag(
+    process.env.NEXT_PUBLIC_USE_VENDOR_PRODUCTS_MOCK,
+    enableFrontendMocks
+  ),
   useVendorTasksMock: envFlag(
     process.env.NEXT_PUBLIC_USE_VENDOR_TASKS_MOCK,
     enableFrontendMocks

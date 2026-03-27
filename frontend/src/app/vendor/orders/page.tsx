@@ -44,7 +44,7 @@ export default function VendorOrdersPage() {
     <VendorPortalShell>
       <div className="max-w-7xl mx-auto">
         <div className="bg-white border border-gray-200 rounded-2xl py-4 md:py-6 px-4 sm:px-8 shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">Orders</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
           <p className="text-gray-600 mt-1 md:mt-2 text-sm md:text-base">Manage and track your orders</p>
         </div>
       </div>

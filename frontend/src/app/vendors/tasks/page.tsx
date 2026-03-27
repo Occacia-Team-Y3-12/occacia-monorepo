@@ -6,9 +6,7 @@ import { VendorTasksDashboard } from '@/components/vendor/VendorTasksDashboard';
 export default function VendorTasksPage() {
   return (
     <VendorPortalShell>
-      <div className="max-w-7xl mx-auto">
-        <VendorTasksDashboard />
-      </div>
+      <VendorTasksDashboard />
     </VendorPortalShell>
   );
 }

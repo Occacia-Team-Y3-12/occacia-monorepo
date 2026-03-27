@@ -47,7 +47,7 @@ export default function OfferingsPage() {
       <div className="w-full">
         <div className="mb-8 flex items-center justify-between rounded-2xl border border-[#E2E5EC] bg-white px-4 py-5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:px-6">
           <div>
-            <h1 className="text-2xl font-bold text-[#1F293F]">Manage Offerings</h1>
+            <h1 className="text-3xl font-bold text-[#1F293F]">Manage Offerings</h1>
             <p className="mt-1 text-sm text-[#5B6478]">Create and manage your offerings for AI-based recommendations</p>
           </div>
           <Link
