@@ -3,15 +3,18 @@ app/routers/v1/auth_router.py
 """
 from __future__ import annotations
 
+from datetime import timedelta
 from types import SimpleNamespace
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi import HTTPException, status
+from jwt.exceptions import PyJWTError
 from pydantic import BaseModel, EmailStr, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin, get_current_customer, get_current_vendor
+from app.core.security import create_access_token, create_refresh_token, decode_token
 from app.models.admin import Admin
 from app.models.customer import Customer
 from app.models.organization import Organization
@@ -26,6 +29,7 @@ from app.schemas.auth_schema import (
     ResendVerificationRequest,
 )
 from app.schemas.vendor_schema import VendorRegisterRequest, VendorResponse
+from app.services.admin_service import admin_service
 from app.services.auth_service import auth_service
 from app.services.vendor_service import vendor_service
 
@@ -214,7 +218,6 @@ def customer_verify_password_otp(
     Response: { "resetToken": "...", "message": "..." }
     """
     return auth_service.verify_customer_password_reset_otp(db, str(payload.email), payload.otp)
-
 
 
 @router.post("/customer/password/reset", response_model=AuthMessageResponse)
@@ -474,46 +477,7 @@ def vendor_change_password(
 )
 def refresh_vendor_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
     """Refresh vendor access token using a refresh token."""
-    # Reuse customer refresh logic — claims carry role so it's safe
-    exc = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or expired refresh token.",
-    )
-    from jwt.exceptions import PyJWTError
-    from app.core.security import decode_token, create_access_token, create_refresh_token
-    from datetime import timedelta
-    try:
-        claims = decode_token(payload.refresh_token)
-    except PyJWTError:
-        raise exc
-    if claims.get("type") != "refresh" or claims.get("role") != "VENDOR":
-        raise exc
-    email = claims.get("sub")
-    if not email:
-        raise exc
-    vendor = vendor_service.get_vendor_by_email(db, email=email)
-    if not vendor:
-        raise exc
-    if getattr(vendor, "approval_status", None) != "APPROVED":
-        raise exc
-    access_token  = create_access_token(
-        data={"sub": vendor.email, "role": "VENDOR"}, expires_delta=timedelta(minutes=60),
-    )
-    refresh_token = create_refresh_token(
-        data={"sub": vendor.email, "role": "VENDOR"}, expires_delta=timedelta(days=7),
-    )
-    return {
-        "access_token":  access_token,
-        "token_type":    "bearer",
-        "accessToken":   access_token,
-        "refreshToken":  refresh_token,
-        "user": {
-            "userId": getattr(vendor, "vendor_id", str(getattr(vendor, "id", ""))),
-            "email":  vendor.email,
-            "role":   "VENDOR",
-            "status": getattr(vendor, "approval_status", getattr(vendor, "status", "ACTIVE")),
-        },
-    }
+    return auth_service.refresh_vendor_token(db, payload)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -526,7 +490,6 @@ def verify_admin_email(token: str = Query(...), db: Session = Depends(get_db)):
     Verify admin email via the link sent in the registration email.
     Frontend should redirect here with the token as a query param.
     """
-    from app.services.admin_service import admin_service
     return admin_service.verify_admin_email(db, token)
 
 
@@ -536,7 +499,6 @@ def resend_admin_verification_email(
     db: Session = Depends(get_db),
 ):
     """Resend admin verification email (link-based)."""
-    from app.services.admin_service import admin_service
     return admin_service.resend_admin_verification_email(db, str(payload.email))
 
 
@@ -550,7 +512,6 @@ def admin_login(payload: AdminLoginRequest, db: Session = Depends(get_db)):
     After this, call POST /auth/admin/login/verify-otp with email + otp
     to receive the JWT token.
     """
-    from app.services.admin_service import admin_service
     return admin_service.login_admin(db, payload.email, payload.password)
 
 
@@ -561,7 +522,6 @@ def admin_verify_login_otp(payload: AdminOTPVerifyRequest, db: Session = Depends
     Submit the 6-digit OTP sent to admin email.
     Returns JWT access token on success. OTP is single-use.
     """
-    from app.services.admin_service import admin_service
     return admin_service.verify_admin_login_otp(db, payload.email, payload.otp)
 
 
@@ -576,7 +536,6 @@ def admin_logout(
     _: Admin = Depends(get_current_admin),
 ):
     """Invalidate current admin access token using blacklist semantics."""
-    from app.services.admin_service import admin_service
     return admin_service.logout_admin(db, authorization=request.headers.get("Authorization"))
 
 
@@ -591,7 +550,6 @@ def delete_admin_account(
     current_admin: Admin = Depends(get_current_admin),
 ):
     """Delete authenticated admin account."""
-    from app.services.admin_service import admin_service
     return admin_service.delete_admin_account(
         db=db,
         admin=current_admin,
@@ -607,7 +565,6 @@ def delete_admin_account(
 )
 def admin_refresh_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
     """Refresh admin access token using an admin refresh token."""
-    from app.services.admin_service import admin_service
     return admin_service.refresh_admin_token(db, payload.refresh_token)
 
 
@@ -620,7 +577,6 @@ def admin_forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(
     Sends a 6-digit password reset OTP to the admin's email.
     OTP expires in 5 minutes.
     """
-    from app.services.admin_service import admin_service
     return admin_service.request_admin_password_reset_otp(db, str(payload.email))
 
 
@@ -633,7 +589,6 @@ def admin_verify_password_otp(payload: AdminOTPVerifyRequest, db: Session = Depe
 
     Response: { "resetToken": "...", "message": "..." }
     """
-    from app.services.admin_service import admin_service
     return admin_service.verify_admin_password_reset_otp(db, str(payload.email), payload.otp)
 
 
@@ -643,5 +598,4 @@ def admin_reset_password(payload: ResetPasswordRequest, db: Session = Depends(ge
     Admin forgot password — Step 3.
     Submit the reset token from Step 2 and the new password.
     """
-    from app.services.admin_service import admin_service
     return admin_service.confirm_admin_password_reset(db, payload.reset_token, payload.new_password)
