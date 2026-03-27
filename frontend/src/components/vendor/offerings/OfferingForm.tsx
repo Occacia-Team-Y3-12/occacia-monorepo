@@ -7,8 +7,8 @@ import { z } from 'zod';
 import { CreateOfferingData, OfferingCategory, QualityTier, Offering } from '@/types/vendor/offering';
 
 const offeringSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must not exceed 100 characters'),
-  description: z.string().min(10, 'Description must be at least 10 characters').max(500, 'Description must not exceed 500 characters'),
+  title: z.string().min(2, 'Title must be at least 2 characters').max(100, 'Title must not exceed 100 characters'),
+  description: z.string().min(2, 'Description must be at least 2 characters').max(500, 'Description must not exceed 500 characters'),
   category: z.enum(['CATERING', 'PHOTOGRAPHY', 'VENUE', 'DECORATION', 'MUSIC', 'TRANSPORT', 'OTHER']),
   price: z.preprocess((val) => parseFloat(val as string), z.number().min(1, 'Price must be at least LKR 1').max(1000000, 'Price must not exceed LKR 1,000,000')),
   qualityTier: z.enum(['BUDGET', 'STANDARD', 'PREMIUM', 'LUXURY']),

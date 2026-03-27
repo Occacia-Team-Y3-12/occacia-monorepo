@@ -58,6 +58,23 @@ const apiOfferingService = {
   },
 };
 
+const withMockFallback = async <T>(action: () => Promise<T>, fallback: () => Promise<T>): Promise<T> => {
+  try {
+    return await action();
+  } catch (error) {
+    if (!featureFlags.enableFrontendMocks) {
+      throw error;
+    }
+    return fallback();
+  }
+};
+
 export const offeringService = featureFlags.useVendorOfferingsMock
   ? mockOfferingService
-  : apiOfferingService;
+  : {
+      getAll: () => withMockFallback(apiOfferingService.getAll, mockOfferingService.getAll),
+      getById: (id: string) => withMockFallback(() => apiOfferingService.getById(id), () => mockOfferingService.getById(id)),
+      create: (data: CreateOfferingData) => withMockFallback(() => apiOfferingService.create(data), () => mockOfferingService.create(data)),
+      update: (id: string, data: UpdateOfferingData) =>
+        withMockFallback(() => apiOfferingService.update(id, data), () => mockOfferingService.update(id, data)),
+    };

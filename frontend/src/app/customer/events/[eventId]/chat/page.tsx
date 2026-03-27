@@ -102,6 +102,7 @@ export default function CustomerEventChatPage() {
   const [baselineValues, setBaselineValues] = useState<{
     startDate: string;
     frequency: RecurrenceFrequencyOption;
+    remindersEnabled: boolean;
     offsets: number[];
     calendarSyncEnabled: boolean;
   } | null>(null);
@@ -126,11 +127,13 @@ export default function CustomerEventChatPage() {
     addTask,
     updateTaskTitle,
     removeTask,
+    setDateTBD,
     startDate,
     setStartDate,
     setIsRecurring,
     frequency,
     setFrequency,
+    remindersEnabled,
     setRemindersEnabled,
     offsets,
     toggleOffset,
@@ -178,6 +181,7 @@ export default function CustomerEventChatPage() {
     setBaselineValues({
       startDate,
       frequency,
+      remindersEnabled,
       offsets: normalizeOffsets(offsets),
       calendarSyncEnabled,
     });
@@ -186,7 +190,7 @@ export default function CustomerEventChatPage() {
     setSaveStatus('idle');
     setIsEditorOpen(false);
     setIsRightPanelOpenMobile(false);
-  }, [isInitialLoading, eventId, baselineEventId, startDate, frequency, offsets, calendarSyncEnabled]);
+  }, [isInitialLoading, eventId, baselineEventId, startDate, frequency, remindersEnabled, offsets, calendarSyncEnabled]);
 
   if (!eventId) {
     return <section className="rounded-2xl border border-[#EAEAEA] bg-white p-6 text-sm text-[#EA4335]">Invalid event id.</section>;
@@ -216,6 +220,7 @@ export default function CustomerEventChatPage() {
     && (
       baselineValues.startDate !== startDate
       || baselineValues.frequency !== frequency
+      || baselineValues.remindersEnabled !== remindersEnabled
       || normalizeOffsets(baselineValues.offsets).join(',') !== normalizeOffsets(offsets).join(',')
       || baselineValues.calendarSyncEnabled !== pendingCalendarSyncEnabled
     ),
@@ -286,9 +291,15 @@ export default function CustomerEventChatPage() {
 
     let effectiveStartDate = startDate;
     if (isoDate && !isPastIsoDate(isoDate) && isoDate !== startDate) {
+      setDateTBD(false);
       setStartDate(isoDate);
       setDateInputValue(toDisplayDate(isoDate));
       effectiveStartDate = isoDate;
+      await waitForStateCommit();
+    }
+
+    if (effectiveStartDate) {
+      setDateTBD(false);
       await waitForStateCommit();
     }
 
@@ -322,6 +333,7 @@ export default function CustomerEventChatPage() {
     setBaselineValues({
       startDate: effectiveStartDate,
       frequency,
+      remindersEnabled,
       offsets: normalizeOffsets(offsets),
       calendarSyncEnabled: pendingCalendarSyncEnabled,
     });
@@ -390,11 +402,12 @@ export default function CustomerEventChatPage() {
     }
 
     setStartDate(baselineValues.startDate);
+    setDateTBD(!baselineValues.startDate);
     setDateInputValue(toDisplayDate(baselineValues.startDate));
     setDateInputError(null);
     setIsRecurring(true);
     setFrequency(baselineValues.frequency);
-    setRemindersEnabled(baselineValues.offsets.length > 0);
+    setRemindersEnabled(baselineValues.remindersEnabled);
 
     const currentOffsets = normalizeOffsets(offsets);
     const targetOffsets = normalizeOffsets(baselineValues.offsets);
@@ -432,6 +445,7 @@ export default function CustomerEventChatPage() {
     }
 
     setDateInputError(null);
+    setDateTBD(!isoDate);
     setStartDate(isoDate);
   };
 
@@ -562,7 +576,9 @@ export default function CustomerEventChatPage() {
   const minSelectableDate = todayIso();
   const recurrenceSummary = recurrenceLabelByFrequency[frequency];
   const reminderSummary = offsets.length
-    ? offsets.map((offset) => (offset === 10080 ? '7d' : offset === 1440 ? '1d' : '1h')).join(', ')
+    ? (remindersEnabled
+      ? offsets.map((offset) => (offset === 10080 ? '7d' : offset === 1440 ? '1d' : '1h')).join(', ')
+      : 'Off')
     : 'Off';
   const calendarSummary = pendingCalendarSyncEnabled
     ? (calendarStatus.connected ? 'Enabled' : 'Enable on save (connect required)')
@@ -870,6 +886,7 @@ export default function CustomerEventChatPage() {
                             return;
                           }
 
+                          setDateTBD(!selectedDate);
                           setStartDate(selectedDate);
                           setDateInputValue(toDisplayDate(selectedDate));
                           setDateInputError(null);
@@ -1129,6 +1146,7 @@ export default function CustomerEventChatPage() {
                             return;
                           }
 
+                          setDateTBD(!selectedDate);
                           setStartDate(selectedDate);
                           setDateInputValue(toDisplayDate(selectedDate));
                           setDateInputError(null);
