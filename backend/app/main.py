@@ -14,7 +14,6 @@ from app.core.config import settings
 from app.core.exceptions import add_exception_handlers
 from app.core.logging import configure_logging
 from app.routers import api_router
-from app.scripts.seed import seed_data
 
 
 logger = configure_logging(settings)
@@ -56,10 +55,14 @@ async def lifespan(_: FastAPI):
         return
 
     # Seed reference data only after the database is reachable.
-    try:
-        seed_data()
-    except Exception as e:
-        logger.warning("Seeding warning: %s", e)
+    if os.getenv("RUN_DB_SEED_ON_STARTUP") == "1":
+        try:
+            from app.scripts.seed import seed_data
+            seed_data()
+        except ModuleNotFoundError as exc:
+            logger.warning("Seeding skipped (missing dependency): %s", exc)
+        except Exception as e:
+            logger.warning("Seeding warning: %s", e)
 
     if settings.NOTIFICATION_WORKER_ENABLED:
         try:

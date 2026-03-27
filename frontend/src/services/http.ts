@@ -1,9 +1,9 @@
 import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 import { ROUTES } from '@/lib/routes';
-import { logoutCustomerSession } from '@/services/customer/authService.shared';
+import { logoutCustomerSession } from '@/services/customer/session';
 import { clearVendorSession } from '@/services/vendor/authService.shared';
-import { getStoredCustomerToken } from '@/services/customer/authService.shared';
+import { getStoredCustomerToken } from '@/services/customer/session';
 import { getStoredVendorToken } from '@/services/vendor/authService.shared';
 
 const redirectTo = (path: string) => {
