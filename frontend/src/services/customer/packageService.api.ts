@@ -7,17 +7,14 @@ import type {
   ShortlistedOffering,
 } from '@/types/customer/package';
 import type { CustomerPackageService } from './packageService.types';
-import { attachCustomer401Interceptor } from '@/services/http';
+import { attachAuthHeaderInterceptor, attachCustomer401Interceptor } from '@/services/http';
+import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('customerToken');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+attachAuthHeaderInterceptor(api, () => getStoredCustomerToken());
 attachCustomer401Interceptor(api);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

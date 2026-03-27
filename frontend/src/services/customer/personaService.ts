@@ -1,8 +1,7 @@
 import { featureFlags } from '@/config/featureFlags';
 import { mockCustomerPersonaService } from '@/mocks/customer/personaService';
-import { getStoredCustomerToken } from '@/services/customer/authService.shared';
 import { ServiceResult } from '@/types/customer';
-import { handleCustomerFetchUnauthorized } from '@/services/http';
+import { handleCustomerFetchUnauthorized, withCustomerAuthHeaders } from '@/services/http';
 import {
   CustomerPersona,
   CustomerPersonaCreatePayload,
@@ -23,17 +22,6 @@ type CustomerPersonaService = {
 };
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
-
-const withCustomerAuthHeaders = (headers?: HeadersInit) => {
-  const merged = new Headers(headers);
-  const token = getStoredCustomerToken();
-
-  if (token && !merged.has('Authorization')) {
-    merged.set('Authorization', `Bearer ${token}`);
-  }
-
-  return merged;
-};
 
 const toErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message) {

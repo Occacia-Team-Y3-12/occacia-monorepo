@@ -1,7 +1,6 @@
 import { featureFlags } from '@/config/featureFlags';
 import { mockCustomerEventChatService } from '@/mocks/customer/eventChatService';
-import { getStoredCustomerToken } from '@/services/customer/authService.shared';
-import { handleCustomerFetchUnauthorized } from '@/services/http';
+import { handleCustomerFetchUnauthorized, withCustomerAuthHeaders } from '@/services/http';
 import {
   CalendarConnectionStatus,
   CalendarProvider,
@@ -487,17 +486,6 @@ const mapTaskUpdatePayloadToBackend = (
     vendorCategory: needsVendor ? normalizedCategory : undefined,
     currency: 'LKR',
   };
-};
-
-const withCustomerAuthHeaders = (headers?: HeadersInit) => {
-  const merged = new Headers(headers);
-  const token = getStoredCustomerToken();
-
-  if (token && !merged.has('Authorization')) {
-    merged.set('Authorization', `Bearer ${token}`);
-  }
-
-  return merged;
 };
 
 const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<ServiceResult<T>> => {

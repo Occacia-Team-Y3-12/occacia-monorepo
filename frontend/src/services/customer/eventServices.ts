@@ -1,7 +1,6 @@
 import { featureFlags } from '@/config/featureFlags';
 import { mockCustomerEventService } from '@/mocks/customer/eventService';
-import { getStoredCustomerToken } from '@/services/customer/authService.shared';
-import { handleCustomerFetchUnauthorized } from '@/services/http';
+import { handleCustomerFetchUnauthorized, withCustomerAuthHeaders } from '@/services/http';
 import {
   CreateCustomerEventPayload,
   CreateCustomerEventResponse,
@@ -50,17 +49,6 @@ const parseBody = <T>(raw: string, contentType: string): (T & { message?: string
   } catch {
     return undefined;
   }
-};
-
-const withCustomerAuthHeaders = (headers?: HeadersInit) => {
-  const merged = new Headers(headers);
-  const token = getStoredCustomerToken();
-
-  if (token && !merged.has('Authorization')) {
-    merged.set('Authorization', `Bearer ${token}`);
-  }
-
-  return merged;
 };
 
 const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<ServiceResult<T>> => {
