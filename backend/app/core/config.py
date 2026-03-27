@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     NOTIFICATION_WORKER_ENABLED: bool = True
     NOTIFICATION_POLL_INTERVAL_SECONDS: float = 0.2
     NOTIFICATION_BATCH_SIZE: int = 20
+    # When true, only auth-related emails are allowed by default.
+    NOTIFICATION_AUTH_EMAILS_ONLY: bool = True
+    # Optional comma-separated allowlist that overrides NOTIFICATION_AUTH_EMAILS_ONLY.
+    NOTIFICATION_ALLOWED_TYPES: str | None = None
 
     # ── Google Calendar ───────────────────────────────────────────────────────
     GOOGLE_CLIENT_ID: str | None = None

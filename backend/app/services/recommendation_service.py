@@ -234,22 +234,60 @@ class RecommendationService:
     def update_custom_package(self, db: Session, *, customer_id: str, event_id: str, package_id: str, request: UpdateCustomPackageRequest) -> RecommendationPackageDetailsResponse:
         event_planning_service.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
         package = self._get_package_or_404(db, event_id=event_id, package_id=package_id)
-        if not package.is_customized:
-            raise HTTPException(status_code=400, detail="Only custom packages can be updated")
-        if package.created_by_customer_id and package.created_by_customer_id != customer_id:
-            raise HTTPException(status_code=403, detail="Custom package does not belong to this customer")
 
-        base_package = self._get_package_or_404(db, event_id=event_id, package_id=package.base_package_id or package.package_id)
+        if package.is_customized:
+            if package.created_by_customer_id and package.created_by_customer_id != customer_id:
+                raise HTTPException(status_code=403, detail="Custom package does not belong to this customer")
+            base_package = self._get_package_or_404(
+                db,
+                event_id=event_id,
+                package_id=package.base_package_id or package.package_id,
+            )
+            target_package = package
+        else:
+            # Allow updating a system package by creating (or reusing) a custom variant.
+            base_package = package
+            target_package = (
+                db.query(RecommendationPackage)
+                .filter(
+                    RecommendationPackage.event_id == event_id,
+                    RecommendationPackage.base_package_id == package.package_id,
+                    RecommendationPackage.created_by_customer_id == customer_id,
+                    RecommendationPackage.is_customized.is_(True),
+                )
+                .order_by(RecommendationPackage.generated_at.desc())
+                .first()
+            )
+            if target_package is None:
+                target_package = RecommendationPackage(
+                    event_id=event_id,
+                    package_type="CUSTOM",
+                    package_total_price=0.0,
+                    currency=base_package.currency,
+                    is_customized=True,
+                    base_package_id=base_package.package_id,
+                    created_by_customer_id=customer_id,
+                    generated_at=now_utc(),
+                    expires_at=base_package.expires_at,
+                )
+                db.add(target_package)
+                db.flush()
 
         try:
-            self._replace_package_items(db, event_id=event_id, package=package, base_package=base_package, requested_items=request.items)
+            self._replace_package_items(
+                db,
+                event_id=event_id,
+                package=target_package,
+                base_package=base_package,
+                requested_items=request.items,
+            )
             db.commit()
         except Exception:
             db.rollback()
             raise
 
-        db.refresh(package)
-        return self._build_package_details_response(db, event_id=event_id, package=package)
+        db.refresh(target_package)
+        return self._build_package_details_response(db, event_id=event_id, package=target_package)
 
     def delete_custom_package(self, db: Session, *, customer_id: str, event_id: str, package_id: str) -> None:
         event_planning_service.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)

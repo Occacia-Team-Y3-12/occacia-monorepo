@@ -34,6 +34,16 @@ VENDOR_PASSWORD_RESET_LINK             = "VENDOR_PASSWORD_RESET_LINK"
 ADMIN_LOGIN_OTP_NOTIFICATION           = "ADMIN_LOGIN_OTP"
 ADMIN_PASSWORD_RESET_OTP               = "ADMIN_PASSWORD_RESET_OTP"
 
+AUTH_NOTIFICATION_TYPES = {
+    CUSTOMER_VERIFICATION_NOTIFICATION,
+    CUSTOMER_PASSWORD_RESET_LINK,
+    VENDOR_VERIFICATION_NOTIFICATION,
+    VENDOR_PASSWORD_RESET_LINK,
+    ADMIN_VERIFICATION_NOTIFICATION,
+    ADMIN_LOGIN_OTP_NOTIFICATION,
+    ADMIN_PASSWORD_RESET_OTP,
+}
+
 # ── Statuses / channels ───────────────────────────────────────────────────────
 NOTIFICATION_CHANNEL_EMAIL             = "EMAIL"
 NOTIFICATION_STATUS_QUEUED             = "QUEUED"
@@ -313,6 +323,19 @@ class _SafeDict(dict):
 
 
 class NotificationService:
+    def _enabled_notification_types(self) -> set[str] | None:
+        raw = getattr(settings, "NOTIFICATION_ALLOWED_TYPES", None)
+        if raw:
+            return {item.strip().upper() for item in raw.split(",") if item.strip()}
+        if getattr(settings, "NOTIFICATION_AUTH_EMAILS_ONLY", False):
+            return set(AUTH_NOTIFICATION_TYPES)
+        return None
+
+    def _is_notification_type_enabled(self, notification_type: str) -> bool:
+        allowed = self._enabled_notification_types()
+        if allowed is None:
+            return True
+        return notification_type.upper() in allowed
 
     # ── Core enqueue ──────────────────────────────────────────────────────────
 
@@ -325,6 +348,9 @@ class NotificationService:
         context_data: dict[str, object],
         dedupe_window: timedelta | None = None,
     ) -> Notification | None:
+        if not self._is_notification_type_enabled(notification_type):
+            logger.info("Notification %s disabled by feature flag", notification_type)
+            return None
         recipient  = self._resolve_recipient(db, recipient_id=recipient_id)
         dedupe_key = self._build_dedupe_key(
             notification_type=notification_type,
@@ -632,6 +658,17 @@ class NotificationService:
     # ── Delivery ──────────────────────────────────────────────────────────────
 
     def _deliver_notification(self, db: Session, *, notification: Notification) -> Notification:
+        if not self._is_notification_type_enabled(notification.type):
+            notification.status          = NOTIFICATION_STATUS_PERMANENT_FAILURE
+            notification.last_attempt_at = now_utc()
+            notification.next_attempt_at = None
+            notification.attempt_count   = (notification.attempt_count or 0) + 1
+            notification.error_message   = "Disabled by feature flag"
+            db.add(notification)
+            db.commit()
+            db.refresh(notification)
+            return notification
+
         notification.status         = NOTIFICATION_STATUS_PROCESSING
         notification.last_attempt_at = now_utc()
         db.add(notification)
