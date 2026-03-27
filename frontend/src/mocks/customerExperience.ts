@@ -44,7 +44,7 @@ export const createMockPackages = (): RecommendationPackage[] => [
     packageId: 'pkg-budget',
     type: 'BUDGET',
     packageTotalPrice: 4200,
-    currency: 'USD',
+    currency: 'LKR',
     expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     items: [
       { taskId: 't1', taskName: 'VENUE BOOKING', offeringId: 'b-o1', offeringTitle: 'Standard Banquet Hall', offeringCategory: 'Venue', vendorName: 'CitySpace Halls', taskPrice: 1500 },
@@ -57,7 +57,7 @@ export const createMockPackages = (): RecommendationPackage[] => [
     packageId: 'pkg-recommended',
     type: 'RECOMMENDED',
     packageTotalPrice: 7850,
-    currency: 'USD',
+    currency: 'LKR',
     expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     items: [
       { taskId: 't1', taskName: 'VENUE BOOKING', offeringId: 'r-o1', offeringTitle: 'Premier Ballroom', offeringCategory: 'Venue', vendorName: 'Grand Horizon Hotel', taskPrice: 3000 },
@@ -70,7 +70,7 @@ export const createMockPackages = (): RecommendationPackage[] => [
     packageId: 'pkg-highquality',
     type: 'HIGH_QUALITY',
     packageTotalPrice: 14500,
-    currency: 'USD',
+    currency: 'LKR',
     expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     items: [
       { taskId: 't1', taskName: 'VENUE BOOKING', offeringId: 'h-o1', offeringTitle: 'Exclusive Rooftop Terrace', offeringCategory: 'Venue', vendorName: 'The Ritz Venue', taskPrice: 5500 },
@@ -93,7 +93,7 @@ export const MOCK_PACKAGE: RecommendationPackage = {
   packageId: 'pkg-001',
   type: 'RECOMMENDED',
   packageTotalPrice: 19000,
-  currency: 'USD',
+  currency: 'LKR',
   expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
   items: [
     { taskId: 't1', taskName: 'Photography', offeringId: 'o1', offeringTitle: 'Premium Studio', offeringCategory: 'Photography', vendorName: 'Lumen Studios', taskPrice: 2500, rating: 4.9 },

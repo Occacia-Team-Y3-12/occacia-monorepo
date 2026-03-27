@@ -29,7 +29,7 @@ type OrderFilter = 'all' | 'pending' | 'completed';
 const statCards: StatCard[] = [
   { title: 'New Orders Today', value: '24', note: '+12%', noteTone: 'green', iconBg: 'bg-blue-100', icon: '/icons/vendor/dashboard/stat-bag.svg' },
   { title: 'Awaiting Preparation', value: '8', note: 'Pending', noteTone: 'orange', iconBg: 'bg-amber-100', icon: '/icons/vendor/dashboard/stat-clock.svg' },
-  { title: 'Revenue This Week', value: '$4,280', note: '+8%', noteTone: 'green', iconBg: 'bg-violet-100', icon: '/icons/vendor/dashboard/stat-currency.svg' },
+  { title: 'Revenue This Week', value: 'LKR 4,280', note: '+8%', noteTone: 'green', iconBg: 'bg-violet-100', icon: '/icons/vendor/dashboard/stat-currency.svg' },
   { title: 'Vendor Rating', value: '4.9', note: 'Excellent', noteTone: 'green', iconBg: 'bg-emerald-100', icon: '/icons/vendor/dashboard/stat-star.svg' },
 ];
 
@@ -39,7 +39,7 @@ const orders: OrderRow[] = [
     occasion: 'Birthday Surprise',
     recipient: 'Sarah (28, Artist)',
     recipientMeta: 'Loves minimalist design, vegan',
-    budget: '$150',
+    budget: 'LKR 150',
     status: 'New Order',
   },
   {
@@ -47,7 +47,7 @@ const orders: OrderRow[] = [
     occasion: 'Date Night',
     recipient: 'Couple - Alex & Jordan',
     recipientMeta: 'Adventurous, foodies, jazz lovers',
-    budget: '$200',
+    budget: 'LKR 200',
     status: 'Preparing',
   },
   {
@@ -55,7 +55,7 @@ const orders: OrderRow[] = [
     occasion: 'Hospital Visit',
     recipient: 'Grandpa Joe (78)',
     recipientMeta: 'Gardening enthusiast, diabetic',
-    budget: '$85',
+    budget: 'LKR 85',
     status: 'Ready',
   },
   {
@@ -63,7 +63,7 @@ const orders: OrderRow[] = [
     occasion: 'Dinner Out',
     recipient: 'Family of 4',
     recipientMeta: 'Kids ages 5 & 8, picky eaters',
-    budget: '$120',
+    budget: 'LKR 120',
     status: 'Delivered',
   },
 ];
@@ -228,7 +228,7 @@ export default function VendorDashboard() {
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:p-5">
             <h3 className="mb-4 text-base font-semibold text-slate-900">Quick Actions</h3>
             <div className="space-y-3 text-sm">
-              <Link href={`${ROUTES.VENDOR.OFFERINGS}?new=1`} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white shadow-md hover:bg-blue-700">
+              <Link href={ROUTES.VENDOR.OFFERINGS_NEW} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white shadow-md hover:bg-blue-700">
                 <Image src="/icons/vendor/dashboard/quick-package.svg" alt="" aria-hidden="true" width={18} height={18} className="h-[18px] w-[18px]" />
                 Create New Package
               </Link>

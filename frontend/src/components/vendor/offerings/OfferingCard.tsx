@@ -1,7 +1,7 @@
 'use client';
 
 import { Offering } from '@/types/vendor/offering';
-import { Edit2, Tag, DollarSign, Star } from 'lucide-react';
+import { Edit2, Tag, Star } from 'lucide-react';
 
 const tierColors: Record<string, string> = {
   BUDGET: 'bg-slate-100 text-slate-700',
@@ -43,7 +43,7 @@ export default function OfferingCard({ offering, onEdit }: OfferingCardProps) {
           <Star size={11} /> {tierLabel}
         </span>
         <span className="inline-flex items-center gap-1 rounded-full bg-[#EAF2FF] px-2.5 py-1 text-xs font-medium text-[#1565c0]">
-          <DollarSign size={11} /> ${offering.price.toLocaleString()}
+          LKR {offering.price.toLocaleString()}
         </span>
         <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${offering.isActive ? 'bg-[#EAF2FF] text-[#0D47A1]' : 'bg-[#FFF1F1] text-[#C22525]'}`}>
           {offering.isActive ? 'Active' : 'Inactive'}

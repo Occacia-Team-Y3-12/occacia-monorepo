@@ -1,15 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { CreateOfferingData, OfferingCategory, QualityTier, Offering } from '@/types/vendor/offering';
 
 const offeringSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must not exceed 100 characters'),
-  description: z.string().min(10, 'Description must be at least 10 characters').max(500, 'Description must not exceed 500 characters'),
+  title: z.string().min(2, 'Title must be at least 2 characters').max(100, 'Title must not exceed 100 characters'),
+  description: z.string().min(2, 'Description must be at least 2 characters').max(500, 'Description must not exceed 500 characters'),
   category: z.enum(['CATERING', 'PHOTOGRAPHY', 'VENUE', 'DECORATION', 'MUSIC', 'TRANSPORT', 'OTHER']),
-  price: z.preprocess((val) => parseFloat(val as string), z.number().min(1, 'Price must be at least $1').max(1000000, 'Price must not exceed $1,000,000')),
+  price: z.preprocess((val) => parseFloat(val as string), z.number().min(1, 'Price must be at least LKR 1').max(1000000, 'Price must not exceed LKR 1,000,000')),
   qualityTier: z.enum(['BUDGET', 'STANDARD', 'PREMIUM', 'LUXURY']),
   isActive: z.boolean(),
 });
@@ -21,6 +22,7 @@ interface OfferingFormProps {
   onSubmit: (data: CreateOfferingData) => Promise<void>;
   isLoading: boolean;
   onCancel: () => void;
+  submitRedirectHref?: string;
 }
 
 const CATEGORIES: { value: OfferingCategory; label: string }[] = [
@@ -40,7 +42,8 @@ const QUALITY_TIERS: { value: QualityTier; label: string; desc: string }[] = [
   { value: 'LUXURY', label: 'Luxury', desc: 'Top-tier experience' },
 ];
 
-export default function OfferingForm({ initialData, onSubmit, isLoading, onCancel }: OfferingFormProps) {
+export default function OfferingForm({ initialData, onSubmit, isLoading, onCancel, submitRedirectHref }: OfferingFormProps) {
+  const router = useRouter();
   const [formData, setFormData] = useState<CreateOfferingData>({
     title: initialData?.title || '',
     description: initialData?.description || '',
@@ -72,6 +75,9 @@ export default function OfferingForm({ initialData, onSubmit, isLoading, onCance
       offeringSchema.parse(formData);
       setErrors({});
       await onSubmit(formData);
+      if (submitRedirectHref) {
+        router.push(submitRedirectHref);
+      }
     } catch (error: any) {
       if (error.errors) {
         const fieldErrors: OfferingFormErrors = {};
@@ -155,9 +161,9 @@ export default function OfferingForm({ initialData, onSubmit, isLoading, onCance
       </div>
 
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-[#3D475C]">Price (USD) *</label>
+        <label className="mb-1.5 block text-sm font-medium text-[#3D475C]">Price (LKR) *</label>
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#8A93A6]">$</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#8A93A6]">LKR</span>
           <input
             type="number"
             name="price"
@@ -167,7 +173,7 @@ export default function OfferingForm({ initialData, onSubmit, isLoading, onCance
             max={1000000}
             step={0.01}
             placeholder="0.00"
-            className={`${inputClass('price')} pl-7`}
+            className={`${inputClass('price')} pl-12`}
             disabled={isLoading}
           />
         </div>

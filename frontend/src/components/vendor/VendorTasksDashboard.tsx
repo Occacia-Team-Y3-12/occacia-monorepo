@@ -62,11 +62,11 @@ function taskMeta(task: VendorTaskItem): string {
     task.budgetMin !== null && task.budgetMax !== null
       ? `Budget: ${task.currency} ${task.budgetMin} - ${task.budgetMax}`
       : 'Budget: N/A';
-  return `${task.vendorCategory ?? 'General'} • ${budget}`;
+  return `${task.vendorCategory ?? 'General'} - ${budget}`;
 }
 
 function requestLabel(request: FulfillmentRequestItem): string {
-  return `Task ${request.taskId} • Attempt ${request.attemptNo}`;
+  return `Task ${request.taskId} - Attempt ${request.attemptNo}`;
 }
 
 export function VendorTasksDashboard() {
@@ -116,6 +116,16 @@ export function VendorTasksDashboard() {
   const totalTasks = useMemo(
     () => pendingRequests.length + assignedTasks.length + inProgressTasks.length + doneTasks.length,
     [pendingRequests.length, assignedTasks.length, inProgressTasks.length, doneTasks.length]
+  );
+
+  const tableRows = useMemo(
+    () => [
+      ...pendingRequests.map((request) => ({ type: 'request' as const, request })),
+      ...assignedTasks.map((task) => ({ type: 'task' as const, task, lane: 'ASSIGNED' as const })),
+      ...inProgressTasks.map((task) => ({ type: 'task' as const, task, lane: 'IN_PROGRESS' as const })),
+      ...doneTasks.map((task) => ({ type: 'task' as const, task, lane: 'DONE' as const })),
+    ],
+    [pendingRequests, assignedTasks, inProgressTasks, doneTasks]
   );
 
   const setBusy = (id: string, value: boolean) => {
@@ -217,154 +227,148 @@ export function VendorTasksDashboard() {
   }
 
   return (
-    <div className="space-y-8 p-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Vendor Task Board</h1>
-        <p className="mt-1 text-sm text-gray-600">{totalTasks} total items</p>
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-[#E2E5EC] bg-white px-4 py-5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:px-6">
+        <h1 className="text-3xl font-bold text-[#1F293F]">Vendor Task Board</h1>
+        <p className="mt-1 text-sm text-[#5B6478]">
+          {totalTasks} total items | Requests: {pendingRequests.length} | Assigned: {assignedTasks.length} | In Progress: {inProgressTasks.length} | Done: {doneTasks.length}
+        </p>
       </div>
 
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold text-gray-900">Requests ({pendingRequests.length})</h2>
-        {pendingRequests.length === 0 ? (
+      <section className="rounded-2xl border border-[#E2E5EC] bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] sm:p-5">
+        {tableRows.length === 0 ? (
           <Card>
             <CardBody>
-              <p className="text-gray-600">No pending requests right now.</p>
+              <p className="text-gray-600">No tasks or requests available right now.</p>
             </CardBody>
           </Card>
         ) : (
-          pendingRequests.map((request) => {
-            const expired = isExpired(request.respondBy, nowMs);
-            const busy = actionLoading[`request:${request.fulfillmentRequestId}`] ?? false;
-            const remainingMs = request.respondBy
-              ? new Date(request.respondBy).getTime() - nowMs
-              : Number.POSITIVE_INFINITY;
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1020px] border-separate border-spacing-y-2">
+              <thead>
+                <tr className="text-left text-[12px] font-semibold uppercase tracking-wide text-slate-400">
+                  <th className="px-2 py-1">Type</th>
+                  <th className="px-2 py-1">Title</th>
+                  <th className="px-2 py-1">Details</th>
+                  <th className="px-2 py-1">Status</th>
+                  <th className="px-2 py-1">Countdown</th>
+                  <th className="px-2 py-1">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableRows.map((row) => {
+                  if (row.type === 'request') {
+                    const { request } = row;
+                    const busy = actionLoading[`request:${request.fulfillmentRequestId}`] ?? false;
+                    const expired = isExpired(request.respondBy, nowMs);
+                    const remainingMs = request.respondBy
+                      ? new Date(request.respondBy).getTime() - nowMs
+                      : Number.POSITIVE_INFINITY;
 
-            return (
-              <Card key={request.fulfillmentRequestId} className="border border-amber-200 bg-amber-50/50">
-                <CardBody className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-amber-900">{requestLabel(request)}</p>
-                    <p className="text-xs text-amber-700">
-                      Expires in: {formatCountdown(remainingMs)}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700"
-                      disabled={busy || expired}
-                      onClick={() => handleRespond(request, 'ACCEPT')}
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Accept
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      disabled={busy || expired}
-                      onClick={() => handleRespond(request, 'REJECT')}
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Reject
-                    </Button>
-                  </div>
-                </CardBody>
-              </Card>
-            );
-          })
-        )}
-      </section>
+                    return (
+                      <tr key={`request-${request.fulfillmentRequestId}`} className="rounded-xl bg-amber-50/60">
+                        <td className="rounded-l-xl px-2 py-3">
+                          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                            Request
+                          </span>
+                        </td>
+                        <td className="px-2 py-3 text-sm font-semibold text-slate-800">{requestLabel(request)}</td>
+                        <td className="px-2 py-3 text-sm text-slate-600">Task ID: {request.taskId}</td>
+                        <td className="px-2 py-3">
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${expired ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {expired ? 'Expired' : 'Pending Response'}
+                          </span>
+                        </td>
+                        <td className="px-2 py-3 text-sm text-slate-700">{formatCountdown(remainingMs)}</td>
+                        <td className="rounded-r-xl px-2 py-3">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700"
+                              disabled={busy || expired}
+                              onClick={() => handleRespond(request, 'ACCEPT')}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              disabled={busy || expired}
+                              onClick={() => handleRespond(request, 'REJECT')}
+                            >
+                              <XCircle className="h-4 w-4" />
+                              Reject
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
 
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold text-gray-900">Assigned ({assignedTasks.length})</h2>
-        {assignedTasks.length === 0 ? (
-          <Card>
-            <CardBody>
-              <p className="text-gray-600">No assigned tasks yet.</p>
-            </CardBody>
-          </Card>
-        ) : (
-          assignedTasks.map((task) => {
-            const busy = actionLoading[`task:${task.taskId}`] ?? false;
-            return (
-              <Card key={task.taskId}>
-                <CardBody className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900">{task.name}</p>
-                    <p className="text-xs text-gray-600">{taskMeta(task)}</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => handleTaskTransition(task, 'IN_PROGRESS')}
-                  >
-                    <PlayCircle className="h-4 w-4" />
-                    Start Task
-                  </Button>
-                </CardBody>
-              </Card>
-            );
-          })
-        )}
-      </section>
+                  const { task, lane } = row;
+                  const busy = actionLoading[`task:${task.taskId}`] ?? false;
+                  const laneStyle =
+                    lane === 'ASSIGNED'
+                      ? 'bg-blue-100 text-blue-700'
+                      : lane === 'IN_PROGRESS'
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : 'bg-emerald-100 text-emerald-700';
 
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold text-gray-900">In Progress ({inProgressTasks.length})</h2>
-        {inProgressTasks.length === 0 ? (
-          <Card>
-            <CardBody>
-              <p className="text-gray-600">No tasks in progress.</p>
-            </CardBody>
-          </Card>
-        ) : (
-          inProgressTasks.map((task) => {
-            const busy = actionLoading[`task:${task.taskId}`] ?? false;
-            return (
-              <Card key={task.taskId} className="border border-blue-100">
-                <CardBody className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900">{task.name}</p>
-                    <p className="text-xs text-gray-600">{taskMeta(task)}</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                    disabled={busy}
-                    onClick={() => handleTaskTransition(task, 'DONE')}
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Mark Done
-                  </Button>
-                </CardBody>
-              </Card>
-            );
-          })
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold text-gray-900">Done ({doneTasks.length})</h2>
-        {doneTasks.length === 0 ? (
-          <Card>
-            <CardBody>
-              <p className="text-gray-600">No completed tasks yet.</p>
-            </CardBody>
-          </Card>
-        ) : (
-          doneTasks.map((task) => (
-            <Card key={task.taskId} className="border border-green-100 bg-green-50/40">
-              <CardBody className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-green-900">{task.name}</p>
-                  <p className="text-xs text-green-700">{taskMeta(task)}</p>
-                </div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-                  <Clock3 className="h-3.5 w-3.5" />
-                  Completed
-                </span>
-              </CardBody>
-            </Card>
-          ))
+                  return (
+                    <tr key={`task-${task.taskId}`} className="rounded-xl bg-slate-50">
+                      <td className="rounded-l-xl px-2 py-3">
+                        <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
+                          Task
+                        </span>
+                      </td>
+                      <td className="px-2 py-3 text-sm font-semibold text-slate-800">{task.name}</td>
+                      <td className="px-2 py-3 text-xs text-slate-600">{taskMeta(task)}</td>
+                      <td className="px-2 py-3">
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${laneStyle}`}>
+                          {lane === 'ASSIGNED' ? 'Assigned' : lane === 'IN_PROGRESS' ? 'In Progress' : 'Done'}
+                        </span>
+                      </td>
+                      <td className="px-2 py-3 text-sm text-slate-600">
+                        {lane === 'DONE' ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-700">
+                            <Clock3 className="h-3.5 w-3.5" />
+                            Completed
+                          </span>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="rounded-r-xl px-2 py-3">
+                        {lane === 'ASSIGNED' ? (
+                          <Button
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => handleTaskTransition(task, 'IN_PROGRESS')}
+                          >
+                            <PlayCircle className="h-4 w-4" />
+                            Start Task
+                          </Button>
+                        ) : lane === 'IN_PROGRESS' ? (
+                          <Button
+                            size="sm"
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                            disabled={busy}
+                            onClick={() => handleTaskTransition(task, 'DONE')}
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            Mark Done
+                          </Button>
+                        ) : (
+                          <span className="text-xs font-semibold text-emerald-700">No action</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

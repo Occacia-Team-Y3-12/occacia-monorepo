@@ -271,7 +271,7 @@ export function VendorTaskDetail({ taskId, onBack }: TaskDetailProps) {
                 <div>
                   <p className="text-gray-500">Minimum</p>
                   <p className="font-semibold text-lg">
-                    ${task.budget_min.toLocaleString()}
+                    LKR {task.budget_min.toLocaleString()}
                   </p>
                 </div>
               )}
@@ -280,7 +280,7 @@ export function VendorTaskDetail({ taskId, onBack }: TaskDetailProps) {
                 <div>
                   <p className="text-gray-500">Maximum</p>
                   <p className="font-semibold text-lg">
-                    ${task.budget_max.toLocaleString()}
+                    LKR {task.budget_max.toLocaleString()}
                   </p>
                 </div>
               )}
@@ -289,7 +289,7 @@ export function VendorTaskDetail({ taskId, onBack }: TaskDetailProps) {
                 <div className="border-t pt-3">
                   <p className="text-gray-500">Agreed Price</p>
                   <p className="font-bold text-lg text-green-600">
-                    ${task.agreed_price.toLocaleString()}
+                    LKR {task.agreed_price.toLocaleString()}
                   </p>
                 </div>
               )}

@@ -32,7 +32,11 @@ const toLocalDate = (iso?: string): string => {
   if (Number.isNaN(dt.getTime())) {
     return '';
   }
-  return dt.toISOString().slice(0, 10);
+  // Use local calendar date parts to avoid UTC date shifts (e.g. +05:30 showing previous day).
+  const year = dt.getFullYear();
+  const month = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const toLocalTime = (iso?: string): string => {
@@ -493,7 +497,7 @@ export const useEventChatPlanner = (eventId: string) => {
     return true;
   };
 
-  const setCalendarSync = async (enabled: boolean) => {
+  const setCalendarSync = async (enabled: boolean): Promise<boolean> => {
     setIsBusy(true);
     setError(null);
     setWarning(null);
@@ -511,7 +515,7 @@ export const useEventChatPlanner = (eventId: string) => {
     if (enabled && !latestStatus.connected) {
       setWarning('Calendar not connected. Connect provider first or use local reminders only.');
       setIsBusy(false);
-      return;
+      return false;
     }
 
     const result = await customerEventChatService.setCalendarSync(eventId, {
@@ -528,12 +532,13 @@ export const useEventChatPlanner = (eventId: string) => {
         setError(message);
       }
       setIsBusy(false);
-      return;
+      return false;
     }
 
     setCalendarSyncEnabled(enabled);
     setSuccess(enabled ? 'Calendar sync enabled.' : 'Calendar sync disabled.');
     setIsBusy(false);
+    return true;
   };
 
   const summarize = async () => {

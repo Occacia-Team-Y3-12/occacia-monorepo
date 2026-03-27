@@ -2,6 +2,7 @@
 
 import { X, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import type { RecommendationPackage } from '@/types/customer/package';
+import { formatCurrency } from '@/lib/currency';
 
 interface Props {
   isOpen: boolean;
@@ -51,7 +52,7 @@ export default function ConfirmPackageModal({ isOpen, onClose, onConfirm, pkg, l
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Total Price</p>
               <p className="text-2xl font-bold text-gray-900">
-                ${pkg.packageTotalPrice.toLocaleString()}
+                {formatCurrency(pkg.packageTotalPrice, pkg.currency || 'LKR')}
                 <span className="text-xs font-normal text-gray-400 ml-1">{pkg.currency}</span>
               </p>
             </div>
@@ -75,7 +76,7 @@ export default function ConfirmPackageModal({ isOpen, onClose, onConfirm, pkg, l
                       <p className="text-xs text-gray-500">{item.vendorName}</p>
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-gray-700">${item.taskPrice.toLocaleString()}</span>
+                  <span className="text-sm font-bold text-gray-700">{formatCurrency(item.taskPrice, pkg.currency || 'LKR')}</span>
                 </div>
               ))}
             </div>
