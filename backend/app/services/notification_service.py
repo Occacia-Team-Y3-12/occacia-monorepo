@@ -60,6 +60,8 @@ class ProviderResult:
     provider: str
     provider_message_id: str | None = None
     error_message: str | None = None
+    # When true, the failure should not be retried (e.g., auth/recipient issues).
+    is_permanent_failure: bool = False
 
 
 # ── Shared OTP block helpers ──────────────────────────────────────────────────
@@ -653,7 +655,10 @@ class NotificationService:
             notification.sent_at          = now_utc()
             notification.next_attempt_at  = None
         else:
-            if notification.attempt_count >= (notification.max_attempts or DEFAULT_MAX_ATTEMPTS):
+            if result.is_permanent_failure:
+                notification.status          = NOTIFICATION_STATUS_PERMANENT_FAILURE
+                notification.next_attempt_at = None
+            elif notification.attempt_count >= (notification.max_attempts or DEFAULT_MAX_ATTEMPTS):
                 notification.status          = NOTIFICATION_STATUS_PERMANENT_FAILURE
                 notification.next_attempt_at = None
             else:
@@ -683,7 +688,21 @@ class NotificationService:
         if not smtp_host:
             logger.warning("SMTP_HOST not set — email not sent (dev mode)")
             logger.info("DEV EMAIL\n  To: %s\n  Subject: %s\n  Body:\n%s", to, subject, text_body)
-            return ProviderResult(success=False, provider="SMTP", error_message="SMTP_HOST not configured")
+            return ProviderResult(
+                success=False,
+                provider="SMTP",
+                error_message="SMTP_HOST not configured",
+                is_permanent_failure=True,
+            )
+
+        if (smtp_user and not smtp_password) or (smtp_password and not smtp_user):
+            logger.error("SMTP credentials misconfigured — set both SMTP_USER and SMTP_PASSWORD")
+            return ProviderResult(
+                success=False,
+                provider="SMTP",
+                error_message="SMTP_USER/SMTP_PASSWORD must both be set",
+                is_permanent_failure=True,
+            )
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
@@ -714,10 +733,20 @@ class NotificationService:
 
         except smtplib.SMTPAuthenticationError as exc:
             logger.error("SMTP auth failed: %s", exc)
-            return ProviderResult(success=False, provider="SMTP", error_message=f"Auth failed: {exc}")
+            return ProviderResult(
+                success=False,
+                provider="SMTP",
+                error_message=f"Auth failed: {exc}",
+                is_permanent_failure=True,
+            )
         except smtplib.SMTPRecipientsRefused as exc:
             logger.error("SMTP recipient refused %s: %s", to, exc)
-            return ProviderResult(success=False, provider="SMTP", error_message=f"Recipient refused: {exc}")
+            return ProviderResult(
+                success=False,
+                provider="SMTP",
+                error_message=f"Recipient refused: {exc}",
+                is_permanent_failure=True,
+            )
         except Exception as exc:
             logger.error("Failed to send email to %s: %s", to, exc)
             return ProviderResult(success=False, provider="SMTP", error_message=str(exc))
