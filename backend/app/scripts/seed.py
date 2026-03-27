@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import random
 from datetime import timedelta
 
+from faker import Faker
 from sqlalchemy import inspect, text
 
 from app.common.utils import now_utc, generate_prefixed_id
@@ -30,6 +32,7 @@ from app.models.user import User
 from app.models.vendor import Vendor
 
 logger = logging.getLogger(__name__)
+fake = Faker()
 
 SEED_MODELS = (
     Admin,
@@ -54,6 +57,28 @@ SEED_MODELS = (
     Notification,
     SupportNote,
 )
+
+# 🔥 EXACT system categories needed by Occi and the Recommendation Engine
+VENDOR_CATEGORIES = [
+    "cakes & bakery",
+    "catering",
+    "drinks & bar",
+    "dj & music",
+    "photography & videography",
+    "band & live music",
+    "entertainment",
+    "floral arrangements",
+    "event decoration",
+    "venue & spaces",
+    "transport",
+]
+
+QUALITY_TIERS = ["LOW", "MEDIUM", "HIGH"]
+
+LOCATIONS = [
+    "Colombo", "Kandy", "Galle", "Negombo", "Matara",
+    "Kurunegala", "Anuradhapura", "Jaffna"
+]
 
 def _get_or_create(db, model, lookup: dict, values: dict | None = None):
     instance = db.query(model).filter_by(**lookup).first()
@@ -177,9 +202,7 @@ def seed_data() -> bool:
         )
         created_rows += int(created)
 
-        # ── 3. Sri Lankan Vendors (High, Medium, and Budget Tiers) ─────────────────
-        
-        # VENDOR: Galle Face Hotel (Venue - Premium)
+        # ── 3. Specific Hand-Crafted Vendors ─────────────────────────────────────────
         vendor_hotel, created = _get_or_create(
             db, Vendor, {"email": "events@gallefacehotel.lk"},
             {
@@ -195,7 +218,6 @@ def seed_data() -> bool:
         )
         created_rows += int(created)
 
-        # VENDOR: Mount Lavinia Hotel (Venue - Medium/High)
         vendor_hotel_2, created = _get_or_create(
             db, Vendor, {"email": "weddings@mountlaviniahotel.lk"},
             {
@@ -211,7 +233,6 @@ def seed_data() -> bool:
         )
         created_rows += int(created)
 
-        # VENDOR: Colombo Jazz Quintet (Music - Premium)
         vendor_music, created = _get_or_create(
             db, Vendor, {"email": "bookings@colombojazz.lk"},
             {
@@ -227,111 +248,12 @@ def seed_data() -> bool:
         )
         created_rows += int(created)
 
-        # VENDOR: Daddy Live Band (Music - High Energy)
-        vendor_music_2, created = _get_or_create(
-            db, Vendor, {"email": "contact@daddyband.lk"},
-            {
-                "vendor_id": generate_prefixed_id("VND"),
-                "business_name": "Daddy Band",
-                "display_name": "Daddy Live Band",
-                "location_base": "Colombo",
-                "phone": "+94778889999",
-                "approval_status": "APPROVED",
-                "is_verified": True,
-                "password_hash": get_password_hash("Vendor123!"),
-            }
-        )
-        created_rows += int(created)
-
-        # VENDOR: The Fab (Bakery - Medium/Premium)
-        vendor_bakery, created = _get_or_create(
-            db, Vendor, {"email": "orders@thefab.lk"},
-            {
-                "vendor_id": generate_prefixed_id("VND"),
-                "business_name": "The Fab",
-                "display_name": "The Fab Bakery",
-                "location_base": "Colombo",
-                "phone": "+94112555666",
-                "approval_status": "APPROVED",
-                "is_verified": True,
-                "password_hash": get_password_hash("Vendor123!"),
-            }
-        )
-        created_rows += int(created)
-
-        # VENDOR: Sponge (Bakery - Budget/Medium)
-        vendor_bakery_2, created = _get_or_create(
-            db, Vendor, {"email": "sales@sponge.lk"},
-            {
-                "vendor_id": generate_prefixed_id("VND"),
-                "business_name": "Sponge Pastry Shop",
-                "display_name": "Sponge Bakery",
-                "location_base": "Colombo 03",
-                "phone": "+94112345678",
-                "approval_status": "APPROVED",
-                "is_verified": True,
-                "password_hash": get_password_hash("Vendor123!"),
-            }
-        )
-        created_rows += int(created)
-
-        # VENDOR: Flash Moments (Photography - Premium)
-        vendor_photo, created = _get_or_create(
-            db, Vendor, {"email": "hello@flashmoments.lk"},
-            {
-                "vendor_id": generate_prefixed_id("VND"),
-                "business_name": "Flash Moments Photography",
-                "display_name": "Flash Moments",
-                "location_base": "Kandy",
-                "phone": "+94812223344",
-                "approval_status": "APPROVED",
-                "is_verified": True,
-                "password_hash": get_password_hash("Vendor123!"),
-            }
-        )
-        created_rows += int(created)
-
-        # VENDOR: Lassana Flora (Decor/Flowers - Premium)
-        vendor_decor, created = _get_or_create(
-            db, Vendor, {"email": "info@lassana.com"},
-            {
-                "vendor_id": generate_prefixed_id("VND"),
-                "business_name": "Lassana Flora",
-                "display_name": "Lassana Flora Events",
-                "location_base": "Colombo",
-                "phone": "+94112002000",
-                "approval_status": "APPROVED",
-                "is_verified": True,
-                "password_hash": get_password_hash("Vendor123!"),
-            }
-        )
-        created_rows += int(created)
-
-        # VENDOR: Tasty Caterers (Catering - Budget/Medium)
-        vendor_cater, created = _get_or_create(
-            db, Vendor, {"email": "orders@tasty.lk"},
-            {
-                "vendor_id": generate_prefixed_id("VND"),
-                "business_name": "Tasty Caterers",
-                "display_name": "Tasty Caterers",
-                "location_base": "Colombo 05",
-                "phone": "+94112585858",
-                "approval_status": "APPROVED",
-                "is_verified": True,
-                "password_hash": get_password_hash("Vendor123!"),
-            }
-        )
-        created_rows += int(created)
-
-
-        # ── 4. LKR Offerings (The Supermarket Inventory) ────────────────────────────
-        
-        # --- VENUES ---
+        # ── 4. Specific Hand-Crafted Offerings ───────────────────────────────────────
         _, created = _get_or_create(
             db, Offering, {"vendor_id": vendor_hotel.vendor_id, "name": "Grand Ballroom"},
             {
                 "offering_id": generate_prefixed_id("OFF"),
-                "category": "VENUE",
+                "category": "venue & spaces",
                 "description": "Historic grand ballroom with premium facilities.",
                 "price": 500000.0,
                 "currency": "LKR",
@@ -344,27 +266,10 @@ def seed_data() -> bool:
         created_rows += int(created)
 
         _, created = _get_or_create(
-            db, Offering, {"vendor_id": vendor_hotel_2.vendor_id, "name": "Beachfront Pavilion"},
-            {
-                "offering_id": generate_prefixed_id("OFF"),
-                "category": "VENUE",
-                "description": "Beautiful outdoor beachfront space for private events.",
-                "price": 300000.0,
-                "currency": "LKR",
-                "unit": "event",
-                "quality_tier": "MEDIUM",
-                "is_active": True,
-                "is_available": True,
-            }
-        )
-        created_rows += int(created)
-
-        # --- MUSIC & ENTERTAINMENT ---
-        _, created = _get_or_create(
             db, Offering, {"vendor_id": vendor_music.vendor_id, "name": "Live Jazz Band (4 Hours)"},
             {
                 "offering_id": generate_prefixed_id("OFF"),
-                "category": "DJ & MUSIC",
+                "category": "dj & music",
                 "description": "Premium 5-piece jazz band for elegant evenings.",
                 "price": 85000.0,
                 "currency": "LKR",
@@ -376,105 +281,66 @@ def seed_data() -> bool:
         )
         created_rows += int(created)
 
-        _, created = _get_or_create(
-            db, Offering, {"vendor_id": vendor_music_2.vendor_id, "name": "Pop & Baila Party Band"},
-            {
-                "offering_id": generate_prefixed_id("OFF"),
-                "category": "BAND & LIVE MUSIC",
-                "description": "High energy band playing local and international hits.",
-                "price": 150000.0,
-                "currency": "LKR",
-                "unit": "event",
-                "quality_tier": "MEDIUM",
-                "is_active": True,
-                "is_available": True,
-            }
-        )
-        created_rows += int(created)
 
-        # --- CAKES & BAKERY ---
-        _, created = _get_or_create(
-            db, Offering, {"vendor_id": vendor_bakery.vendor_id, "name": "Custom 3-Tier Fondant Cake"},
-            {
-                "offering_id": generate_prefixed_id("OFF"),
-                "category": "CAKES & BAKERY",
-                "description": "Beautiful custom designed cake for luxury celebrations.",
-                "price": 28000.0,
-                "currency": "LKR",
-                "unit": "item",
-                "quality_tier": "HIGH",
-                "is_active": True,
-                "is_available": True,
-            }
-        )
-        created_rows += int(created)
+        # ── 5. 🔥 FAKER: GENERATE 100 REALISTIC VENDORS & OFFERINGS 🔥 ───────────────
+        logger.info("Generating 100 extra realistic vendors and offerings...")
+        faker_vendors = []
+        for i in range(100):
+            email = f"vendor{i}_{fake.word()}@occacia.lk"
 
-        _, created = _get_or_create(
-            db, Offering, {"vendor_id": vendor_bakery_2.vendor_id, "name": "Classic Ribbon Cake (2KG)"},
-            {
-                "offering_id": generate_prefixed_id("OFF"),
-                "category": "CAKES & BAKERY",
-                "description": "Delicious standard ribbon cake with buttercream icing.",
-                "price": 7500.0,
-                "currency": "LKR",
-                "unit": "item",
-                "quality_tier": "LOW", # Will be picked up by the Budget package!
-                "is_active": True,
-                "is_available": True,
-            }
-        )
-        created_rows += int(created)
+            vendor, created = _get_or_create(
+                db,
+                Vendor,
+                {"email": email},
+                {
+                    "vendor_id": generate_prefixed_id("VND"),
+                    "business_name": fake.company(),
+                    "display_name": fake.company(),
+                    "location_base": random.choice(LOCATIONS),
+                    "phone": fake.phone_number(),
+                    "approval_status": "APPROVED",
+                    "is_verified": True,
+                    "password_hash": get_password_hash("Vendor123!"),
+                },
+            )
+            created_rows += int(created)
+            if created:
+                faker_vendors.append(vendor)
 
-        # --- CATERING ---
-        _, created = _get_or_create(
-            db, Offering, {"vendor_id": vendor_cater.vendor_id, "name": "Standard Sri Lankan Buffet"},
-            {
-                "offering_id": generate_prefixed_id("OFF"),
-                "category": "CATERING",
-                "description": "Authentic rice and curry buffet with 5 curries and dessert.",
-                "price": 4500.0,
-                "currency": "LKR",
-                "unit": "head",
-                "quality_tier": "LOW", # Will be picked up by the Budget package!
-                "is_active": True,
-                "is_available": True,
-            }
-        )
-        created_rows += int(created)
+        # Generate Offerings for the 100 new vendors
+        for vendor in faker_vendors:
+            # 1 to 3 offerings per vendor
+            for _ in range(random.randint(1, 3)):
+                category = random.choice(VENDOR_CATEGORIES)
+                quality = random.choice(QUALITY_TIERS)
 
-        # --- DECOR & FLOWERS ---
-        _, created = _get_or_create(
-            db, Offering, {"vendor_id": vendor_decor.vendor_id, "name": "Elegant Floral Centerpieces"},
-            {
-                "offering_id": generate_prefixed_id("OFF"),
-                "category": "FLORAL ARRANGEMENTS",
-                "description": "Fresh imported flowers arranged for 10 tables.",
-                "price": 45000.0,
-                "currency": "LKR",
-                "unit": "event",
-                "quality_tier": "HIGH",
-                "is_active": True,
-                "is_available": True,
-            }
-        )
-        created_rows += int(created)
-        
-        # --- PHOTOGRAPHY ---
-        _, created = _get_or_create(
-            db, Offering, {"vendor_id": vendor_photo.vendor_id, "name": "Full Event Coverage"},
-            {
-                "offering_id": generate_prefixed_id("OFF"),
-                "category": "PHOTOGRAPHY & VIDEOGRAPHY",
-                "description": "Unlimited photos and cinematic video for the entire event.",
-                "price": 120000.0,
-                "currency": "LKR",
-                "unit": "event",
-                "quality_tier": "HIGH",
-                "is_active": True,
-                "is_available": True,
-            }
-        )
-        created_rows += int(created)
+                base_price = {
+                    "LOW": random.randint(5000, 20000),
+                    "MEDIUM": random.randint(20000, 80000),
+                    "HIGH": random.randint(80000, 300000),
+                }[quality]
+
+                _, created = _get_or_create(
+                    db,
+                    Offering,
+                    {
+                        "vendor_id": vendor.vendor_id,
+                        "name": f"{category.title()} Package - {fake.word().capitalize()}",
+                    },
+                    {
+                        "offering_id": generate_prefixed_id("OFF"),
+                        "category": category,
+                        "description": fake.sentence(nb_words=12),
+                        "price": float(base_price),
+                        "currency": "LKR",
+                        "unit": "event",
+                        "quality_tier": quality,
+                        "is_active": True,
+                        "is_available": True,
+                    },
+                )
+                created_rows += int(created)
+
 
         db.commit()
         
