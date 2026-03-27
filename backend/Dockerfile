@@ -1,5 +1,5 @@
 # Build dependencies once and copy the virtualenv into a smaller runtime image.
-FROM python:3.11-slim AS builder
+FROM ghcr.io/library/python:3.11-slim AS builder
 
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && apt-get install -y --no-install-recommends \
     build-essential \
@@ -21,7 +21,7 @@ RUN poetry install --only main --no-root --no-ansi && \
     find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # Runtime image for OCI/container deployment.
-FROM python:3.11-slim
+FROM ghcr.io/library/python:3.11-slim
 
 # Use the copied virtualenv directly and keep container logs unbuffered.
 ENV PYTHONDONTWRITEBYTECODE=1 \
