@@ -174,30 +174,12 @@ def seed_data() -> bool:
         admin, created = _get_or_create(
             db,
             Admin,
-            {"email": "boss@occacia.com"},
+            {"email": "kashmikat@gmail.com"},
             {
                 "admin_id": generate_prefixed_id("ADM"),
                 "password_hash": get_password_hash("SuperSecretPassword123!"),
                 "staff_role": "super_admin",
                 "status": "ACTIVE"
-            },
-        )
-        created_rows += int(created)
-
-        # ── 2. The Test Customer ─────────────────────────────────────────────────────
-        customer1, created = _get_or_create(
-            db,
-            Customer,
-            {"email": "kashmikat@gmail.com"},
-            {
-                "customer_id": generate_prefixed_id("CUS"),
-                "full_name": "Kashmika De Silva",
-                "password_hash": get_password_hash("testpass1"),
-                "phone": "+94771111000",
-                "locale": "en-LK",
-                "address": "Colombo, Sri Lanka",
-                "email_verified": True,
-                "status": "ACTIVE",
             },
         )
         created_rows += int(created)

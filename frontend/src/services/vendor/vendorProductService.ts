@@ -8,22 +8,16 @@ import type {
   UpdateVendorProductData,
   VendorProduct,
 } from '@/types/vendor/product';
+import { attachAuthHeaderInterceptor, attachVendor401Interceptor } from '@/services/http';
+import { getStoredVendorToken } from '@/services/vendor/authService.shared';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
-api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('vendorToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-
-  return config;
-});
+attachAuthHeaderInterceptor(api, () => getStoredVendorToken());
+attachVendor401Interceptor(api);
 
 const extractPayload = <T>(raw: unknown): T => {
   if (raw && typeof raw === 'object') {
