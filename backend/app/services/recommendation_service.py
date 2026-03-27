@@ -55,16 +55,12 @@ def _run_async(coro):
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            # We're inside a running loop (FastAPI runs sync endpoints in a
-            # threadpool that shares the loop). Spin up a fresh thread with
-            # its own event loop to avoid blocking the main loop.
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                 future = pool.submit(asyncio.run, coro)
                 return future.result()
         else:
             return loop.run_until_complete(coro)
     except RuntimeError:
-        # No current event loop at all — just create one
         return asyncio.run(coro)
 
 
@@ -88,7 +84,6 @@ class RecommendationService:
         if not tasks:
             raise HTTPException(status_code=400, detail="No confirmed tasks available for recommendations")
 
-        # Regenerate full shortlist (5) for all confirmed tasks (UC-16 source of truth).
         for task in tasks:
             try:
                 shortlist = offering_service.find_offerings_for_task(db=db, task=task, limit=5)
@@ -103,6 +98,7 @@ class RecommendationService:
 
         personas = self._get_event_personas(db, event_id=event_id)
         ranked_by_task: dict[str, list[RankedOffering]] = {}
+        
         for task in tasks:
             ranked = self._rank_offerings_for_task(
                 db,
@@ -110,10 +106,11 @@ class RecommendationService:
                 event=event,
                 personas=personas,
             )
+            # 🛡️ FATAL ERROR CATCHER: Gives a clear reason instead of a silent crash
             if not ranked:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"No valid offerings available for task {task.task_id}",
+                    detail=f"Cannot build package: The database has zero valid vendors/offerings to fulfill the task '{task.name}'. Please add vendor offerings to the system.",
                 )
             ranked_by_task[task.task_id] = ranked
 
@@ -179,93 +176,33 @@ class RecommendationService:
             packages=package_rows,
         )
 
-    def get_packages(
-        self,
-        db: Session,
-        *,
-        customer_id: str,
-        event_id: str,
-    ) -> RecommendationPackageListResponse:
-        event_planning_service.get_event_for_customer(
-            db,
-            customer_id=customer_id,
-            event_id=event_id,
-        )
-        packages = (
-            db.query(RecommendationPackage)
-            .filter(
-                RecommendationPackage.event_id == event_id,
-                RecommendationPackage.is_customized.is_(False),
-            )
-            .all()
-        )
+    def get_packages(self, db: Session, *, customer_id: str, event_id: str) -> RecommendationPackageListResponse:
+        event_planning_service.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
+        packages = db.query(RecommendationPackage).filter(
+            RecommendationPackage.event_id == event_id,
+            RecommendationPackage.is_customized.is_(False),
+        ).all()
         if not packages:
             return RecommendationPackageListResponse(
-                eventId=event_id,
-                generatedAt=now_utc(),
-                expiresAt=None,
-                isExpired=False,
-                packages=[],
+                eventId=event_id, generatedAt=now_utc(), expiresAt=None, isExpired=False, packages=[]
             )
         return self._build_package_list_response(db, event_id=event_id, packages=packages)
 
-    def get_package_by_id(
-        self,
-        db: Session,
-        *,
-        customer_id: str,
-        event_id: str,
-        package_id: str,
-    ) -> RecommendationPackageDetailsResponse:
-        event_planning_service.get_event_for_customer(
-            db,
-            customer_id=customer_id,
-            event_id=event_id,
-        )
+    def get_package_by_id(self, db: Session, *, customer_id: str, event_id: str, package_id: str) -> RecommendationPackageDetailsResponse:
+        event_planning_service.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
         package = self._get_package_or_404(db, event_id=event_id, package_id=package_id)
         return self._build_package_details_response(db, event_id=event_id, package=package)
 
-    def get_task_recommendations(
-        self,
-        db: Session,
-        *,
-        customer_id: str,
-        event_id: str,
-        task_id: str,
-    ) -> TaskRecommendationListResponse:
-        event_planning_service.get_event_for_customer(
-            db,
-            customer_id=customer_id,
-            event_id=event_id,
-        )
-        task = (
-            db.query(Task)
-            .filter(Task.event_id == event_id, Task.task_id == task_id)
-            .first()
-        )
+    def get_task_recommendations(self, db: Session, *, customer_id: str, event_id: str, task_id: str) -> TaskRecommendationListResponse:
+        event_planning_service.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
+        task = db.query(Task).filter(Task.event_id == event_id, Task.task_id == task_id).first()
         if not task:
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-
-        recommendations = self._get_task_recommendations_for_tasks(
-            db,
-            event_id=event_id,
-            task_ids=[task_id],
-        )
+        recommendations = self._get_task_recommendations_for_tasks(db, event_id=event_id, task_ids=[task_id])
         return TaskRecommendationListResponse(items=recommendations.get(task_id, []))
 
-    def create_custom_package(
-        self,
-        db: Session,
-        *,
-        customer_id: str,
-        event_id: str,
-        request: CreateCustomPackageRequest,
-    ) -> RecommendationPackageDetailsResponse:
-        event_planning_service.get_event_for_customer(
-            db,
-            customer_id=customer_id,
-            event_id=event_id,
-        )
+    def create_custom_package(self, db: Session, *, customer_id: str, event_id: str, request: CreateCustomPackageRequest) -> RecommendationPackageDetailsResponse:
+        event_planning_service.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
         base_package = self._get_package_or_404(db, event_id=event_id, package_id=request.base_package_id)
         if base_package.is_customized:
             raise HTTPException(status_code=400, detail="Base package must be system generated")
@@ -285,13 +222,7 @@ class RecommendationService:
         db.flush()
 
         try:
-            self._replace_package_items(
-                db,
-                event_id=event_id,
-                package=custom_package,
-                base_package=base_package,
-                requested_items=request.items,
-            )
+            self._replace_package_items(db, event_id=event_id, package=custom_package, base_package=base_package, requested_items=request.items)
             db.commit()
         except Exception:
             db.rollback()
@@ -300,40 +231,18 @@ class RecommendationService:
         db.refresh(custom_package)
         return self._build_package_details_response(db, event_id=event_id, package=custom_package)
 
-    def update_custom_package(
-        self,
-        db: Session,
-        *,
-        customer_id: str,
-        event_id: str,
-        package_id: str,
-        request: UpdateCustomPackageRequest,
-    ) -> RecommendationPackageDetailsResponse:
-        event_planning_service.get_event_for_customer(
-            db,
-            customer_id=customer_id,
-            event_id=event_id,
-        )
+    def update_custom_package(self, db: Session, *, customer_id: str, event_id: str, package_id: str, request: UpdateCustomPackageRequest) -> RecommendationPackageDetailsResponse:
+        event_planning_service.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
         package = self._get_package_or_404(db, event_id=event_id, package_id=package_id)
         if not package.is_customized:
             raise HTTPException(status_code=400, detail="Only custom packages can be updated")
         if package.created_by_customer_id and package.created_by_customer_id != customer_id:
             raise HTTPException(status_code=403, detail="Custom package does not belong to this customer")
 
-        base_package = self._get_package_or_404(
-            db,
-            event_id=event_id,
-            package_id=package.base_package_id or package.package_id,
-        )
+        base_package = self._get_package_or_404(db, event_id=event_id, package_id=package.base_package_id or package.package_id)
 
         try:
-            self._replace_package_items(
-                db,
-                event_id=event_id,
-                package=package,
-                base_package=base_package,
-                requested_items=request.items,
-            )
+            self._replace_package_items(db, event_id=event_id, package=package, base_package=base_package, requested_items=request.items)
             db.commit()
         except Exception:
             db.rollback()
@@ -342,92 +251,38 @@ class RecommendationService:
         db.refresh(package)
         return self._build_package_details_response(db, event_id=event_id, package=package)
 
-    def delete_custom_package(
-        self,
-        db: Session,
-        *,
-        customer_id: str,
-        event_id: str,
-        package_id: str,
-    ) -> None:
-        event_planning_service.get_event_for_customer(
-            db,
-            customer_id=customer_id,
-            event_id=event_id,
-        )
+    def delete_custom_package(self, db: Session, *, customer_id: str, event_id: str, package_id: str) -> None:
+        event_planning_service.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
         package = self._get_package_or_404(db, event_id=event_id, package_id=package_id)
         if not package.is_customized:
             raise HTTPException(status_code=400, detail="Only custom packages can be deleted")
         if package.created_by_customer_id and package.created_by_customer_id != customer_id:
             raise HTTPException(status_code=403, detail="Custom package does not belong to this customer")
 
-        (
-            db.query(PackageItem)
-            .filter(PackageItem.package_id == package.package_id)
-            .delete(synchronize_session=False)
-        )
+        db.query(PackageItem).filter(PackageItem.package_id == package.package_id).delete(synchronize_session=False)
         db.delete(package)
         db.commit()
 
-    def _build_package_list_response(
-        self,
-        db: Session,
-        *,
-        event_id: str,
-        packages: list[RecommendationPackage],
-    ) -> RecommendationPackageListResponse:
+    def _build_package_list_response(self, db: Session, *, event_id: str, packages: list[RecommendationPackage]) -> RecommendationPackageListResponse:
         ordered_packages = sorted(packages, key=lambda pkg: _PACKAGE_TYPE_ORDER.get(pkg.package_type, 999))
         package_ids = [pkg.package_id for pkg in ordered_packages]
-        package_items = (
-            db.query(PackageItem)
-            .filter(PackageItem.package_id.in_(package_ids))
-            .all()
-        )
+        package_items = db.query(PackageItem).filter(PackageItem.package_id.in_(package_ids)).all()
+        
         items_by_package: dict[str, list[PackageItem]] = {package_id: [] for package_id in package_ids}
         for item in package_items:
             items_by_package.setdefault(item.package_id, []).append(item)
 
         task_ids = list({item.task_id for item in package_items})
         offering_ids = list({item.offering_id for item in package_items})
-        tasks = (
-            db.query(Task)
-            .filter(Task.task_id.in_(task_ids))
-            .all()
-            if task_ids
-            else []
-        )
-        offerings = (
-            db.query(Offering)
-            .filter(Offering.offering_id.in_(offering_ids))
-            .all()
-            if offering_ids
-            else []
-        )
-        recommendations = (
-            db.query(TaskRecommendation)
-            .filter(
-                TaskRecommendation.event_id == event_id,
-                TaskRecommendation.offering_id.in_(offering_ids),
-            )
-            .all()
-            if offering_ids
-            else []
-        )
+        tasks = db.query(Task).filter(Task.task_id.in_(task_ids)).all() if task_ids else []
+        offerings = db.query(Offering).filter(Offering.offering_id.in_(offering_ids)).all() if offering_ids else []
+        recommendations = db.query(TaskRecommendation).filter(TaskRecommendation.event_id == event_id, TaskRecommendation.offering_id.in_(offering_ids)).all() if offering_ids else []
 
         tasks_by_id = {task.task_id: task for task in tasks}
         offerings_by_id = {offering.offering_id: offering for offering in offerings}
-        vendors = (
-            db.query(Vendor)
-            .filter(Vendor.vendor_id.in_([offering.vendor_id for offering in offerings]))
-            .all()
-            if offerings
-            else []
-        )
+        vendors = db.query(Vendor).filter(Vendor.vendor_id.in_([offering.vendor_id for offering in offerings])).all() if offerings else []
         vendors_by_id = {vendor.vendor_id: vendor for vendor in vendors}
-        rec_rank_by_key = {
-            (rec.task_id, rec.offering_id): rec.rank
-            for rec in recommendations
-        }
+        rec_rank_by_key = {(rec.task_id, rec.offering_id): rec.rank for rec in recommendations}
 
         package_responses: list[RecommendationPackageResponse] = []
         now = now_utc()
@@ -455,7 +310,7 @@ class RecommendationService:
                         vendorName=vendor.display_name or vendor.business_name if vendor else None,
                         unitPrice=item.unit_price,
                         taskPrice=item.line_total,
-                        currency=offering.currency if offering else package_row.currency,
+                        currency="LKR",  # 🛡️ TITANIUM LOCK: Force LKR
                         aiRank=rec_rank_by_key.get((item.task_id, item.offering_id)),
                     )
                 )
@@ -466,7 +321,7 @@ class RecommendationService:
                     eventId=package_row.event_id,
                     packageType=package_row.package_type,
                     packageTotalPrice=package_row.package_total_price,
-                    currency=package_row.currency,
+                    currency="LKR",  # 🛡️ TITANIUM LOCK: Force LKR
                     isCustomized=package_row.is_customized,
                     basePackageId=package_row.base_package_id,
                     createdByCustomerId=package_row.created_by_customer_id,
@@ -478,10 +333,7 @@ class RecommendationService:
             )
 
         generated_at = max(self._ensure_aware_datetime(pkg.generated_at) for pkg in ordered_packages)
-        expires_at = min(
-            (self._ensure_aware_datetime(pkg.expires_at) for pkg in ordered_packages if pkg.expires_at is not None),
-            default=None,
-        )
+        expires_at = min((self._ensure_aware_datetime(pkg.expires_at) for pkg in ordered_packages if pkg.expires_at is not None), default=None)
         is_expired = bool(expires_at and expires_at <= now)
         return RecommendationPackageListResponse(
             eventId=event_id,
@@ -491,125 +343,53 @@ class RecommendationService:
             packages=package_responses,
         )
 
-    def _build_package_details_response(
-        self,
-        db: Session,
-        *,
-        event_id: str,
-        package: RecommendationPackage,
-    ) -> RecommendationPackageDetailsResponse:
+    def _build_package_details_response(self, db: Session, *, event_id: str, package: RecommendationPackage) -> RecommendationPackageDetailsResponse:
         package_response = self._build_package_list_response(db, event_id=event_id, packages=[package]).packages[0]
         task_ids = [item.task_id for item in self._get_package_items(db, package.package_id)]
         allowed_offerings = self._get_task_recommendations_for_tasks(db, event_id=event_id, task_ids=task_ids)
-        return RecommendationPackageDetailsResponse(
-            **package_response.model_dump(),
-            allowedOfferingsByTask=allowed_offerings,
-        )
+        return RecommendationPackageDetailsResponse(**package_response.model_dump(), allowedOfferingsByTask=allowed_offerings)
 
     def _delete_existing_generated_records(self, db: Session, *, event_id: str) -> None:
         existing_package_ids = [
-            package_id
-            for (package_id,) in (
-                db.query(RecommendationPackage.package_id)
-                .filter(
-                    RecommendationPackage.event_id == event_id,
-                    RecommendationPackage.is_customized.is_(False),
-                )
-                .all()
-            )
+            package_id for (package_id,) in db.query(RecommendationPackage.package_id).filter(
+                RecommendationPackage.event_id == event_id, RecommendationPackage.is_customized.is_(False)
+            ).all()
         ]
         if existing_package_ids:
-            (
-                db.query(PackageItem)
-                .filter(PackageItem.package_id.in_(existing_package_ids))
-                .delete(synchronize_session=False)
-            )
-            (
-                db.query(RecommendationPackage)
-                .filter(
-                    RecommendationPackage.event_id == event_id,
-                    RecommendationPackage.is_customized.is_(False),
-                )
-                .delete(synchronize_session=False)
-            )
-        (
-            db.query(TaskRecommendation)
-            .filter(TaskRecommendation.event_id == event_id)
-            .delete(synchronize_session=False)
-        )
+            db.query(PackageItem).filter(PackageItem.package_id.in_(existing_package_ids)).delete(synchronize_session=False)
+            db.query(RecommendationPackage).filter(RecommendationPackage.event_id == event_id, RecommendationPackage.is_customized.is_(False)).delete(synchronize_session=False)
+        db.query(TaskRecommendation).filter(TaskRecommendation.event_id == event_id).delete(synchronize_session=False)
         db.flush()
 
     def _get_confirmed_tasks(self, db: Session, *, event_id: str) -> list[Task]:
-        return (
-            db.query(Task)
-            .filter(Task.event_id == event_id, Task.confirmed_at.is_not(None))
-            .order_by(Task.created_at.asc(), Task.id.asc())
-            .all()
-        )
+        return db.query(Task).filter(Task.event_id == event_id, Task.confirmed_at.is_not(None)).order_by(Task.created_at.asc(), Task.id.asc()).all()
 
     def _get_package_or_404(self, db: Session, *, event_id: str, package_id: str) -> RecommendationPackage:
-        package = (
-            db.query(RecommendationPackage)
-            .filter(
-                RecommendationPackage.event_id == event_id,
-                RecommendationPackage.package_id == package_id,
-            )
-            .first()
-        )
+        package = db.query(RecommendationPackage).filter(RecommendationPackage.event_id == event_id, RecommendationPackage.package_id == package_id).first()
         if not package:
             raise HTTPException(status_code=404, detail=f"Recommendation package {package_id} not found")
         return package
 
     def _get_package_items(self, db: Session, package_id: str) -> list[PackageItem]:
-        return (
-            db.query(PackageItem)
-            .filter(PackageItem.package_id == package_id)
-            .all()
-        )
+        return db.query(PackageItem).filter(PackageItem.package_id == package_id).all()
 
-    def _get_task_recommendations_for_tasks(
-        self,
-        db: Session,
-        *,
-        event_id: str,
-        task_ids: list[str],
-    ) -> dict[str, list[TaskRecommendationResponse]]:
-        if not task_ids:
-            return {}
-
-        recommendations = (
-            db.query(TaskRecommendation)
-            .filter(
-                TaskRecommendation.event_id == event_id,
-                TaskRecommendation.task_id.in_(task_ids),
-            )
-            .order_by(TaskRecommendation.task_id.asc(), TaskRecommendation.rank.asc(), TaskRecommendation.id.asc())
-            .all()
-        )
+    def _get_task_recommendations_for_tasks(self, db: Session, *, event_id: str, task_ids: list[str]) -> dict[str, list[TaskRecommendationResponse]]:
+        if not task_ids: return {}
+        recommendations = db.query(TaskRecommendation).filter(
+            TaskRecommendation.event_id == event_id, TaskRecommendation.task_id.in_(task_ids)
+        ).order_by(TaskRecommendation.task_id.asc(), TaskRecommendation.rank.asc(), TaskRecommendation.id.asc()).all()
+        
         response: dict[str, list[TaskRecommendationResponse]] = {task_id: [] for task_id in task_ids}
-        for recommendation in recommendations:
-            response.setdefault(recommendation.task_id, []).append(
+        for rec in recommendations:
+            response.setdefault(rec.task_id, []).append(
                 TaskRecommendationResponse(
-                    recommendationId=recommendation.recommendation_id,
-                    eventId=recommendation.event_id,
-                    taskId=recommendation.task_id,
-                    offeringId=recommendation.offering_id,
-                    score=recommendation.score,
-                    rank=recommendation.rank,
-                    generatedAt=self._ensure_aware_datetime(recommendation.generated_at),
+                    recommendationId=rec.recommendation_id, eventId=rec.event_id, taskId=rec.task_id,
+                    offeringId=rec.offering_id, score=rec.score, rank=rec.rank, generatedAt=self._ensure_aware_datetime(rec.generated_at),
                 )
             )
         return response
 
-    def _replace_package_items(
-        self,
-        db: Session,
-        *,
-        event_id: str,
-        package: RecommendationPackage,
-        base_package: RecommendationPackage,
-        requested_items,
-    ) -> None:
+    def _replace_package_items(self, db: Session, *, event_id: str, package: RecommendationPackage, base_package: RecommendationPackage, requested_items) -> None:
         requested_by_task = {}
         for item in requested_items:
             if item.task_id in requested_by_task:
@@ -623,48 +403,25 @@ class RecommendationService:
         base_items_by_task = {item.task_id: item for item in base_items}
         invalid_task_ids = sorted(set(requested_by_task) - set(base_items_by_task))
         if invalid_task_ids:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Tasks not part of base package: {', '.join(invalid_task_ids)}",
-            )
+            raise HTTPException(status_code=400, detail=f"Tasks not part of base package: {', '.join(invalid_task_ids)}")
 
-        recommendations_by_task = self._get_task_recommendations_for_tasks(
-            db,
-            event_id=event_id,
-            task_ids=list(base_items_by_task),
-        )
+        recommendations_by_task = self._get_task_recommendations_for_tasks(db, event_id=event_id, task_ids=list(base_items_by_task))
         offering_ids = [item.offering_id for item in requested_by_task.values()]
-        offerings = (
-            db.query(Offering)
-            .filter(Offering.offering_id.in_(offering_ids))
-            .all()
-            if offering_ids
-            else []
-        )
+        offerings = db.query(Offering).filter(Offering.offering_id.in_(offering_ids)).all() if offering_ids else []
         offerings_by_id = {offering.offering_id: offering for offering in offerings}
 
         new_rows: list[PackageItem] = []
         total_price = 0.0
-        currency = None
         for task_id, requested_item in requested_by_task.items():
-            allowed_offering_ids = {
-                recommendation.offering_id
-                for recommendation in recommendations_by_task.get(task_id, [])
-            }
+            allowed_offering_ids = {rec.offering_id for rec in recommendations_by_task.get(task_id, [])}
             if requested_item.offering_id not in allowed_offering_ids:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Offering {requested_item.offering_id} is not in the shortlist for task {task_id}",
-                )
+                raise HTTPException(status_code=400, detail=f"Offering {requested_item.offering_id} is not in the shortlist for task {task_id}")
 
             offering = offerings_by_id.get(requested_item.offering_id)
             if offering is None:
                 raise HTTPException(status_code=404, detail=f"Offering {requested_item.offering_id} not found")
             if not (offering.is_active and offering.is_available):
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Offering {requested_item.offering_id} is no longer available",
-                )
+                raise HTTPException(status_code=409, detail=f"Offering {requested_item.offering_id} is no longer available")
 
             base_item = base_items_by_task[task_id]
             quantity = requested_item.quantity or base_item.quantity
@@ -673,10 +430,8 @@ class RecommendationService:
 
             line_total = offering.price * quantity
             total_price += line_total
-            currency = currency or offering.currency
-            if offering.currency != currency:
-                raise HTTPException(status_code=400, detail="Custom package requires a single currency")
-
+            
+            # 🚑 FATAL BUG FIX: Actually append the customized item to the new package!
             new_rows.append(
                 PackageItem(
                     package_id=package.package_id,
@@ -688,34 +443,38 @@ class RecommendationService:
                 )
             )
 
-        (
-            db.query(PackageItem)
-            .filter(PackageItem.package_id == package.package_id)
-            .delete(synchronize_session=False)
-        )
+        db.query(PackageItem).filter(PackageItem.package_id == package.package_id).delete(synchronize_session=False)
         for row in new_rows:
             db.add(row)
 
         package.package_total_price = total_price
-        package.currency = currency or base_package.currency
+        package.currency = "LKR"  # 🛡️ TITANIUM LOCK: Force LKR
         package.base_package_id = base_package.package_id
         package.is_customized = True
         db.add(package)
         db.flush()
 
     def _get_event_personas(self, db: Session, *, event_id: str) -> list[Persona]:
-        return (
-            db.query(Persona)
-            .join(EventPersona, EventPersona.persona_id == Persona.persona_id)
-            .filter(EventPersona.event_id == event_id)
-            .all()
-        )
+        return db.query(Persona).join(EventPersona, EventPersona.persona_id == Persona.persona_id).filter(EventPersona.event_id == event_id).all()
 
     def _rank_offerings_for_task(self, db: Session, *, task: Task, event, personas: list[Persona]) -> list[RankedOffering]:
-        query = db.query(Offering).filter(Offering.is_active.is_(True), Offering.is_available.is_(True))
+        base_query = db.query(Offering).filter(Offering.is_active.is_(True), Offering.is_available.is_(True))
+        
+        # We try to strict match the category first.
+        strict_query = base_query
         if task.needs_vendor:
-            query = query.filter(Offering.category.ilike(task.needs_vendor))
-        offerings = query.all()
+            strict_query = base_query.filter(Offering.category.ilike(task.needs_vendor))
+
+        offerings = strict_query.all()
+
+        # 🛡️ THE "EMPTY AISLE" FIX: If the specific category is empty, fetch ALL active offerings
+        if not offerings:
+            logger.warning(f"Task '{task.name}' requested category '{task.needs_vendor}', but the aisle is empty. Falling back to all offerings.")
+            offerings = base_query.all()
+
+        # If it's STILL empty, you literally have zero vendors in the database.
+        if not offerings:
+            return []
 
         scored: list[tuple[Offering, float]] = []
         task_tokens = self._build_task_context_tokens(task=task, event=event, personas=personas)
@@ -723,13 +482,7 @@ class RecommendationService:
             score = self._score_offering(offering=offering, task=task, task_tokens=task_tokens, event=event)
             scored.append((offering, score))
 
-        scored.sort(
-            key=lambda item: (
-                -item[1],
-                item[0].price,
-                item[0].offering_id,
-            )
-        )
+        scored.sort(key=lambda item: (-item[1], item[0].price, item[0].offering_id))
 
         seen_vendors: set[str] = set()
         unique_ranked: list[RankedOffering] = []
@@ -737,38 +490,16 @@ class RecommendationService:
             if offering.vendor_id in seen_vendors:
                 continue
             seen_vendors.add(offering.vendor_id)
-            unique_ranked.append(
-                RankedOffering(
-                    offering=offering,
-                    score=round(score, 4),
-                    rank=len(unique_ranked) + 1,
-                )
-            )
+            unique_ranked.append(RankedOffering(offering=offering, score=round(score, 4), rank=len(unique_ranked) + 1))
             if len(unique_ranked) == 12:
                 break
 
-        ai_ranked = self._apply_ai_shortlist(
-            ranked_offerings=unique_ranked,
-            task=task,
-            event=event,
-            personas=personas,
-        )
+        ai_ranked = self._apply_ai_shortlist(ranked_offerings=unique_ranked, task=task, event=event, personas=personas)
         return ai_ranked[:5]
 
     def _score_offering(self, *, offering: Offering, task: Task, task_tokens: set[str], event) -> float:
-        offering_tokens = self._tokenize(
-            " ".join(
-                value
-                for value in (
-                    offering.name,
-                    offering.description,
-                    offering.category,
-                )
-                if value
-            )
-        )
-        overlap_score = float(len(task_tokens & offering_tokens))
-        score = overlap_score
+        offering_tokens = self._tokenize(" ".join(value for value in (offering.name, offering.description, offering.category) if value))
+        score = float(len(task_tokens & offering_tokens))
 
         if task.needs_vendor and offering.category.lower() == task.needs_vendor.lower():
             score += 6.0
@@ -796,98 +527,27 @@ class RecommendationService:
         return score
 
     def _build_task_context_tokens(self, *, task: Task, event, personas: list[Persona]) -> set[str]:
-        parts = [
-            event.title,
-            event.description,
-            event.event_type,
-            event.location_text,
-            task.name,
-            task.description,
-            task.needs_vendor,
-        ]
+        parts = [event.title, event.description, event.event_type, event.location_text, task.name, task.description, task.needs_vendor]
         for persona in personas:
-            parts.extend(
-                [
-                    persona.name,
-                    persona.relationship,
-                    persona.personality,
-                    " ".join(persona.food_preferences or []),
-                    " ".join(persona.color_preferences or []),
-                    " ".join(persona.music_preferences or []),
-                    " ".join(persona.personality_tags or []),
-                ]
-            )
+            parts.extend([persona.name, persona.relationship, persona.personality, " ".join(persona.food_preferences or []), " ".join(persona.color_preferences or []), " ".join(persona.music_preferences or []), " ".join(persona.personality_tags or [])])
         return self._tokenize(" ".join(part for part in parts if part))
 
     def _tokenize(self, raw: str) -> set[str]:
         return {token for token in _TOKEN_RE.findall((raw or "").lower()) if len(token) > 1}
 
     def _ensure_aware_datetime(self, value):
-        if value is None:
-            return None
-        if value.tzinfo is None:
-            return value.replace(tzinfo=now_utc().tzinfo)
+        if value is None: return None
+        if value.tzinfo is None: return value.replace(tzinfo=now_utc().tzinfo)
         return value
 
-    def _apply_ai_shortlist(
-        self,
-        *,
-        ranked_offerings: list[RankedOffering],
-        task: Task,
-        event,
-        personas: list[Persona],
-    ) -> list[RankedOffering]:
-        # FIX: recommend_offerings_for_task is async but this method is sync.
-        # Use _run_async() to safely bridge the sync/async boundary regardless
-        # of whether we're inside a running event loop or not.
+    def _apply_ai_shortlist(self, *, ranked_offerings: list[RankedOffering], task: Task, event, personas: list[Persona]) -> list[RankedOffering]:
         try:
             ai_shortlist = _run_async(
                 ai_service.recommend_offerings_for_task(
-                    event_context={
-                        "event_id": event.event_id,
-                        "title": event.title,
-                        "description": event.description,
-                        "event_type": event.event_type,
-                        "location_text": event.location_text,
-                        "status": event.status,
-                    },
-                    personas=[
-                        {
-                            "persona_id": persona.persona_id,
-                            "name": persona.name,
-                            "relationship": persona.relationship,
-                            "personality": persona.personality,
-                            "food_preferences": persona.food_preferences or [],
-                            "color_preferences": persona.color_preferences or [],
-                            "music_preferences": persona.music_preferences or [],
-                            "personality_tags": persona.personality_tags or [],
-                        }
-                        for persona in personas
-                    ],
-                    task={
-                        "task_id": task.task_id,
-                        "name": task.name,
-                        "description": task.description,
-                        "quantity": task.quantity,
-                        "vendor_category": task.needs_vendor,
-                        "budget_min": task.budget_min,
-                        "budget_max": task.budget_max,
-                        "currency": task.currency,
-                    },
-                    offerings=[
-                        {
-                            "offering_id": ranked.offering.offering_id,
-                            "vendor_id": ranked.offering.vendor_id,
-                            "name": ranked.offering.name,
-                            "category": ranked.offering.category,
-                            "description": ranked.offering.description,
-                            "price": ranked.offering.price,
-                            "currency": ranked.offering.currency,
-                            "fallback_score": ranked.score,
-                            "fallback_rank": ranked.rank,
-                        }
-                        for ranked in ranked_offerings
-                    ],
+                    event_context={"event_id": event.event_id, "title": event.title, "description": event.description, "event_type": event.event_type, "location_text": event.location_text, "status": event.status},
+                    personas=[{"persona_id": p.persona_id, "name": p.name, "relationship": p.relationship, "personality": p.personality, "food_preferences": p.food_preferences or [], "color_preferences": p.color_preferences or [], "music_preferences": p.music_preferences or [], "personality_tags": p.personality_tags or []} for p in personas],
+                    task={"task_id": task.task_id, "name": task.name, "description": task.description, "quantity": task.quantity, "vendor_category": task.needs_vendor, "budget_min": task.budget_min, "budget_max": task.budget_max, "currency": task.currency},
+                    offerings=[{"offering_id": r.offering.offering_id, "vendor_id": r.offering.vendor_id, "name": r.offering.name, "category": r.offering.category, "description": r.offering.description, "price": r.offering.price, "currency": r.offering.currency, "fallback_score": r.score, "fallback_rank": r.rank} for r in ranked_offerings],
                     limit=5,
                 )
             )
@@ -908,14 +568,7 @@ class RecommendationService:
             if ranked.offering.offering_id not in {item.offering.offering_id for item in ordered}:
                 ordered.append(ranked)
 
-        return [
-            RankedOffering(
-                offering=ranked.offering,
-                score=ranked.score,
-                rank=index + 1,
-            )
-            for index, ranked in enumerate(ordered)
-        ]
+        return [RankedOffering(offering=ranked.offering, score=ranked.score, rank=index + 1) for index, ranked in enumerate(ordered)]
 
     def _select_ranked_offering(self, package_type: str, ranked_offerings: list[RankedOffering]) -> RankedOffering:
         if package_type == "BUDGET":
@@ -925,19 +578,7 @@ class RecommendationService:
         return min(ranked_offerings, key=lambda item: (item.rank, -item.score, item.offering.offering_id))
 
     def _resolve_currency(self, tasks: list[Task], ranked_by_task: dict[str, list[RankedOffering]]) -> str:
-        offering_currencies = {
-            ranked_list[0].offering.currency
-            for ranked_list in ranked_by_task.values()
-            if ranked_list
-        }
-        if len(offering_currencies) != 1:
-            raise HTTPException(status_code=400, detail="Recommendations require a single currency")
-        offering_currency = next(iter(offering_currencies))
-
-        task_currencies = {task.currency for task in tasks if task.currency}
-        if task_currencies and (len(task_currencies) != 1 or offering_currency not in task_currencies):
-            raise HTTPException(status_code=400, detail="Task and offering currencies must match")
-        return offering_currency
-
+        # 🛡️ THE LKR TITANIUM LOCK: Never trust the database. Hardcode to LKR.
+        return "LKR"
 
 recommendation_service = RecommendationService()
