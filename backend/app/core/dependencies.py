@@ -19,7 +19,7 @@ from app.models.vendor import Vendor
 # ── OAuth2 schemes ────────────────────────────────────────────────────────────
 # Singular paths so the FastAPI Swagger UI 'Authorize' button works properly
 oauth2_customer_scheme = OAuth2PasswordBearer(
-    tokenUrl="/api/v1/auth/customer/login", scheme_name="CustomerAuth"
+    tokenUrl="/api/v1/auth/customer/login", scheme_name="CustomerAuth", auto_error=False
 )
 oauth2_vendor_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/vendor/login", scheme_name="VendorAuth"
@@ -32,7 +32,7 @@ oauth2_admin_scheme = OAuth2PasswordBearer(
 # ── Customer dependency ───────────────────────────────────────────────────────
 
 def get_current_customer(
-    token: str = Depends(oauth2_customer_scheme),
+    token: str | None = Depends(oauth2_customer_scheme),
     db: Session = Depends(get_db),
     request: Request = None,
 ) -> Customer:
@@ -41,7 +41,12 @@ def get_current_customer(
         detail="Invalid or expired token. Please log in.",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if not token and request is not None:
+        token = request.cookies.get("customerToken") or request.cookies.get("accessToken")
+
     try:
+        if not token:
+            raise credentials_exception
         payload = _security.decode_token(token)
         email: str = payload.get("sub")
         if email is None:

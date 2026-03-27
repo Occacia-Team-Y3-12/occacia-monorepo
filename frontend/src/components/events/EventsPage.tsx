@@ -60,6 +60,66 @@ const formatUpdatedAt = (value: string) => {
   }).format(date)}`;
 };
 
+const currencyFormatter = new Intl.NumberFormat('en-LK', {
+  style: 'currency',
+  currency: 'LKR',
+  maximumFractionDigits: 0,
+});
+
+const parseFactsSummary = (description: string): string | null => {
+  const match = description.match(/^\s*\[FACTS:([^\]]+)\]\s*$/i);
+  if (!match) return null;
+
+  const rawParts = match[1].split(',').map((part) => part.trim()).filter(Boolean);
+  if (rawParts.length === 0) return null;
+
+  const parts: string[] = [];
+
+  rawParts.forEach((entry) => {
+    const [rawKey, ...rest] = entry.split('=');
+    const key = rawKey?.trim();
+    const value = rest.join('=').trim();
+    if (!key || !value) return;
+
+    if (key === 'guest_count') {
+      const count = Number(value);
+      if (!Number.isNaN(count)) {
+        parts.push(`${count} guest${count === 1 ? '' : 's'}`);
+      }
+      return;
+    }
+
+    if (key === 'budget_total') {
+      const amount = Number(value);
+      if (!Number.isNaN(amount)) {
+        parts.push(`Budget ${currencyFormatter.format(amount)}`);
+      }
+      return;
+    }
+
+    if (key === 'budget_per_head') {
+      const amount = Number(value);
+      if (!Number.isNaN(amount)) {
+        parts.push(`${currencyFormatter.format(amount)} per head`);
+      }
+      return;
+    }
+
+    if (key === 'event_purpose') {
+      parts.push(`Purpose: ${value}`);
+      return;
+    }
+  });
+
+  return parts.length ? parts.join(' · ') : null;
+};
+
+const getEventDescription = (description?: string | null) => {
+  const trimmed = description?.trim();
+  if (!trimmed) return 'No description added yet.';
+  return parseFactsSummary(trimmed) ?? trimmed;
+};
+
 const getEventHref = (event: CustomerEventSummary) =>
   event.status.trim().toLowerCase() === 'draft'
     ? ROUTES.CUSTOMER.EVENT_CHAT(event.eventId)
@@ -249,8 +309,8 @@ export default function EventsPage() {
                   </span>
                 </div>
 
-                <p className="mt-4 flex-1 text-sm leading-7 text-[#5B6780]">
-                  {event.description?.trim() || 'No description added yet.'}
+                <p className="mt-4 flex-1 break-words text-sm leading-7 text-[#5B6780] line-clamp-3">
+                  {getEventDescription(event.description)}
                 </p>
 
                 <div className="mt-5 space-y-3 text-sm text-[#4A5976]">

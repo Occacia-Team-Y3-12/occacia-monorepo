@@ -1929,7 +1929,7 @@
                 }
               ]
             },
-            "description": "Get package details (UC-15)"
+            "description": "Get package details (UC-15). Returns 404 if the package is not available (contains unavailable offerings)."
           },
           "response": []
         },
@@ -1973,7 +1973,7 @@
                 }
               ]
             },
-            "description": "Update custom package (UC-16)",
+            "description": "Update custom package (UC-16). If the package is system-generated, this call creates (or reuses) a custom package and returns it.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"items\": [\n    {\n      \"packageItemId\": \"00000000-0000-0000-0000-000000000000\",\n      \"packageId\": \"00000000-0000-0000-0000-000000000000\",\n      \"taskId\": \"00000000-0000-0000-0000-000000000000\",\n      \"offeringId\": \"00000000-0000-0000-0000-000000000000\",\n      \"quantity\": 0,\n      \"unitPrice\": 0,\n      \"lineTotal\": 0\n    }\n  ]\n}",

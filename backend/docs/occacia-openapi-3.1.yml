@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Occacia API
-  version: 1.1.4
+  version: 1.1.5
   description: 'Occacia API contract aligned with use cases, EERD, and class diagram.
     Core flow: Event -> Tasks -> Recommendations -> Packages -> Confirm Package ->
     Package Order -> Vendor Fulfillment Requests -> Task execution.
@@ -29,6 +29,10 @@ info:
     account deletion (customer/vendor/admin), task offering list and select,
     vendor task dashboard stats, admin notifications, and admin package order
     cancellation.
+
+    Update 1.1.5: Added recommendation package item availability, documented
+    package detail 404 when offerings are unavailable, and noted system package
+    update behavior (custom package creation).
 
     '
 servers:
@@ -2078,10 +2082,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/PackageDetailsResponse'
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: Package not found or not available (contains unavailable offerings)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
     put:
       tags: [Customer]
       summary: Update custom package (UC-16)
+      description: >
+        If the package is system-generated, this call creates (or reuses) a custom
+        package for the customer and returns the updated custom package.
       requestBody:
         required: true
         content:
@@ -4016,6 +4027,39 @@ components:
         lineTotal:
           type: number
 
+    RecommendationPackageItem:
+      type: object
+      required:
+        [taskId, taskName, quantity, offeringId, offeringName, offeringCategory, vendorId, unitPrice, taskPrice, currency, isAvailable]
+      properties:
+        taskId:
+          $ref: '#/components/schemas/UUID'
+        taskName:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        offeringId:
+          $ref: '#/components/schemas/UUID'
+        offeringName:
+          type: string
+        offeringCategory:
+          type: string
+        vendorId:
+          $ref: '#/components/schemas/UUID'
+        vendorName:
+          type: string
+        unitPrice:
+          type: number
+        taskPrice:
+          type: number
+        currency:
+          type: string
+        aiRank:
+          type: integer
+        isAvailable:
+          type: boolean
+
     RecommendationPackage:
       type: object
       required: [packageId, eventId, packageType, currency, packageTotalPrice, generatedAt, updatedAt]
@@ -4043,7 +4087,7 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/PackageItem'
+            $ref: '#/components/schemas/RecommendationPackageItem'
 
     PackageListResponse:
       type: object

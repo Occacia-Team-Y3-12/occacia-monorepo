@@ -8,7 +8,10 @@ export async function POST(
 ) {
   try {
     const { personaId } = await params;
-    const token = request.cookies.get('auth_token')?.value;
+    const token =
+      request.cookies.get('auth_token')?.value ||
+      request.cookies.get('customerToken')?.value ||
+      request.cookies.get('accessToken')?.value;
     
     const response = await fetch(`${BACKEND_URL}/api/v1/customers/personas/${personaId}/confirm`, {
       method: 'POST',
@@ -34,7 +37,10 @@ export async function DELETE(
 ) {
   try {
     const { personaId } = await params;
-    const token = request.cookies.get('auth_token')?.value;
+    const token =
+      request.cookies.get('auth_token')?.value ||
+      request.cookies.get('customerToken')?.value ||
+      request.cookies.get('accessToken')?.value;
     
     const response = await fetch(`${BACKEND_URL}/api/v1/customers/personas/${personaId}/confirm`, {
       method: 'DELETE',

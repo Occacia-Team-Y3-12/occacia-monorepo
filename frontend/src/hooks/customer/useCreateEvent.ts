@@ -211,7 +211,37 @@ export const useCreateEvent = (initialTemplate?: string) => {
       }
 
       if (selectedPersonaIds.length > 0) {
-        void customerEventService.updatePersonas(eventId, { personaIds: selectedPersonaIds });
+        const isLocalPersonaId = (id: string) => id.startsWith('persona_');
+        const existingPersonaIds = selectedPersonaIds.filter((id) => !isLocalPersonaId(id));
+        const localSelected = personas.filter(
+          (persona) => selectedPersonaIds.includes(persona.id) && isLocalPersonaId(persona.id)
+        );
+
+        let createdPersonaIds: string[] = [];
+        if (localSelected.length > 0) {
+          const results = await Promise.allSettled(
+            localSelected.map((persona) =>
+              customerPersonaService.createPersona({
+                name: persona.name,
+                relationship: persona.role || null,
+              })
+            )
+          );
+
+          createdPersonaIds = results
+            .filter((result) => result.status === 'fulfilled' && result.value.ok && result.value.data)
+            .map((result) => (result as PromiseFulfilledResult<any>).value.data.persona_id)
+            .filter((id) => Boolean(id));
+
+          if (createdPersonaIds.length !== localSelected.length) {
+            console.warn('Some personas failed to save before attaching to the event.');
+          }
+        }
+
+        const personaIdsToAttach = [...existingPersonaIds, ...createdPersonaIds];
+        if (personaIdsToAttach.length > 0) {
+          void customerEventService.updatePersonas(eventId, { personaIds: personaIdsToAttach });
+        }
       }
 
       router.push(ROUTES.CUSTOMER.EVENT_CHAT(eventId));
