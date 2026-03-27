@@ -18,6 +18,7 @@ class RecommendationPackageItemResponse(BaseModel):
     task_price: float = Field(alias="taskPrice")
     currency: str
     ai_rank: int | None = Field(default=None, alias="aiRank")
+    is_available: bool = Field(alias="isAvailable")
 
     model_config = {"populate_by_name": True}
 

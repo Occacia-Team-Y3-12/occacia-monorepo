@@ -75,6 +75,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-false}
       SKIP_EMAIL_VERIFICATION: ${SKIP_EMAIL_VERIFICATION:-false}
+      NOTIFICATION_AUTH_EMAILS_ONLY: ${NOTIFICATION_AUTH_EMAILS_ONLY:-true}
+      NOTIFICATION_ALLOWED_TYPES: ${NOTIFICATION_ALLOWED_TYPES:-}
     extra_hosts:
       # Allows backend container to reach Postfix on the host machine
       - "host.docker.internal:host-gateway"

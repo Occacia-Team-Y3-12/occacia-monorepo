@@ -234,22 +234,60 @@ class RecommendationService:
     def update_custom_package(self, db: Session, *, customer_id: str, event_id: str, package_id: str, request: UpdateCustomPackageRequest) -> RecommendationPackageDetailsResponse:
         event_planning_service.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
         package = self._get_package_or_404(db, event_id=event_id, package_id=package_id)
-        if not package.is_customized:
-            raise HTTPException(status_code=400, detail="Only custom packages can be updated")
-        if package.created_by_customer_id and package.created_by_customer_id != customer_id:
-            raise HTTPException(status_code=403, detail="Custom package does not belong to this customer")
 
-        base_package = self._get_package_or_404(db, event_id=event_id, package_id=package.base_package_id or package.package_id)
+        if package.is_customized:
+            if package.created_by_customer_id and package.created_by_customer_id != customer_id:
+                raise HTTPException(status_code=403, detail="Custom package does not belong to this customer")
+            base_package = self._get_package_or_404(
+                db,
+                event_id=event_id,
+                package_id=package.base_package_id or package.package_id,
+            )
+            target_package = package
+        else:
+            # Allow updating a system package by creating (or reusing) a custom variant.
+            base_package = package
+            target_package = (
+                db.query(RecommendationPackage)
+                .filter(
+                    RecommendationPackage.event_id == event_id,
+                    RecommendationPackage.base_package_id == package.package_id,
+                    RecommendationPackage.created_by_customer_id == customer_id,
+                    RecommendationPackage.is_customized.is_(True),
+                )
+                .order_by(RecommendationPackage.generated_at.desc())
+                .first()
+            )
+            if target_package is None:
+                target_package = RecommendationPackage(
+                    event_id=event_id,
+                    package_type="CUSTOM",
+                    package_total_price=0.0,
+                    currency=base_package.currency,
+                    is_customized=True,
+                    base_package_id=base_package.package_id,
+                    created_by_customer_id=customer_id,
+                    generated_at=now_utc(),
+                    expires_at=base_package.expires_at,
+                )
+                db.add(target_package)
+                db.flush()
 
         try:
-            self._replace_package_items(db, event_id=event_id, package=package, base_package=base_package, requested_items=request.items)
+            self._replace_package_items(
+                db,
+                event_id=event_id,
+                package=target_package,
+                base_package=base_package,
+                requested_items=request.items,
+            )
             db.commit()
         except Exception:
             db.rollback()
             raise
 
-        db.refresh(package)
-        return self._build_package_details_response(db, event_id=event_id, package=package)
+        db.refresh(target_package)
+        return self._build_package_details_response(db, event_id=event_id, package=target_package)
 
     def delete_custom_package(self, db: Session, *, customer_id: str, event_id: str, package_id: str) -> None:
         event_planning_service.get_event_for_customer(db, customer_id=customer_id, event_id=event_id)
@@ -285,6 +323,7 @@ class RecommendationService:
         rec_rank_by_key = {(rec.task_id, rec.offering_id): rec.rank for rec in recommendations}
 
         package_responses: list[RecommendationPackageResponse] = []
+        kept_packages: list[RecommendationPackage] = []
         now = now_utc()
         for package_row in ordered_packages:
             generated_at = self._ensure_aware_datetime(package_row.generated_at)
@@ -294,10 +333,15 @@ class RecommendationService:
                 items_by_package.get(package_row.package_id, []),
                 key=lambda item: tasks_by_id.get(item.task_id).created_at if tasks_by_id.get(item.task_id) else now,
             )
+            has_unavailable_item = False
             for item in sorted_items:
                 task = tasks_by_id.get(item.task_id)
                 offering = offerings_by_id.get(item.offering_id)
                 vendor = vendors_by_id.get(offering.vendor_id) if offering else None
+                is_available = bool(offering and offering.is_active and offering.is_available)
+                if not is_available:
+                    has_unavailable_item = True
+                    break
                 item_responses.append(
                     RecommendationPackageItemResponse(
                         taskId=item.task_id,
@@ -312,9 +356,13 @@ class RecommendationService:
                         taskPrice=item.line_total,
                         currency="LKR",  # 🛡️ TITANIUM LOCK: Force LKR
                         aiRank=rec_rank_by_key.get((item.task_id, item.offering_id)),
+                        isAvailable=is_available,
                     )
                 )
+            if has_unavailable_item:
+                continue
             is_expired = bool(expires_at and expires_at <= now)
+            kept_packages.append(package_row)
             package_responses.append(
                 RecommendationPackageResponse(
                     packageId=package_row.package_id,
@@ -332,8 +380,15 @@ class RecommendationService:
                 )
             )
 
-        generated_at = max(self._ensure_aware_datetime(pkg.generated_at) for pkg in ordered_packages)
-        expires_at = min((self._ensure_aware_datetime(pkg.expires_at) for pkg in ordered_packages if pkg.expires_at is not None), default=None)
+        if kept_packages:
+            generated_at = max(self._ensure_aware_datetime(pkg.generated_at) for pkg in kept_packages)
+            expires_at = min(
+                (self._ensure_aware_datetime(pkg.expires_at) for pkg in kept_packages if pkg.expires_at is not None),
+                default=None,
+            )
+        else:
+            generated_at = now
+            expires_at = None
         is_expired = bool(expires_at and expires_at <= now)
         return RecommendationPackageListResponse(
             eventId=event_id,
@@ -344,7 +399,10 @@ class RecommendationService:
         )
 
     def _build_package_details_response(self, db: Session, *, event_id: str, package: RecommendationPackage) -> RecommendationPackageDetailsResponse:
-        package_response = self._build_package_list_response(db, event_id=event_id, packages=[package]).packages[0]
+        package_list = self._build_package_list_response(db, event_id=event_id, packages=[package]).packages
+        if not package_list:
+            raise HTTPException(status_code=404, detail="Package not available")
+        package_response = package_list[0]
         task_ids = [item.task_id for item in self._get_package_items(db, package.package_id)]
         allowed_offerings = self._get_task_recommendations_for_tasks(db, event_id=event_id, task_ids=task_ids)
         return RecommendationPackageDetailsResponse(**package_response.model_dump(), allowedOfferingsByTask=allowed_offerings)
